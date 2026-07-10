@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>СКРИН-СТУДИЯ · зонд</title>
+<style>
+  :root{
+    --ink:#E8E3D8;        /* тёплый песок */
+    --sea:#0B0F14;        /* глубокая ночь */
+    --surface:#121A22;
+    --amber:#FFB454;      /* янтарь-маяк */
+    --coral:#FF5D45;      /* тёплый REC */
+    --violet:#B08CFF;     /* твич-фиолет, смягчённый */
+    --dim:#7d8894;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{
+    position:fixed;inset:0;background:var(--sea);color:var(--ink);
+    font-family:ui-rounded,-apple-system,system-ui,sans-serif;
+    touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* ---- слой ЭФИРА (YouTube) ---- */
+  #yt{position:absolute;inset:0;display:none;background:#000}
+  #yt iframe{width:100%;height:100%;border:0}
+  #urlRow{
+    position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);
+    left:50%;transform:translateX(-50%);z-index:21;display:none;gap:8px;
+    width:min(92%,520px);
+  }
+  #urlRow input{
+    flex:1;height:44px;border-radius:12px;border:1px solid rgba(255,180,84,.35);
+    background:rgba(18,26,34,.9);color:var(--ink);padding:0 14px;font-size:14px;
+    outline:none;user-select:text;-webkit-user-select:text;
+  }
+  #urlRow button{
+    height:44px;padding:0 16px;border-radius:12px;border:none;background:var(--amber);
+    color:#221500;font-weight:800;font-size:14px;cursor:pointer;
+  }
+
+  /* ---- стартовый экран ---- */
+  #start{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;
+    background:radial-gradient(120% 90% at 50% 110%, #16222e 0%, var(--sea) 60%);
+    z-index:30;text-align:center;padding:24px;
+  }
+  #start h1{font-size:28px;letter-spacing:.06em;font-weight:800}
+  #start p{color:var(--dim);font-size:14px;line-height:1.5;max-width:36ch}
+  #btnStart{
+    margin-top:10px;padding:16px 42px;border:none;border-radius:999px;
+    background:var(--amber);color:#221500;font-size:17px;font-weight:800;
+    letter-spacing:.08em;cursor:pointer;box-shadow:0 0 34px rgba(255,180,84,.35);
+  }
+  #btnStart:active{transform:scale(.97)}
+
+  /* ---- сообщения ---- */
+  #msg{
+    position:absolute;top:calc(env(safe-area-inset-top,0px) + 62px);left:50%;
+    transform:translateX(-50%);max-width:92%;padding:8px 14px;border-radius:12px;
+    background:rgba(18,26,34,.94);color:var(--ink);font-size:13px;z-index:25;
+    display:none;text-align:center;border:1px solid rgba(255,180,84,.25);
+  }
+
+  /* ---- HUD (не попадает в canvas-запись) ---- */
+  #hud{
+    position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:14px;
+    display:none;align-items:center;gap:8px;z-index:22;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
+    background:rgba(11,15,20,.6);padding:6px 12px;border-radius:999px;
+  }
+  #hud .dot{width:10px;height:10px;border-radius:50%;background:var(--coral);
+    animation:pulse 1.2s ease-in-out infinite}
+  #hud.live .dot{background:var(--violet)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){#hud .dot{animation:none}}
+
+  /* ---- статус связи ---- */
+  #linkStatus{
+    position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;
+    display:none;z-index:22;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12px;background:rgba(11,15,20,.6);padding:6px 12px;border-radius:999px;
+    border:1px solid rgba(255,180,84,.4);color:var(--amber);
+  }
+  .bigcode{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:40px;
+    letter-spacing:.28em;text-align:center;color:var(--amber);margin:14px 0 6px;
+    text-shadow:0 0 18px rgba(255,180,84,.5);
+  }
+
+  /* ---- окно ---- */
+  #win{position:absolute;z-index:10;touch-action:none;cursor:grab}
+  #win .grip{
+    position:absolute;right:-6px;bottom:-6px;width:26px;height:26px;border-radius:50%;
+    background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.6);
+    touch-action:none;cursor:nwse-resize;z-index:2;
+  }
+  #win.solid{
+    border:2px solid rgba(255,180,84,.9);border-radius:14px;overflow:hidden;
+    box-shadow:0 0 22px rgba(255,180,84,.45);background:#000;
+  }
+  #win.solid video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+
+  /* ---- панель кнопок ---- */
+  #bar{
+    position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+    display:none;justify-content:center;gap:8px;z-index:20;padding:0 8px;flex-wrap:wrap;
+  }
+  .btn{
+    min-width:52px;height:50px;padding:0 14px;border-radius:999px;border:1px solid rgba(232,227,216,.18);
+    background:rgba(18,26,34,.82);color:var(--ink);font-size:12px;font-weight:700;
+    letter-spacing:.04em;cursor:pointer;backdrop-filter:blur(6px);
+  }
+  .btn:active{transform:scale(.95)}
+  .btn.on{border-color:var(--amber);color:var(--amber)}
+  #btnRec{background:rgba(255,93,69,.16);border-color:rgba(255,93,69,.55);color:#ffb0a3;font-weight:800}
+  #btnRec.on{background:var(--coral);color:#2a0800;border-color:var(--coral)}
+  #btnTwitch{border-color:rgba(176,140,255,.55);color:#cdb4ff}
+  #btnTwitch.on{background:var(--violet);color:#1d0a3a;border-color:var(--violet)}
+
+  /* ---- сохранение ---- */
+  #saveWrap{
+    position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
+    transform:translateX(-50%);z-index:22;display:none;
+  }
+  #saveLink{
+    display:inline-block;padding:13px 26px;border-radius:999px;background:var(--amber);
+    color:#221500;font-weight:800;font-size:15px;text-decoration:none;
+    box-shadow:0 0 26px rgba(255,180,84,.4);
+  }
+
+  /* ---- карточки-оверлеи ---- */
+  .sheet{
+    position:absolute;inset:0;z-index:28;display:none;align-items:center;justify-content:center;
+    background:rgba(11,15,20,.86);padding:22px;
+  }
+  .sheet .card{
+    max-width:440px;width:100%;background:var(--surface);border:1px solid rgba(255,180,84,.3);
+    border-radius:18px;padding:20px;font-size:14px;line-height:1.7;
+    max-height:82vh;overflow:auto;
+  }
+  .card.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;white-space:pre-wrap}
+  .card b{color:var(--amber)}
+  .card h3{font-size:16px;margin-bottom:10px;letter-spacing:.04em}
+  .card label{display:block;color:var(--dim);font-size:12px;margin:12px 0 4px}
+  .card input,.card select{
+    width:100%;height:42px;border-radius:10px;border:1px solid rgba(232,227,216,.2);
+    background:rgba(11,15,20,.7);color:var(--ink);padding:0 12px;font-size:14px;outline:none;
+    user-select:text;-webkit-user-select:text;
+  }
+  .card .row{display:flex;gap:10px;margin-top:16px}
+  .card .row button{
+    flex:1;height:46px;border-radius:12px;border:none;font-weight:800;font-size:14px;cursor:pointer;
+  }
+  .go{background:var(--violet);color:#1d0a3a}
+  .quiet{background:rgba(232,227,216,.12);color:var(--ink)}
+  .card small{color:var(--dim);display:block;margin-top:10px;line-height:1.5}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="yt"></div>
+
+<div id="win"><div class="grip"></div></div>
+
+<div id="urlRow">
+  <input id="ytUrl" type="url" inputmode="url" placeholder="ссылка на YouTube (видео или стрим)">
+  <button id="btnWatch">▶</button>
+</div>
+
+<div id="hud"><span class="dot"></span><span id="timer">00:00</span></div>
+<div id="msg"></div>
+
+<div id="start">
+  <h1>СКРИН-СТУДИЯ</h1>
+  <p>Два режима: СТУДИЯ — камера и эхо-окно экрана; ЭФИР — YouTube во весь экран и твоя камера в окошке. Запись и выход на Twitch — по кнопкам.</p>
+  <button id="btnStart">СТАРТ</button>
+</div>
+
+<div id="bar">
+  <button class="btn" id="btnMode">ЭФИР</button>
+  <button class="btn" id="btnFlip">⟲</button>
+  <button class="btn on" id="btnWin">ОКНО</button>
+  <button class="btn" id="btnScreen" style="display:none">ЭКРАН</button>
+  <button class="btn" id="btnMic">МИК·выкл</button>
+  <button class="btn" id="btnRec">● REC</button>
+  <button class="btn" id="btnTwitch">TWITCH</button>
+  <button class="btn" id="btnLink">СВЯЗЬ</button>
+  <button class="btn" id="btnInfo">ⓘ</button>
+</div>
+
+<div id="saveWrap"><a id="saveLink" href="#" download>Сохранить видео</a></div>
+
+<div class="sheet" id="info"><div class="card mono" id="infoText"></div></div>
+
+<div class="sheet" id="howto"><div class="card" id="howtoText"></div></div>
+
+<div class="sheet" id="twitchSheet">
+  <div class="card">
+    <h3>ВЫХОД НА TWITCH · WHIP</h3>
+    <label>WHIP-сервер Twitch</label>
+    <input id="twEndpoint" value="https://g.webrtc.live-video.net:4443/v2/offer">
+    <label>Ключ трансляции (stream key)</label>
+    <input id="twKey" type="password" placeholder="live_...">
+    <label>Что отправлять</label>
+    <select id="twSource">
+      <option value="camera">Камера + микрофон</option>
+      <option value="screen">Экран/вкладка (только на компе)</option>
+      <option value="canvas">Полотно СТУДИИ (эхо-картинка)</option>
+    </select>
+    <div class="row">
+      <button class="quiet" id="twCancel">Закрыть</button>
+      <button class="go" id="twGo">В ЭФИР</button>
+    </div>
+    <small>Ключ никуда не сохраняется — живёт только в этой вкладке.
+    Twitch принимает H264+Opus; браузер договорится сам.
+    Если сервер откажет из-за CORS — нужен мост-прокси, скажи мне.</small>
+  </div>
+</div>
+
+<div class="sheet" id="linkSheet">
+  <div class="card">
+    <h3>ДВА ТЕЛЕФОНА · ОДИН ЭФИР</h3>
+    <div id="linkChoose">
+      Этот телефон собирает картинку (его камера — фон, вторая — в окне) или отдаёт свою камеру другому?
+      <div class="row">
+        <button class="quiet" id="lnkDirector">Я СОБИРАЮ</button>
+        <button class="quiet" id="lnkCamera">Я — КАМЕРА-2</button>
+      </div>
+    </div>
+    <div id="linkDirector" style="display:none">
+      Скажи этот код второму телефону:
+      <div class="bigcode" id="linkCode">····</div>
+      <div id="linkWait" style="color:var(--dim)">жду второй телефон…</div>
+      <div class="row"><button class="quiet" id="lnkStop1">Разорвать</button></div>
+    </div>
+    <div id="linkCameraUi" style="display:none">
+      <label>Код с первого телефона</label>
+      <input id="lnkCodeIn" autocapitalize="characters" autocomplete="off" placeholder="например K7M2">
+      <div class="row">
+        <button class="quiet" id="lnkStop2">Назад</button>
+        <button class="go" id="lnkGo">ОТДАТЬ КАМЕРУ</button>
+      </div>
+    </div>
+    <small>Связь идёт напрямую между телефонами (WebRTC), знакомит их бесплатный брокер PeerJS.
+    Одна Wi-Fi или точка доступа с одного из телефонов — надёжно; разные сети — как повезёт с NAT.
+    Звук камеры-2 попадает в запись и эфир, но вслух здесь не играет — иначе завоет.</small>
+  </div>
+</div>
+
+<div id="linkStatus"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const prev = document.createElement('canvas'), pctx = prev.getContext('2d');
+
+let mode = 'studio';                          // studio | efir
+let camVideo = null, camStream = null, facing = 'environment';
+let dispVideo = null, dispStream = null;      // реальный экран для окна СТУДИИ
+let micStream = null, micOn = false;
+let winOn = true, screenMode = false;
+let recorder = null, chunks = [], recStream = null, recT0 = 0, timerId = null, blobUrl = null;
+let audioCtx = null;
+let pc = null, whipResource = null, twitchOn = false;
+let peer = null, mediaCall = null, remoteVideo = null, remoteStream = null, linkRole = null;
+let wakeLock = null;
+let W = 0, H = 0, running = false;
+
+const win = { nx: 0.52, ny: 0.08, nw: 0.42 }; // нормированный прямоугольник окна
+const camHolder = document.createElement('div'); // невидимый дом для камеры в СТУДИИ
+camHolder.style.display = 'none';
+document.body.appendChild(camHolder);
+
+function showMsg(t, ms = 4000){
+  const m = $('msg'); m.textContent = t; m.style.display = 'block';
+  clearTimeout(showMsg._t);
+  if (ms) showMsg._t = setTimeout(() => m.style.display = 'none', ms);
+}
+
+/* ---------- размеры ---------- */
+function fit(){
+  const cw = window.innerWidth, ch = window.innerHeight;
+  let scale = Math.min(window.devicePixelRatio || 1, 1.5);
+  if (Math.max(cw, ch) * scale > 1440) scale = 1440 / Math.max(cw, ch);
+  W = Math.round(cw * scale); H = Math.round(ch * scale);
+  cv.width = W; cv.height = H; prev.width = W; prev.height = H;
+  placeWinDom();
+}
+window.addEventListener('resize', fit);
+
+/* ---------- камера ---------- */
+async function openCam(face){
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  camStream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  });
+  facing = face;
+  if (!camVideo){
+    camVideo = document.createElement('video');
+    camVideo.playsInline = true; camVideo.muted = true; camVideo.autoplay = true;
+    camHolder.appendChild(camVideo);
+  }
+  camVideo.srcObject = camStream;
+  camVideo.style.transform = (face === 'user') ? 'scaleX(-1)' : '';
+  await camVideo.play();
+}
+
+/* ---------- реальный экран в окно СТУДИИ ---------- */
+async function toggleScreen(){
+  if (screenMode){
+    if (dispStream) dispStream.getTracks().forEach(t => t.stop());
+    dispStream = null; screenMode = false;
+    $('btnScreen').classList.remove('on');
+    return;
+  }
+  try{
+    dispStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    if (!dispVideo){
+      dispVideo = document.createElement('video');
+      dispVideo.playsInline = true; dispVideo.muted = true;
+    }
+    dispVideo.srcObject = dispStream;
+    await dispVideo.play();
+    dispStream.getVideoTracks()[0].addEventListener('ended', () => {
+      screenMode = false; $('btnScreen').classList.remove('on');
+    });
+    screenMode = true; $('btnScreen').classList.add('on');
+  }catch(e){ showMsg('Захват экрана не дали: ' + e.name); }
+}
+
+/* ---------- рисование ---------- */
+function drawCoverRect(c, vid, x, y, w, h, mirror){
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw || !vh) return;
+  const s = Math.max(w / vw, h / vh), dw = vw * s, dh = vh * s;
+  c.save();
+  if (mirror){ c.translate(x + w, y); c.scale(-1, 1); c.translate(-x, -y); }
+  c.drawImage(vid, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  c.restore();
+}
+
+function winRectPx(){
+  const cw = window.innerWidth, ch = window.innerHeight;
+  const wCss = win.nw * cw, hCss = wCss * (ch / cw);
+  const xCss = win.nx * cw, yCss = win.ny * ch;
+  return { xCss, yCss, wCss, hCss,
+           x: xCss / cw * W, y: yCss / ch * H,
+           w: wCss / cw * W, h: hCss / ch * H };
+}
+
+function rr(c, x, y, w, h, r){
+  if (c.roundRect){ c.beginPath(); c.roundRect(x, y, w, h, r); }
+  else { c.beginPath(); c.rect(x, y, w, h); }
+}
+
+function frame(){
+  if (!running) return;
+  requestAnimationFrame(frame);
+  if (mode !== 'studio') return;
+
+  ctx.fillStyle = '#0B0F14';
+  ctx.fillRect(0, 0, W, H);
+  if (camVideo) drawCoverRect(ctx, camVideo, 0, 0, W, H, facing === 'user');
+
+  if (winOn){
+    const r = winRectPx(), rad = Math.min(r.w, r.h) * 0.06;
+    ctx.save();
+    rr(ctx, r.x, r.y, r.w, r.h, rad); ctx.clip();
+    if (remoteStream && remoteVideo && remoteVideo.videoWidth){
+      drawCoverRect(ctx, remoteVideo, r.x, r.y, r.w, r.h, false);
+    } else if (screenMode && dispVideo && dispVideo.videoWidth){
+      drawCoverRect(ctx, dispVideo, r.x, r.y, r.w, r.h, false);
+    } else {
+      ctx.globalAlpha = 0.96; /* эхо: прошлый кадр целиком — в окно → туннель */
+      ctx.drawImage(prev, 0, 0, W, H, r.x, r.y, r.w, r.h);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    rr(ctx, r.x, r.y, r.w, r.h, rad);
+    ctx.lineWidth = Math.max(2, W * 0.004);
+    ctx.strokeStyle = 'rgba(255,180,84,0.9)';
+    ctx.shadowColor = 'rgba(255,180,84,0.55)';
+    ctx.shadowBlur = W * 0.012;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  pctx.drawImage(cv, 0, 0);
+}
+
+/* ---------- окно: перенос и размер ---------- */
+const winEl = $('win'), grip = winEl.querySelector('.grip');
+function placeWinDom(){
+  const r = winRectPx();
+  winEl.style.left = r.xCss + 'px';
+  winEl.style.top = r.yCss + 'px';
+  winEl.style.width = r.wCss + 'px';
+  winEl.style.height = r.hCss + 'px';
+  winEl.style.display = winOn ? 'block' : 'none';
+}
+let drag = null;
+winEl.addEventListener('pointerdown', e => {
+  if (e.target === grip) return;
+  drag = { modeD: 'move', px: e.clientX, py: e.clientY, nx: win.nx, ny: win.ny };
+  winEl.setPointerCapture(e.pointerId);
+});
+grip.addEventListener('pointerdown', e => {
+  e.stopPropagation();
+  drag = { modeD: 'size', px: e.clientX, nw: win.nw };
+  grip.setPointerCapture(e.pointerId);
+});
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const cw = window.innerWidth, ch = window.innerHeight;
+  if (drag.modeD === 'move'){
+    win.nx = Math.min(Math.max(drag.nx + (e.clientX - drag.px) / cw, 0.01), 0.98 - win.nw);
+    win.ny = Math.min(Math.max(drag.ny + (e.clientY - drag.py) / ch, 0.01), 0.98 - win.nw);
+  } else {
+    win.nw = Math.min(Math.max(drag.nw + (e.clientX - drag.px) / cw, 0.16), 0.9);
+    win.nx = Math.min(win.nx, 0.98 - win.nw);
+    win.ny = Math.min(win.ny, 0.98 - win.nw);
+  }
+  placeWinDom();
+});
+window.addEventListener('pointerup', () => drag = null);
+window.addEventListener('pointercancel', () => drag = null);
+
+/* ---------- звук: смешать несколько дорожек в одну ---------- */
+function mixAudio(tracks){
+  if (tracks.length <= 1) return tracks;
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  const dest = audioCtx.createMediaStreamDestination();
+  tracks.forEach(t => {
+    const src = audioCtx.createMediaStreamSource(new MediaStream([t]));
+    src.connect(dest);
+  });
+  return dest.stream.getAudioTracks();
+}
+
+/* ---------- запись ---------- */
+function pickMime(){
+  const list = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  for (const m of list)
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+
+function stopRecTracks(){
+  if (recStream) recStream.getTracks().forEach(t => t.stop());
+  recStream = null;
+}
+
+async function toggleRec(){
+  if (recorder && recorder.state === 'recording'){ recorder.stop(); return; }
+  if (!window.MediaRecorder){ showMsg('Этот браузер не умеет MediaRecorder'); return; }
+
+  let stream;
+  if (mode === 'studio'){
+    stream = cv.captureStream(30);
+    let aTr = [];
+    if (micOn && micStream) aTr = aTr.concat(micStream.getAudioTracks());
+    if (remoteStream) aTr = aTr.concat(remoteStream.getAudioTracks());
+    mixAudio(aTr).forEach(t => stream.addTrack(t));
+  } else {
+    /* ЭФИР: слой YouTube — чужой iframe, в canvas его не нарисовать.
+       На компе берём захват вкладки; на телефоне честно шлём к Пункту управления. */
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)){
+      showHowto(); return;
+    }
+    try{
+      const gdm = await navigator.mediaDevices.getDisplayMedia({
+        video: true, audio: true, preferCurrentTab: true
+      });
+      const audio = gdm.getAudioTracks();
+      if (micOn && micStream) audio.push(...micStream.getAudioTracks());
+      stream = new MediaStream([...gdm.getVideoTracks(), ...mixAudio(audio)]);
+      recStream = gdm;
+      gdm.getVideoTracks()[0].addEventListener('ended', () => {
+        if (recorder && recorder.state === 'recording') recorder.stop();
+      });
+    }catch(e){ showMsg('Захват не дали: ' + e.name); return; }
+  }
+
+  $('saveWrap').style.display = 'none';
+  if (blobUrl){ URL.revokeObjectURL(blobUrl); blobUrl = null; }
+  const mime = pickMime();
+  chunks = [];
+  recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    clearInterval(timerId);
+    if (!twitchOn) $('hud').style.display = 'none';
+    $('btnRec').classList.remove('on');
+    stopRecTracks();
+    const type = recorder.mimeType || mime || 'video/mp4';
+    const blob = new Blob(chunks, { type });
+    blobUrl = URL.createObjectURL(blob);
+    const a = $('saveLink');
+    a.href = blobUrl;
+    a.download = 'skrin-studia.' + (type.includes('mp4') ? 'mp4' : 'webm');
+    a.textContent = 'Сохранить видео · ' + (blob.size / 1048576).toFixed(1) + ' МБ';
+    $('saveWrap').style.display = 'block';
+  };
+  recorder.start(1000);
+  recT0 = Date.now();
+  startTimer();
+  $('btnRec').classList.add('on');
+}
+
+function startTimer(){
+  $('hud').style.display = 'flex';
+  clearInterval(timerId);
+  timerId = setInterval(() => {
+    const s = Math.floor((Date.now() - recT0) / 1000);
+    $('timer').textContent =
+      String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }, 250);
+}
+
+/* ---------- YouTube ---------- */
+function ytId(s){
+  const m = String(s).match(/(?:v=|youtu\.be\/|\/live\/|\/shorts\/|\/embed\/)([\w-]{11})/);
+  if (m) return m[1];
+  if (/^[\w-]{11}$/.test(s.trim())) return s.trim();
+  return null;
+}
+$('btnWatch').onclick = () => {
+  const id = ytId($('ytUrl').value);
+  if (!id){ showMsg('Не разобрал ссылку — нужен адрес видео YouTube'); return; }
+  $('yt').innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + id +
+    '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+  $('ytUrl').blur();
+};
+
+/* ---------- режимы ---------- */
+function setMode(m){
+  mode = m;
+  const efir = m === 'efir';
+  $('yt').style.display = efir ? 'block' : 'none';
+  $('urlRow').style.display = efir ? 'flex' : 'none';
+  cv.style.display = efir ? 'none' : 'block';
+  $('btnMode').textContent = efir ? 'СТУДИЯ' : 'ЭФИР';
+  $('btnScreen').style.display =
+    (!efir && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) ? 'inline-block' : 'none';
+  winEl.classList.toggle('solid', efir);
+  if (camVideo){
+    if (efir) winEl.appendChild(camVideo);
+    else camHolder.appendChild(camVideo);
+    camVideo.play().catch(() => {});
+  }
+  placeWinDom();
+}
+$('btnMode').onclick = () => setMode(mode === 'studio' ? 'efir' : 'studio');
+
+/* ---------- Twitch · WHIP ---------- */
+async function twitchStart(){
+  const endpoint = $('twEndpoint').value.trim();
+  const key = $('twKey').value.trim();
+  const srcKind = $('twSource').value;
+  if (!key){ showMsg('Нужен ключ трансляции из панели Twitch'); return; }
+
+  let vTrack = null, aTracks = [];
+  try{
+    if (srcKind === 'screen'){
+      if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia))
+        throw new Error('на этом устройстве браузер не отдаёт экран');
+      const gdm = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true });
+      vTrack = gdm.getVideoTracks()[0];
+      aTracks = gdm.getAudioTracks();
+      recStream = gdm;
+    } else if (srcKind === 'canvas'){
+      vTrack = cv.captureStream(30).getVideoTracks()[0];
+    } else {
+      if (!camStream) await openCam(facing);
+      vTrack = camStream.getVideoTracks()[0];
+    }
+    if (micOn){
+      if (!micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      aTracks = aTracks.concat(micStream.getAudioTracks());
+    }
+    if (remoteStream) aTracks = aTracks.concat(remoteStream.getAudioTracks());
+    aTracks = mixAudio(aTracks);
+
+    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const vt = pc.addTransceiver(vTrack, { direction: 'sendonly' });
+    if (aTracks.length) pc.addTransceiver(aTracks[0], { direction: 'sendonly' });
+
+    /* Twitch хочет H264 */
+    if (vt.setCodecPreferences && window.RTCRtpSender && RTCRtpSender.getCapabilities){
+      const caps = RTCRtpSender.getCapabilities('video');
+      if (caps){
+        const h264 = caps.codecs.filter(c => /h264/i.test(c.mimeType));
+        const rest = caps.codecs.filter(c => !/h264/i.test(c.mimeType));
+        if (h264.length) vt.setCodecPreferences(h264.concat(rest));
+      }
+    }
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await new Promise(res => {
+      if (pc.iceGatheringState === 'complete') return res();
+      const to = setTimeout(res, 2000);
+      pc.addEventListener('icegatheringstatechange', () => {
+        if (pc.iceGatheringState === 'complete'){ clearTimeout(to); res(); }
+      });
+    });
+
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/sdp' },
+      body: pc.localDescription.sdp
+    });
+    if (!resp.ok) throw new Error('сервер ответил ' + resp.status);
+    whipResource = resp.headers.get('Location');
+    if (whipResource) whipResource = new URL(whipResource, endpoint).href;
+    const answer = await resp.text();
+    await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+
+    twitchOn = true;
+    $('btnTwitch').classList.add('on');
+    $('hud').classList.add('live');
+    recT0 = Date.now(); startTimer();
+    $('twitchSheet').style.display = 'none';
+    showMsg('Эфир пошёл. Смотри свой канал — задержка секунд 5–10.');
+  }catch(e){
+    twitchStop(true);
+    const cors = (e && e.name === 'TypeError');
+    showMsg(cors
+      ? 'Сервер не пустил браузер напрямую (CORS). Нужен мост-прокси — скажи, соберу.'
+      : 'Эфир не запустился: ' + (e.message || e.name), 8000);
+  }
+}
+function twitchStop(silent){
+  if (pc){ try{ pc.close(); }catch(e){} pc = null; }
+  if (whipResource){ fetch(whipResource, { method: 'DELETE' }).catch(() => {}); whipResource = null; }
+  stopRecTracks();
+  twitchOn = false;
+  $('btnTwitch').classList.remove('on');
+  $('hud').classList.remove('live');
+  if (!(recorder && recorder.state === 'recording')){
+    clearInterval(timerId); $('hud').style.display = 'none';
+  }
+  if (!silent) showMsg('Эфир остановлен');
+}
+$('btnTwitch').onclick = () => {
+  if (twitchOn){ twitchStop(); return; }
+  $('twitchSheet').style.display = 'flex';
+};
+$('twCancel').onclick = () => $('twitchSheet').style.display = 'none';
+$('twGo').onclick = twitchStart;
+
+/* ---------- связь двух телефонов ---------- */
+async function keepAwake(){
+  try{ if (navigator.wakeLock && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); }
+  catch(e){}
+}
+function makeCode(){
+  const abc = 'ABCDEFGHKMNPRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 4; i++) c += abc[Math.floor(Math.random() * abc.length)];
+  return c;
+}
+function linkStatus(t){
+  const el = $('linkStatus');
+  if (!t){ el.style.display = 'none'; return; }
+  el.textContent = t; el.style.display = 'block';
+}
+function attachRemote(s){
+  remoteStream = s;
+  if (!remoteVideo){
+    remoteVideo = document.createElement('video');
+    remoteVideo.playsInline = true; remoteVideo.autoplay = true;
+    remoteVideo.muted = true; /* вслух не играем — звук уходит в микс */
+    camHolder.appendChild(remoteVideo);
+  }
+  remoteVideo.srcObject = s;
+  remoteVideo.play().catch(() => {});
+  $('linkWait').textContent = 'второй телефон в окне ✓';
+  $('btnLink').classList.add('on');
+  linkStatus('КАМЕРА-2 · в окне');
+  showMsg('Второй телефон подключился — он в окне');
+}
+function linkStop(silent){
+  if (mediaCall){ try{ mediaCall.close(); }catch(e){} mediaCall = null; }
+  if (peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+  remoteStream = null; linkRole = null;
+  $('btnLink').classList.remove('on');
+  linkStatus(null);
+  $('linkSheet').style.display = 'none';
+  $('linkChoose').style.display = 'block';
+  $('linkDirector').style.display = 'none';
+  $('linkCameraUi').style.display = 'none';
+  if (!silent) showMsg('Связь разорвана');
+}
+function startDirector(){
+  const code = makeCode();
+  $('linkCode').textContent = code;
+  $('linkWait').textContent = 'жду второй телефон…';
+  $('linkChoose').style.display = 'none';
+  $('linkDirector').style.display = 'block';
+  peer = new Peer('skrin-' + code);
+  linkRole = 'director';
+  keepAwake();
+  peer.on('call', call => {
+    mediaCall = call;
+    call.answer();
+    call.on('stream', attachRemote);
+    call.on('close', () => { remoteStream = null; linkStatus(null); showMsg('Камера-2 отвалилась'); });
+  });
+  peer.on('error', e => showMsg('Связь: ' + e.type, 6000));
+  peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+}
+async function startCameraRole(){
+  const code = $('lnkCodeIn').value.trim().toUpperCase();
+  if (code.length < 4){ showMsg('Введи код с первого телефона'); return; }
+  try{
+    if (!camStream) await openCam(facing);
+    if (!micStream){
+      try{
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micOn = true;
+        $('btnMic').textContent = 'МИК·вкл';
+        $('btnMic').classList.add('on');
+      }catch(e){}
+    }
+    const out = new MediaStream([
+      ...camStream.getVideoTracks(),
+      ...(micStream ? micStream.getAudioTracks() : [])
+    ]);
+    peer = new Peer();
+    linkRole = 'camera';
+    keepAwake();
+    peer.on('open', () => {
+      mediaCall = peer.call('skrin-' + code, out);
+      mediaCall.on('close', () => { linkStatus(null); showMsg('Режиссёр закрыл связь'); });
+      $('linkSheet').style.display = 'none';
+      $('btnLink').classList.add('on');
+      linkStatus('ОТДАЮ КАМЕРУ → ' + code);
+      showMsg('Камера ушла на первый телефон. Экран не гаси.');
+    });
+    peer.on('error', e => showMsg('Связь: ' + e.type, 6000));
+    peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+  }catch(e){ showMsg('Не вышло: ' + (e.message || e.name)); }
+}
+$('btnLink').onclick = () => {
+  if (linkRole){ linkStop(); return; }
+  $('linkSheet').style.display = 'flex';
+};
+$('lnkDirector').onclick = startDirector;
+$('lnkCamera').onclick = () => {
+  $('linkChoose').style.display = 'none';
+  $('linkCameraUi').style.display = 'block';
+};
+$('lnkStop1').onclick = () => linkStop();
+$('lnkStop2').onclick = () => linkStop(true);
+$('lnkGo').onclick = startCameraRole;
+
+/* ---------- подсказка для айфона ---------- */
+function showHowto(){
+  $('howtoText').innerHTML =
+    '<h3>ЗАПИСЬ ЭФИРА НА АЙФОНЕ</h3>' +
+    'Слой YouTube — чужая страница внутри этой: браузер не даёт мне её рисовать и записывать, это защита самого веба. ' +
+    'Зато системная запись видит всё:<br><br>' +
+    '1 · Смахни Пункт управления (правый верхний угол вниз)<br>' +
+    '2 · Нажми кружок записи экрана ⏺<br>' +
+    '3 · Хочешь свой голос — подержи кнопку и включи микрофон<br>' +
+    '4 · Вернись сюда: YouTube + твоя камера пишутся вместе<br><br>' +
+    'Кнопки «начать это с сайта» не существует ни у одного сайта — Apple отдаёт её только Пункту управления.<br><br>' +
+    '<small>касание — закрыть</small>';
+  $('howto').style.display = 'flex';
+}
+$('howto').onclick = () => $('howto').style.display = 'none';
+
+/* ---------- инфо ---------- */
+function capsReport(){
+  const gum = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  const gdm = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  const mr = !!window.MediaRecorder;
+  const mime = mr ? (pickMime() || 'формат по умолчанию') : '—';
+  return (
+'<b>ЗОНД ВОЗМОЖНОСТЕЙ</b>\n\n' +
+'камера (getUserMedia): ' + (gum ? '✓' : '✗') + '\n' +
+'  сейчас: ' + (facing === 'user' ? 'фронтальная' : 'тыловая') +
+  (camVideo && camVideo.videoWidth ? ' · ' + camVideo.videoWidth + '×' + camVideo.videoHeight : '') + '\n' +
+'  две камеры разом Safari не даёт — только переключение\n\n' +
+'захват экрана (getDisplayMedia): ' + (gdm ? '✓' : '✗') + '\n' +
+'  ' + (gdm ? 'REC в ЭФИРЕ запишет вкладку целиком, со звуком'
+           : 'на iPhone этого нет: REC в ЭФИРЕ покажет путь\n  через Пункт управления') + '\n\n' +
+'запись (MediaRecorder): ' + (mr ? '✓ · ' + mime : '✗') + '\n\n' +
+'СВЯЗЬ: второй телефон входит в окно СТУДИИ,\n' +
+'  его звук — в микс записи и эфира.\n' +
+'  сейчас: ' + (linkRole ? (linkRole === 'director' ? 'режиссёр' : 'камера-2') +
+  (remoteStream ? ' · картинка идёт' : ' · жду') : 'не связаны') + '\n\n' +
+'Twitch · WHIP: браузер сам умеет WebRTC-эфир;\n' +
+'  сервер g.webrtc.live-video.net, ключ = stream key.\n' +
+'  Если откажет CORS — соберём мост-прокси.\n\n' +
+'СТУДИЯ: REC пишет полотно (камера+эхо) без систем.\n' +
+'ЭФИР: слой YouTube в canvas не рисуется (чужой iframe).\n\n' +
+'касание — закрыть');
+}
+$('btnInfo').onclick = () => {
+  $('infoText').innerHTML = capsReport();
+  $('info').style.display = 'flex';
+};
+$('info').onclick = () => $('info').style.display = 'none';
+
+/* ---------- кнопки ---------- */
+$('btnFlip').onclick = async () => {
+  try{
+    await openCam(facing === 'user' ? 'environment' : 'user');
+    if (linkRole === 'camera' && mediaCall && mediaCall.peerConnection){
+      const s = mediaCall.peerConnection.getSenders().find(x => x.track && x.track.kind === 'video');
+      if (s) await s.replaceTrack(camStream.getVideoTracks()[0]);
+    }
+  }
+  catch(e){ showMsg('Камера не переключилась: ' + e.name); }
+};
+$('btnWin').onclick = () => {
+  winOn = !winOn;
+  $('btnWin').classList.toggle('on', winOn);
+  placeWinDom();
+};
+$('btnMic').onclick = async () => {
+  micOn = !micOn;
+  if (micOn){
+    try{
+      if (!micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }catch(e){ micOn = false; showMsg('Микрофон не дали: ' + e.name); }
+  } else if (micStream){
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+  }
+  $('btnMic').textContent = 'МИК·' + (micOn ? 'вкл' : 'выкл');
+  $('btnMic').classList.toggle('on', micOn);
+};
+$('btnScreen').onclick = toggleScreen;
+$('btnRec').onclick = toggleRec;
+
+/* ---------- старт ---------- */
+$('btnStart').onclick = async () => {
+  try{
+    fit();
+    await openCam('environment');
+  }catch(e1){
+    try{ await openCam('user'); }
+    catch(e2){ showMsg('Камера недоступна: ' + e2.name + '. Нужен HTTPS и разрешение.', 8000); return; }
+  }
+  $('start').style.display = 'none';
+  $('bar').style.display = 'flex';
+  running = true;
+  setMode('studio');
+  frame();
+};
+
+fit();
+</script>
+</body>
+</html>
