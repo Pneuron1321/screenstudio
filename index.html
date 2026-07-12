@@ -93,7 +93,8 @@
 
   /* ---- окно ---- */
   #win{position:absolute;z-index:10;touch-action:none;cursor:grab}
-  #win .grip{
+  .rwin{position:absolute;z-index:10;touch-action:none;cursor:grab}
+  #win .grip, .rwin .grip{
     position:absolute;right:-6px;bottom:-6px;width:26px;height:26px;border-radius:50%;
     background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.6);
     touch-action:none;cursor:nwse-resize;z-index:2;
@@ -118,8 +119,41 @@
   .btn.on{border-color:var(--amber);color:var(--amber)}
   #btnRec{background:rgba(255,93,69,.16);border-color:rgba(255,93,69,.55);color:#ffb0a3;font-weight:800}
   #btnRec.on{background:var(--coral);color:#2a0800;border-color:var(--coral)}
+  #btnGateMic.on,#btnGateCam.on{background:var(--coral);color:#2a0800;border-color:var(--coral)}
+  #btnPtt.on{background:var(--amber);color:#221500;border-color:var(--amber)}
+  #btnPtt.learn{border-color:var(--violet);color:#cdb4ff}
+  #btnPrompt.aloud{background:var(--violet);color:#1d0a3a;border-color:var(--violet)}
+  #btnBlur.on{background:var(--amber);color:#221500;border-color:var(--amber)}
+  #btnZone.on{background:var(--amber);color:#221500;border-color:var(--amber)}
+  #btnPanic.on{background:var(--coral);color:#2a0800;border-color:var(--coral)}
+  /* оверлей рисования ручной зоны */
+  #zoneLayer{position:absolute;inset:0;z-index:15;display:none;touch-action:none;
+    background:rgba(11,15,20,.12);cursor:crosshair}
+  #zoneRub{position:absolute;border:2px dashed var(--amber);background:rgba(255,180,84,.15);display:none;pointer-events:none}
+  #zoneHint{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 90px);
+    transform:translateX(-50%);z-index:16;display:none;background:rgba(18,26,34,.94);
+    color:var(--amber);border:1px solid var(--amber);padding:7px 14px;border-radius:12px;
+    font-size:12px;font-family:ui-monospace,Menlo,monospace;text-align:center;max-width:88%}
+  /* индикатор «говорю с Клодом» — HTML-оверлей, в захват канваса НЕ попадает */
+  #pttHud{
+    position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 54px);
+    transform:translateX(-50%);display:none;align-items:center;gap:8px;z-index:24;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;font-weight:800;
+    background:rgba(255,180,84,.16);border:1px solid var(--amber);color:var(--amber);
+    padding:7px 16px;border-radius:999px;letter-spacing:.06em;
+  }
+  #pttHud .p{width:9px;height:9px;border-radius:50%;background:var(--amber);
+    animation:pulse 1s ease-in-out infinite}
   #btnTwitch{border-color:rgba(176,140,255,.55);color:#cdb4ff}
   #btnTwitch.on{background:var(--violet);color:#1d0a3a;border-color:var(--violet)}
+
+  /* ---- КАРМАН: замок от случайных касаний ---- */
+  #lock{position:absolute;inset:0;z-index:200;display:none;touch-action:none;
+    background:rgba(11,15,20,.04)}
+  #lock svg{position:absolute;inset:0;width:100%;height:100%}
+  #lockHint{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 16px);
+    transform:translateX(-50%);color:var(--amber);opacity:.22;font-size:12px;
+    font-family:ui-monospace,Menlo,monospace;letter-spacing:.08em;white-space:nowrap}
 
   /* ---- сохранение ---- */
   #saveWrap{
@@ -173,6 +207,9 @@
 </div>
 
 <div id="hud"><span class="dot"></span><span id="timer">00:00</span></div>
+<div id="pttHud"><span class="p"></span><span>CODE ROOT · слушаю</span></div>
+<div id="zoneLayer"><div id="zoneRub"></div></div>
+<div id="zoneHint">Обведи пальцем область — замажу. Двойной тап по фону — стереть все зоны.</div>
 <div id="msg"></div>
 
 <div id="start">
@@ -187,10 +224,23 @@
   <button class="btn on" id="btnWin">ОКНО</button>
   <button class="btn" id="btnScreen" style="display:none">ЭКРАН</button>
   <button class="btn" id="btnMic">МИК·выкл</button>
+  <button class="btn" id="btnGateMic">⊘МИК</button>
+  <button class="btn" id="btnGateCam">⊘КАМ</button>
+  <button class="btn" id="btnPtt">◉ РАЦИЯ</button>
+  <button class="btn" id="btnPrompt">СУФЛЁР·ухо</button>
+  <button class="btn" id="btnBlur">БЛЮР</button>
+  <button class="btn" id="btnZone">ЗОНА</button>
+  <button class="btn" id="btnPanic">ПАНИКА</button>
+  <button class="btn" id="btnPocket">КАРМАН</button>
   <button class="btn" id="btnRec">● REC</button>
   <button class="btn" id="btnTwitch">TWITCH</button>
   <button class="btn" id="btnLink">СВЯЗЬ</button>
   <button class="btn" id="btnInfo">ⓘ</button>
+</div>
+
+<div id="lock">
+  <svg id="lockSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="lockHint">карман · проведи по «Г» — открою</div>
 </div>
 
 <div id="saveWrap"><a id="saveLink" href="#" download>Сохранить видео</a></div>
@@ -224,31 +274,35 @@
 
 <div class="sheet" id="linkSheet">
   <div class="card">
-    <h3>ДВА ТЕЛЕФОНА · ОДИН ЭФИР</h3>
+    <h3>ДРУЗЬЯ · ОДИН ЭФИР</h3>
     <div id="linkChoose">
-      Этот телефон собирает картинку (его камера — фон, вторая — в окне) или отдаёт свою камеру другому?
+      Этот телефон собирает картинку (режиссёр) — или отдаёт свою камеру в чужой эфир?
       <div class="row">
         <button class="quiet" id="lnkDirector">Я СОБИРАЮ</button>
-        <button class="quiet" id="lnkCamera">Я — КАМЕРА-2</button>
+        <button class="quiet" id="lnkCamera">Я — КАМЕРА</button>
       </div>
     </div>
     <div id="linkDirector" style="display:none">
-      Скажи этот код второму телефону:
+      Дай друзьям ссылку на эту страницу и скажи код:
       <div class="bigcode" id="linkCode">····</div>
-      <div id="linkWait" style="color:var(--dim)">жду второй телефон…</div>
-      <div class="row"><button class="quiet" id="lnkStop1">Разорвать</button></div>
+      <div id="linkWait" style="color:var(--dim)">жду телефоны…</div>
+      <div id="engLine" style="color:var(--dim);font-size:12px;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></div>
+      <div class="row"><button class="quiet" id="lnkStop1">Разорвать всё</button></div>
     </div>
     <div id="linkCameraUi" style="display:none">
-      <label>Код с первого телефона</label>
+      <label>Подпись в эфире (имя)</label>
+      <input id="lnkName" autocomplete="off" maxlength="16" placeholder="Дима">
+      <label>Код с телефона-режиссёра</label>
       <input id="lnkCodeIn" autocapitalize="characters" autocomplete="off" placeholder="например K7M2">
       <div class="row">
         <button class="quiet" id="lnkStop2">Назад</button>
         <button class="go" id="lnkGo">ОТДАТЬ КАМЕРУ</button>
       </div>
     </div>
-    <small>Связь идёт напрямую между телефонами (WebRTC), знакомит их бесплатный брокер PeerJS.
-    Одна Wi-Fi или точка доступа с одного из телефонов — надёжно; разные сети — как повезёт с NAT.
-    Звук камеры-2 попадает в запись и эфир, но вслух здесь не играет — иначе завоет.</small>
+    <small>Каждый друг летит напрямую к режиссёру (WebRTC), знакомит всех бесплатный брокер PeerJS.
+    До четырёх камер на телефоне-режиссёре — дальше он закипит; много друзей собирай на ноутбуке этой же страницей.
+    Одна сеть или точка доступа — надёжно; разные сети — как повезёт с NAT.
+    Звук друзей идёт в запись и эфир, но вслух у режиссёра не играет — иначе завоет.</small>
   </div>
 </div>
 
@@ -259,6 +313,9 @@
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const prev = document.createElement('canvas'), pctx = prev.getContext('2d');
+const det = document.createElement('canvas'), dctx = det.getContext('2d', { willReadFrequently: true });
+const tmp = document.createElement('canvas'), tctx = tmp.getContext('2d');
+const out = document.createElement('canvas'), octx = out.getContext('2d'); // эфирный выход: его пишут REC и Twitch
 
 let mode = 'studio';                          // studio | efir
 let camVideo = null, camStream = null, facing = 'environment';
@@ -268,8 +325,32 @@ let winOn = true, screenMode = false;
 let recorder = null, chunks = [], recStream = null, recT0 = 0, timerId = null, blobUrl = null;
 let audioCtx = null;
 let pc = null, whipResource = null, twitchOn = false;
-let peer = null, mediaCall = null, remoteVideo = null, remoteStream = null, linkRole = null;
+let peer = null, mediaCall = null, linkRole = null;
+let micGate = null, micSrcNode = null;         // цепь микрофона в шину
+let bus = null;                                // постоянная аудио-шина эфира
+const BLUR_DELAY = 0.4;                        // конвейер-страховка блюра, сек
+let ring = null, ringN = 14;                   // видеобуфер страховки
+const detHist = [];                            // история детекций лиц (t, faces)
+let lockOn = false;                            // КАРМАН
+let twitchSrcKind = '';
+let twScreenStream = null, twTabNode = null, recTabNode = null;
+let rubkaWs = null, rubkaConn = null, rubkaTimer = null;
+let pttKeyT = 0, pttSticky = false;            // кликеры-«пульсы»: рация-залипание
+let micMuted = false, camMuted = false;
+let engKey = '', engConns = [];
+const layers = new Map();
+const remotes = [];
+const SLOTS = [
+  { nx: 0.55, ny: 0.55, nw: 0.34 }, { nx: 0.04, ny: 0.55, nw: 0.34 },
+  { nx: 0.04, ny: 0.08, nw: 0.34 }, { nx: 0.30, ny: 0.32, nw: 0.34 }
+];
 let wakeLock = null;
+let pttHeld = false, prompterAloud = false, pttLearn = false;
+let autoBlur = false, panic = false, zoneMode = false;
+let faceDetector = null, faceLoading = false, lastDet = 0;
+let faces = [];              // {nx,ny,nw,nh,seen}
+const manualZones = [];      // {nx,ny,nw,nh}
+let pttKey = (() => { try { return localStorage.getItem('skrin_ptt_key') || ''; } catch (e) { return ''; } })();
 let W = 0, H = 0, running = false;
 
 const win = { nx: 0.52, ny: 0.08, nw: 0.42 }; // нормированный прямоугольник окна
@@ -290,7 +371,10 @@ function fit(){
   if (Math.max(cw, ch) * scale > 1440) scale = 1440 / Math.max(cw, ch);
   W = Math.round(cw * scale); H = Math.round(ch * scale);
   cv.width = W; cv.height = H; prev.width = W; prev.height = H;
+  out.width = W; out.height = H;
+  if (ring) allocRing();
   placeWinDom();
+  if (lockOn) placeLockPath();
 }
 window.addEventListener('resize', fit);
 
@@ -302,6 +386,7 @@ async function openCam(face){
     audio: false
   });
   facing = face;
+  if (camMuted) camStream.getVideoTracks().forEach(t => t.enabled = false);
   if (!camVideo){
     camVideo = document.createElement('video');
     camVideo.playsInline = true; camVideo.muted = true; camVideo.autoplay = true;
@@ -346,14 +431,15 @@ function drawCoverRect(c, vid, x, y, w, h, mirror){
   c.restore();
 }
 
-function winRectPx(){
+function rectPx(o){
   const cw = window.innerWidth, ch = window.innerHeight;
-  const wCss = win.nw * cw, hCss = wCss * (ch / cw);
-  const xCss = win.nx * cw, yCss = win.ny * ch;
+  const wCss = o.nw * cw, hCss = wCss * (ch / cw);
+  const xCss = o.nx * cw, yCss = o.ny * ch;
   return { xCss, yCss, wCss, hCss,
            x: xCss / cw * W, y: yCss / ch * H,
            w: wCss / cw * W, h: hCss / ch * H };
 }
+function winRectPx(){ return rectPx(win); }
 
 function rr(c, x, y, w, h, r){
   if (c.roundRect){ c.beginPath(); c.roundRect(x, y, w, h, r); }
@@ -373,9 +459,7 @@ function frame(){
     const r = winRectPx(), rad = Math.min(r.w, r.h) * 0.06;
     ctx.save();
     rr(ctx, r.x, r.y, r.w, r.h, rad); ctx.clip();
-    if (remoteStream && remoteVideo && remoteVideo.videoWidth){
-      drawCoverRect(ctx, remoteVideo, r.x, r.y, r.w, r.h, false);
-    } else if (screenMode && dispVideo && dispVideo.videoWidth){
+    if (screenMode && dispVideo && dispVideo.videoWidth){
       drawCoverRect(ctx, dispVideo, r.x, r.y, r.w, r.h, false);
     } else {
       ctx.globalAlpha = 0.96; /* эхо: прошлый кадр целиком — в окно → туннель */
@@ -391,7 +475,54 @@ function frame(){
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
+
+  for (const rm of remotes){
+    if (!rm.video || !rm.video.videoWidth) continue;
+    const rp = rectPx(rm), rad2 = Math.min(rp.w, rp.h) * 0.06;
+    ctx.save();
+    rr(ctx, rp.x, rp.y, rp.w, rp.h, rad2); ctx.clip();
+    drawCoverRect(ctx, rm.video, rp.x, rp.y, rp.w, rp.h, false);
+    ctx.restore();
+    rr(ctx, rp.x, rp.y, rp.w, rp.h, rad2);
+    ctx.lineWidth = Math.max(2, W * 0.004);
+    ctx.strokeStyle = 'rgba(255,180,84,0.9)';
+    ctx.shadowColor = 'rgba(255,180,84,0.55)';
+    ctx.shadowBlur = W * 0.012;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (rm.label){
+      const fs = Math.max(12, W * 0.018);
+      ctx.font = '700 ' + fs + 'px ui-monospace, Menlo, monospace';
+      const tw = ctx.measureText(rm.label).width;
+      const lx = rp.x + rp.w / 2 - tw / 2, ly = rp.y + rp.h - fs * 0.7;
+      ctx.fillStyle = 'rgba(11,15,20,0.65)';
+      rr(ctx, lx - fs * 0.5, ly - fs * 1.05, tw + fs, fs * 1.5, fs * 0.75);
+      ctx.fill();
+      ctx.fillStyle = '#FFB454';
+      ctx.fillText(rm.label, lx, ly);
+    }
+  }
+
+  const nowT = performance.now();
+  if (autoBlur && ring) snapshotRing(nowT);   // чистый кадр в буфер ДО живой мозаики
+  privacyPass(nowT);
+
+  for (const [id, fn] of layers){
+    try{ fn(ctx, W, H, performance.now()); }
+    catch(e){ layers.delete(id); engSend({ op: 'layer-error', id, error: String(e) }); }
+  }
+
+  if (camMuted){
+    ctx.fillStyle = '#0B0F14';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(255,180,84,0.85)';
+    ctx.font = '700 ' + Math.round(W * 0.05) + 'px ui-monospace, Menlo, monospace';
+    const t = '· пауза ·';
+    ctx.fillText(t, (W - ctx.measureText(t).width) / 2, H / 2);
+  }
+
   pctx.drawImage(cv, 0, 0);
+  renderOut(nowT);
 }
 
 /* ---------- окно: перенос и размер ---------- */
@@ -403,6 +534,7 @@ function placeWinDom(){
   winEl.style.width = r.wCss + 'px';
   winEl.style.height = r.hCss + 'px';
   winEl.style.display = winOn ? 'block' : 'none';
+  remotes.forEach(r => { if (r.place) r.place(); });
 }
 let drag = null;
 winEl.addEventListener('pointerdown', e => {
@@ -431,16 +563,269 @@ window.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => drag = null);
 window.addEventListener('pointercancel', () => drag = null);
 
-/* ---------- звук: смешать несколько дорожек в одну ---------- */
-function mixAudio(tracks){
-  if (tracks.length <= 1) return tracks;
+/* ---------- звук: постоянная шина эфира ----------
+   Всё аудио — микрофон (через гейт), друзья при входе, звук вкладки —
+   подключается в одну шину. REC и Twitch всегда берут её ЕДИНСТВЕННЫЙ
+   выход, поэтому кто вошёл позже — автоматически в миксе.
+   busDelay — страховка блюра: звук отстаёт вместе с видео. */
+function ensureBus(){
+  if (bus) return bus;
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  const master = audioCtx.createGain();
+  const delay = audioCtx.createDelay(3.0); delay.delayTime.value = 0;
   const dest = audioCtx.createMediaStreamDestination();
-  tracks.forEach(t => {
-    const src = audioCtx.createMediaStreamSource(new MediaStream([t]));
-    src.connect(dest);
+  master.connect(delay); delay.connect(dest);
+  bus = { master, delay, dest };
+  return bus;
+}
+function busTrack(){ return ensureBus().dest.stream.getAudioTracks()[0]; }
+function connectToBus(streamOrTrack){
+  ensureBus();
+  const ms = (streamOrTrack instanceof MediaStream) ? streamOrTrack
+                                                    : new MediaStream([streamOrTrack]);
+  const node = audioCtx.createMediaStreamSource(ms);
+  node.connect(bus.master);
+  return node;   // держи ссылку: отключение — node.disconnect()
+}
+function setBusDelay(sec){
+  ensureBus();
+  const v = Math.min(Math.max(+sec || 0, 0), 3);
+  bus.delay.delayTime.setTargetAtTime(v, audioCtx.currentTime, 0.05);
+}
+/* Микрофон входит в шину через гейт: ⊘МИК и рация режут его,
+   не трогая голоса друзей. */
+function ensureMicChain(){
+  if (!micStream || micSrcNode) return;
+  ensureBus();
+  micSrcNode = audioCtx.createMediaStreamSource(micStream);
+  micGate = audioCtx.createGain();
+  micGate.gain.value = (micMuted || pttHeld) ? 0 : 1;
+  micSrcNode.connect(micGate); micGate.connect(bus.master);
+}
+function dropMicChain(){
+  try{ if (micSrcNode) micSrcNode.disconnect(); }catch(e){}
+  try{ if (micGate) micGate.disconnect(); }catch(e){}
+  micSrcNode = null; micGate = null;
+}
+/* Итоговый гейт = постоянный мут ⊘МИК ЛИБО зажатая рация.
+   Так push-to-talk и кнопка мута не спорят за один gain. */
+function applyMicGate(){
+  if (micGate) micGate.gain.setTargetAtTime((micMuted || pttHeld) ? 0 : 1, audioCtx.currentTime, 0.02);
+}
+function setMicMuted(v){
+  micMuted = !!v;
+  applyMicGate();
+  /* пояс и подтяжки: глушим и сырую дорожку — честно для ЛЮБОГО пути наружу */
+  if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = !micMuted);
+  $('btnGateMic').classList.toggle('on', micMuted);
+  linkFlash(micMuted ? 'микрофон вырезан из эфира' : 'микрофон в эфире');
+}
+
+/* РАЦИЯ — push-to-talk к Клоду. Пока зажата: голос вырезан из эфира
+   (команда «code root ...» не утечёт), Клод слушает даже без слова-триггера.
+   Индикатор — HTML поверх, в захват канваса не попадает. */
+function pttDown(){
+  if (pttHeld) return;
+  pttHeld = true;
+  ensureMicChain();
+  applyMicGate();
+  $('btnPtt').classList.add('on');
+  $('pttHud').style.display = 'flex';
+  engSend({ op: 'ptt', down: true });
+}
+function pttUp(){
+  pttSticky = false;
+  if (!pttHeld) return;
+  pttHeld = false;
+  applyMicGate();
+  $('btnPtt').classList.remove('on');
+  $('pttHud').style.display = 'none';
+  engSend({ op: 'ptt', down: false });
+}
+function setPrompterAloud(v){
+  prompterAloud = !!v;
+  $('btnPrompt').textContent = 'СУФЛЁР·' + (prompterAloud ? 'вслух' : 'ухо');
+  $('btnPrompt').classList.toggle('aloud', prompterAloud);
+  linkFlash(prompterAloud ? 'суфлёр вслух — Клода услышат зрители'
+                          : 'суфлёр в ухо — Клода слышишь только ты');
+}
+/* Шёпот Клода. В режиме «ухо» — тост только режиссёру (в эфир не идёт).
+   В режиме «вслух» — титр на полотне, который видят зрители. */
+function prompterWhisper(text){
+  const s = String(text);
+  if (prompterAloud){
+    CMDS.text('суфлёр', s, { y: 0.9, size: 0.032, color: '#B08CFF' });
+    clearTimeout(prompterWhisper._t);
+    prompterWhisper._t = setTimeout(() => layers.delete('суфлёр'), 6000);
+  } else {
+    linkFlash('🎧 ' + s);
+  }
+}
+function setCamMuted(v){
+  camMuted = !!v;
+  /* enabled=false даёт чёрные кадры В САМОЙ дорожке: пауза честна и для
+     режиссёра, принимающего эту камеру, и для Twitch-источника «камера» */
+  if (camStream) camStream.getVideoTracks().forEach(t => t.enabled = !camMuted);
+  $('btnGateCam').classList.toggle('on', camMuted);
+  linkFlash(camMuted ? 'камера на паузе — наружу идёт чёрный кадр' : 'камера в эфире');
+}
+function setMicDelay(sec){ setBusDelay(sec); } // историческое имя: теперь это задержка всей шины
+function linkFlash(t){ showMsg(t, 2000); }
+
+/* ---------- приватность: блюр лиц, паника, ручная зона ---------- */
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21';
+const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+async function ensureFaceDetector(){
+  if (faceDetector || faceLoading) return;
+  faceLoading = true;
+  showMsg('загружаю детектор лиц…', 3000);
+  try{
+    const vision = await import(MP + '/vision_bundle.mjs');
+    const fileset = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
+    faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' },
+      runningMode: 'VIDEO', minDetectionConfidence: 0.4
+    });
+    showMsg('детектор лиц готов — лица замазываются', 2500);
+  }catch(e){
+    autoBlur = false; $('btnBlur').classList.remove('on');
+    showMsg('детектор не загрузился: ' + (e.message || e), 6000);
+  }
+  faceLoading = false;
+}
+/* мозаика области любого полотна (нормированные координаты) */
+function mosaicOn(c, srcCanvas, nx, ny, nw, nh, across){
+  const x = Math.max(0, Math.floor(nx * W)), y = Math.max(0, Math.floor(ny * H));
+  const w = Math.min(W - x, Math.ceil(nw * W)), h = Math.min(H - y, Math.ceil(nh * H));
+  if (w <= 1 || h <= 1) return;
+  const sw = Math.max(2, Math.round(across || 10));
+  const sh = Math.max(2, Math.round(sw * h / w));
+  tmp.width = sw; tmp.height = sh;
+  tctx.imageSmoothingEnabled = true;
+  tctx.drawImage(srcCanvas, x, y, w, h, 0, 0, sw, sh);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(tmp, 0, 0, sw, sh, x, y, w, h);
+  c.imageSmoothingEnabled = true;
+}
+function mosaic(nx, ny, nw, nh, across){ mosaicOn(ctx, cv, nx, ny, nw, nh, across); }
+/* детекция лиц — реже кадров, чтобы не грузить телефон */
+function detectFaces(now){
+  if (!faceDetector || now - lastDet < 70) return;
+  lastDet = now;
+  const dw = 256, dh = Math.max(1, Math.round(256 * H / W));
+  det.width = dw; det.height = dh;
+  dctx.drawImage(cv, 0, 0, dw, dh);
+  let res;
+  try{ res = faceDetector.detectForVideo(det, now); }catch(e){ return; }
+  const found = [];
+  (res && res.detections || []).forEach(d => {
+    const b = d.boundingBox;
+    if (!b) return;
+    found.push({
+      nx: b.originX / dw, ny: b.originY / dh,
+      nw: b.width / dw, nh: b.height / dh, seen: now
+    });
   });
-  return dest.stream.getAudioTracks();
+  faces = found;
+  faces._t = now;
+  if (autoBlur){
+    detHist.push({ t: now, faces: found });
+    const cutoff = now - (BLUR_DELAY * 1000 + 900);
+    while (detHist.length && detHist[0].t < cutoff) detHist.shift();
+  }
+}
+/* приватность-проход: рисуется по картинке камеры/окон, ДО титров */
+function privacyPass(now){
+  if (panic){ mosaic(0, 0, 1, 1, 22); return; }
+  if (autoBlur && faceDetector){
+    detectFaces(now);
+    const keep = (faces._t && now - faces._t < 400) ? faces : [];
+    keep.forEach(f => {
+      const px = f.nw * 0.28, py = f.nh * 0.35;   // padding, лоб/подбородок
+      mosaic(f.nx - px, f.ny - py, f.nw + px * 2, f.nh + py * 2, 9);
+    });
+  }
+  manualZones.forEach(z => mosaic(z.nx, z.ny, z.nw, z.nh, 12));
+}
+function setAutoBlur(v){
+  autoBlur = !!v;
+  $('btnBlur').classList.toggle('on', autoBlur);
+  if (autoBlur){
+    ensureFaceDetector();
+    allocRing();
+    setBusDelay(BLUR_DELAY);
+    linkFlash('блюр включён · эфир и запись отстают на ' + BLUR_DELAY + ' с — страховка');
+  } else {
+    freeRing();
+    setBusDelay(0);
+    linkFlash('блюр выключен · задержка снята, эфир живой');
+  }
+}
+function setPanic(v){
+  panic = !!v;
+  $('btnPanic').classList.toggle('on', panic);
+  linkFlash(panic ? '⚠ ПАНИКА — весь кадр замазан' : 'паника снята');
+}
+
+/* ---------- конвейер-страховка блюра ----------
+   Живое полотно cv стример видит сразу. В эфир и запись уходит out:
+   блюр выключен — out = копия текущего кадра (ноль задержки);
+   блюр включён — out = кадр возрастом BLUR_DELAY из кольцевого буфера,
+   замазанный по ВСЕМ детекциям вокруг его момента. Лицо, пойманное
+   детектором на 200 мс позже появления, до зрителя не доедет.
+   Цена страховки: задержка эфира и ~50 МБ памяти — только пока блюр горит. */
+function allocRing(){
+  ringN = Math.ceil(BLUR_DELAY * 30) + 3;
+  ring = { i: 0, frames: [] };
+  for (let k = 0; k < ringN; k++){
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    ring.frames.push({ t: 0, c, cx: c.getContext('2d') });
+  }
+}
+function freeRing(){ ring = null; detHist.length = 0; }
+function snapshotRing(now){
+  if (!ring) return;
+  const f = ring.frames[ring.i];
+  f.t = now;
+  f.cx.drawImage(cv, 0, 0);
+  ring.i = (ring.i + 1) % ringN;
+}
+function ringFrameAt(ts){
+  if (!ring) return null;
+  let best = null;
+  for (const f of ring.frames)
+    if (f.t && f.t <= ts && (!best || f.t > best.t)) best = f;
+  return best;
+}
+function renderOut(now){
+  if (!(autoBlur && ring)){ octx.drawImage(cv, 0, 0); return; }
+  const f = ringFrameAt(now - BLUR_DELAY * 1000);
+  if (!f) return;               // буфер набирается: out держит последний кадр — ничего незастрахованного
+  octx.drawImage(f.c, 0, 0);
+  if (panic){
+    mosaicOn(octx, out, 0, 0, 1, 1, 22);
+  } else {
+    for (const d of detHist){
+      if (d.t < f.t - 300) continue;      // окно: чуть раньше кадра … до текущего момента
+      for (const fc of d.faces){
+        const px = fc.nw * 0.28, py = fc.nh * 0.35;
+        mosaicOn(octx, out, fc.nx - px, fc.ny - py, fc.nw + px * 2, fc.nh + py * 2, 9);
+      }
+    }
+    manualZones.forEach(z => mosaicOn(octx, out, z.nx, z.ny, z.nw, z.nh, 12));
+  }
+  for (const [id, fn] of layers){
+    try{ fn(octx, W, H, now); }catch(e){}
+  }
+  if (camMuted){
+    octx.fillStyle = '#0B0F14'; octx.fillRect(0, 0, W, H);
+    octx.fillStyle = 'rgba(255,180,84,0.85)';
+    octx.font = '700 ' + Math.round(W * 0.05) + 'px ui-monospace, Menlo, monospace';
+    const t = '· пауза ·';
+    octx.fillText(t, (W - octx.measureText(t).width) / 2, H / 2);
+  }
 }
 
 /* ---------- запись ---------- */
@@ -462,11 +847,9 @@ async function toggleRec(){
 
   let stream;
   if (mode === 'studio'){
-    stream = cv.captureStream(30);
-    let aTr = [];
-    if (micOn && micStream) aTr = aTr.concat(micStream.getAudioTracks());
-    if (remoteStream) aTr = aTr.concat(remoteStream.getAudioTracks());
-    mixAudio(aTr).forEach(t => stream.addTrack(t));
+    stream = out.captureStream(30);          // эфирный выход: с блюром — застрахованный кадр
+    ensureMicChain();
+    stream.addTrack(busTrack());             // шина: микрофон, друзья — и все, кто войдёт ПОЗЖЕ
   } else {
     /* ЭФИР: слой YouTube — чужой iframe, в canvas его не нарисовать.
        На компе берём захват вкладки; на телефоне честно шлём к Пункту управления. */
@@ -477,9 +860,10 @@ async function toggleRec(){
       const gdm = await navigator.mediaDevices.getDisplayMedia({
         video: true, audio: true, preferCurrentTab: true
       });
-      const audio = gdm.getAudioTracks();
-      if (micOn && micStream) audio.push(...micStream.getAudioTracks());
-      stream = new MediaStream([...gdm.getVideoTracks(), ...mixAudio(audio)]);
+      ensureMicChain();
+      const tabA = gdm.getAudioTracks();
+      recTabNode = tabA.length ? connectToBus(new MediaStream(tabA)) : null;
+      stream = new MediaStream([...gdm.getVideoTracks(), busTrack()]);
       recStream = gdm;
       gdm.getVideoTracks()[0].addEventListener('ended', () => {
         if (recorder && recorder.state === 'recording') recorder.stop();
@@ -498,6 +882,7 @@ async function toggleRec(){
     if (!twitchOn) $('hud').style.display = 'none';
     $('btnRec').classList.remove('on');
     stopRecTracks();
+    if (recTabNode){ try{ recTabNode.disconnect(); }catch(e){} recTabNode = null; }
     const type = recorder.mimeType || mime || 'video/mp4';
     const blob = new Blob(chunks, { type });
     blobUrl = URL.createObjectURL(blob);
@@ -563,6 +948,7 @@ async function twitchStart(){
   const endpoint = $('twEndpoint').value.trim();
   const key = $('twKey').value.trim();
   const srcKind = $('twSource').value;
+  twitchSrcKind = srcKind;
   if (!key){ showMsg('Нужен ключ трансляции из панели Twitch'); return; }
 
   let vTrack = null, aTracks = [];
@@ -572,34 +958,35 @@ async function twitchStart(){
         throw new Error('на этом устройстве браузер не отдаёт экран');
       const gdm = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true });
       vTrack = gdm.getVideoTracks()[0];
-      aTracks = gdm.getAudioTracks();
-      recStream = gdm;
+      const twA = gdm.getAudioTracks();
+      twTabNode = twA.length ? connectToBus(new MediaStream(twA)) : null;
+      twScreenStream = gdm;
+      gdm.getVideoTracks()[0].addEventListener('ended', () => { if (twitchOn) twitchStop(); });
     } else if (srcKind === 'canvas'){
-      vTrack = cv.captureStream(30).getVideoTracks()[0];
+      vTrack = out.captureStream(30).getVideoTracks()[0];   // застрахованный кадр
     } else {
       if (!camStream) await openCam(facing);
       vTrack = camStream.getVideoTracks()[0];
     }
-    if (micOn){
-      if (!micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      aTracks = aTracks.concat(micStream.getAudioTracks());
-    }
-    if (remoteStream) aTracks = aTracks.concat(remoteStream.getAudioTracks());
-    aTracks = mixAudio(aTracks);
+    ensureMicChain();
+    aTracks = [busTrack()];   // шина даёт дорожку всегда, даже тихую — Twitch хочет видеть аудио
+    try{ vTrack.contentHint = (srcKind === 'screen') ? 'detail' : 'motion'; }catch(e){}
 
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     const vt = pc.addTransceiver(vTrack, { direction: 'sendonly' });
     if (aTracks.length) pc.addTransceiver(aTracks[0], { direction: 'sendonly' });
 
-    /* Twitch хочет H264 */
-    if (vt.setCodecPreferences && window.RTCRtpSender && RTCRtpSender.getCapabilities){
-      const caps = RTCRtpSender.getCapabilities('video');
-      if (caps){
-        const h264 = caps.codecs.filter(c => /h264/i.test(c.mimeType));
-        const rest = caps.codecs.filter(c => !/h264/i.test(c.mimeType));
-        if (h264.length) vt.setCodecPreferences(h264.concat(rest));
+    /* Twitch хочет H264; setCodecPreferences у браузеров с норовом — не даём ему уронить старт */
+    try{
+      if (vt.setCodecPreferences && window.RTCRtpSender && RTCRtpSender.getCapabilities){
+        const caps = RTCRtpSender.getCapabilities('video');
+        if (caps){
+          const h264 = caps.codecs.filter(c => /h264/i.test(c.mimeType));
+          const rest = caps.codecs.filter(c => !/h264/i.test(c.mimeType));
+          if (h264.length) vt.setCodecPreferences(h264.concat(rest));
+        }
       }
-    }
+    }catch(e){}
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -622,6 +1009,16 @@ async function twitchStart(){
     const answer = await resp.text();
     await pc.setRemoteDescription({ type: 'answer', sdp: answer });
 
+    try{
+      const snd = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (snd){
+        const p = snd.getParameters();
+        p.encodings = (p.encodings && p.encodings.length) ? p.encodings : [{}];
+        p.encodings[0].maxBitrate = 3500000;
+        await snd.setParameters(p);
+      }
+    }catch(e){}
+
     twitchOn = true;
     $('btnTwitch').classList.add('on');
     $('hud').classList.add('live');
@@ -639,7 +1036,9 @@ async function twitchStart(){
 function twitchStop(silent){
   if (pc){ try{ pc.close(); }catch(e){} pc = null; }
   if (whipResource){ fetch(whipResource, { method: 'DELETE' }).catch(() => {}); whipResource = null; }
-  stopRecTracks();
+  if (twScreenStream){ twScreenStream.getTracks().forEach(t => t.stop()); twScreenStream = null; }
+  if (twTabNode){ try{ twTabNode.disconnect(); }catch(e){} twTabNode = null; }
+  twitchSrcKind = '';
   twitchOn = false;
   $('btnTwitch').classList.remove('on');
   $('hud').classList.remove('live');
@@ -655,10 +1054,131 @@ $('btnTwitch').onclick = () => {
 $('twCancel').onclick = () => $('twitchSheet').style.display = 'none';
 $('twGo').onclick = twitchStart;
 
+/* ---------- рубка: канал инженера (Claude Code) ---------- */
+const api = {
+  addLayer: (id, fn) => layers.set(id, fn),
+  delLayer: id => layers.delete(id),
+  clearLayers: () => layers.clear(),
+  cmd: (name, ...args) => runCmd(name, args),
+  get W(){ return W; }, get H(){ return H; },
+  get remotes(){ return remotes; }, get win(){ return win; },
+  ctx, canvas: cv,
+  send: x => engSend({ op: 'note', data: x })
+};
+const CMDS = {
+  micGate: on => setMicMuted(!!on),
+  camMute: on => setCamMuted(!!on),
+  micDelay: sec => setBusDelay(sec),   // историческое имя
+  delay: sec => setBusDelay(sec),      // задержка шины (звук); видео-страховку носит блюр
+  pocket: on => setPocket(!!on),
+  winSet: o => {
+    const t = (o.i === undefined || o.i === null) ? win : remotes[o.i];
+    if (!t) return 'нет такого окна';
+    if (o.nx !== undefined) t.nx = o.nx;
+    if (o.ny !== undefined) t.ny = o.ny;
+    if (o.nw !== undefined) t.nw = o.nw;
+    placeWinDom();
+  },
+  winToggle: on => { winOn = !!on; $('btnWin').classList.toggle('on', winOn); placeWinDom(); },
+  text: (id, str, o) => {
+    o = o || {};
+    if (!str){ layers.delete(id); return; }
+    layers.set(id, (c, w, h) => {
+      const fs = Math.round(w * (o.size || 0.03));
+      c.font = '700 ' + fs + 'px ui-monospace, Menlo, monospace';
+      const tw = c.measureText(str).width;
+      const x = (o.x !== undefined) ? o.x * w : (w - tw) / 2;
+      const y = (o.y !== undefined) ? o.y * h : h * 0.1;
+      c.fillStyle = 'rgba(11,15,20,0.65)';
+      c.fillRect(x - fs * 0.5, y - fs * 1.1, tw + fs, fs * 1.6);
+      c.fillStyle = o.color || '#FFB454';
+      c.fillText(str, x, y);
+    });
+  },
+  layerDel: id => layers.delete(id),
+  flash: t => linkFlash(String(t)),
+  prompter: aloud => setPrompterAloud(!!aloud),
+  whisper: t => { prompterWhisper(t); },
+  blur: on => setAutoBlur(!!on),
+  panic: on => setPanic(!!on),
+  zoneClear: () => { manualZones.length = 0; linkFlash('ручные зоны стёрты'); },
+  rec: on => { const active = recorder && recorder.state === 'recording'; if (!!on !== active) toggleRec(); },
+  state: () => ({
+    mode, micOn, micMuted, camMuted, twitchOn,
+    ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
+    pocket: lockOn,
+    delay: bus ? +bus.delay.delayTime.value.toFixed(2) : 0,
+    rec: !!(recorder && recorder.state === 'recording'),
+    cameras: remotes.map(r => r.label), layers: [...layers.keys()]
+  })
+};
+function runCmd(name, args){
+  if (!CMDS[name]) return 'нет команды: ' + name;
+  try{ return CMDS[name](...(args || [])); }
+  catch(e){ return 'ошибка: ' + (e.message || e); }
+}
+function engSend(msg){
+  const s = JSON.stringify(msg);
+  engConns.forEach(c => { try{ c.send(s); }catch(e){} });
+}
+function handleEngMsg(raw){
+  let m = raw;
+  if (typeof raw === 'string'){ try{ m = JSON.parse(raw); }catch(e){ m = { op: 'js', code: raw }; } }
+  if (!m || !m.op) return;
+  if (m.op === 'cmd'){
+    const r = runCmd(m.name, m.args);
+    engSend({ op: 'result', of: m.name, result: (r === undefined ? 'ок' : r) });
+  } else if (m.op === 'whisper'){
+    prompterWhisper(m.text);
+  } else if (m.op === 'js'){
+    try{
+      const r = new Function('api', 'ctx', 'W', 'H', m.code)(api, ctx, W, H);
+      engSend({ op: 'result', of: 'js', result: (r === undefined ? 'ок' : String(r)) });
+      linkFlash('рубка внесла правку');
+    }catch(e){ engSend({ op: 'result', of: 'js', error: String(e) }); }
+  }
+}
+function acceptEngineer(conn){
+  const md = conn.metadata || {};
+  if (md.role !== 'engineer' || md.key !== engKey){ try{ conn.close(); }catch(e){} return; }
+  engConns.push(conn);
+  conn.on('data', d => handleEngMsg(d));
+  conn.on('close', () => { engConns = engConns.filter(c => c !== conn); linkFlash('рубка отключилась'); });
+  linkFlash('РУБКА НА СВЯЗИ — Claude у пульта');
+}
+function tryLocalRubka(){
+  if (rubkaWs && (rubkaWs.readyState === 0 || rubkaWs.readyState === 1)) return; // уже стучимся/на связи
+  let w;
+  try{ w = new WebSocket('ws://127.0.0.1:8787/studio'); }
+  catch(e){ return; } // https+Safari режет ws к loopback — не колотимся зря
+  rubkaWs = w;
+  w.onopen = () => {
+    rubkaConn = { send: s => w.send(s) };
+    engConns.push(rubkaConn);
+    linkFlash('рубка на связи (localhost)');
+  };
+  w.onmessage = e => handleEngMsg(e.data);
+  w.onerror = () => {};
+  w.onclose = () => {
+    if (rubkaConn){
+      engConns = engConns.filter(c => c !== rubkaConn);
+      rubkaConn = null;
+      linkFlash('рубка отключилась');
+    }
+    rubkaWs = null;
+    clearTimeout(rubkaTimer);
+    rubkaTimer = setTimeout(tryLocalRubka, 4000); // тихо стучимся, пока рубку не поднимут
+  };
+}
+
 /* ---------- связь двух телефонов ---------- */
 async function keepAwake(){
-  try{ if (navigator.wakeLock && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); }
-  catch(e){}
+  try{
+    if (navigator.wakeLock && !wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  }catch(e){}
 }
 function makeCode(){
   const abc = 'ABCDEFGHKMNPRSTUVWXYZ23456789';
@@ -671,25 +1191,103 @@ function linkStatus(t){
   if (!t){ el.style.display = 'none'; return; }
   el.textContent = t; el.style.display = 'block';
 }
-function attachRemote(s){
-  remoteStream = s;
-  if (!remoteVideo){
-    remoteVideo = document.createElement('video');
-    remoteVideo.playsInline = true; remoteVideo.autoplay = true;
-    remoteVideo.muted = true; /* вслух не играем — звук уходит в микс */
-    camHolder.appendChild(remoteVideo);
+function makeWinDom(rm){
+  const el = document.createElement('div');
+  el.className = 'rwin';
+  const g = document.createElement('div');
+  g.className = 'grip';
+  el.appendChild(g);
+  document.body.appendChild(el);
+  rm.dom = el;
+  rm.place = () => {
+    const r = rectPx(rm);
+    el.style.left = r.xCss + 'px'; el.style.top = r.yCss + 'px';
+    el.style.width = r.wCss + 'px'; el.style.height = r.hCss + 'px';
+  };
+  let d = null;
+  el.addEventListener('pointerdown', e => {
+    if (e.target === g) return;
+    d = { m: 'move', px: e.clientX, py: e.clientY, nx: rm.nx, ny: rm.ny };
+    el.setPointerCapture(e.pointerId);
+  });
+  g.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    d = { m: 'size', px: e.clientX, nw: rm.nw };
+    g.setPointerCapture(e.pointerId);
+  });
+  const mv = e => {
+    if (!d) return;
+    const cw = window.innerWidth, ch = window.innerHeight;
+    if (d.m === 'move'){
+      rm.nx = Math.min(Math.max(d.nx + (e.clientX - d.px) / cw, 0.01), 0.98 - rm.nw);
+      rm.ny = Math.min(Math.max(d.ny + (e.clientY - d.py) / ch, 0.01), 0.98 - rm.nw);
+    } else {
+      rm.nw = Math.min(Math.max(d.nw + (e.clientX - d.px) / cw, 0.14), 0.9);
+      rm.nx = Math.min(rm.nx, 0.98 - rm.nw);
+      rm.ny = Math.min(rm.ny, 0.98 - rm.nw);
+    }
+    rm.place();
+  };
+  el.addEventListener('pointermove', mv);
+  g.addEventListener('pointermove', mv);
+  const up = () => d = null;
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+  rm.place();
+}
+function onIncomingCall(call){
+  if (remotes.length >= 4){
+    try{ call.close(); }catch(e){}
+    showMsg('Уже четыре камеры — потолок телефона-режиссёра');
+    return;
   }
-  remoteVideo.srcObject = s;
-  remoteVideo.play().catch(() => {});
-  $('linkWait').textContent = 'второй телефон в окне ✓';
+  call.answer();
+  call.on('stream', s => addRemote(call, s));
+  call.on('close', () => removeRemote(call));
+  call.on('error', () => removeRemote(call));
+}
+function addRemote(call, s){
+  if (remotes.some(r => r.call === call)) return;
+  const slot = SLOTS[remotes.length % SLOTS.length];
+  const v = document.createElement('video');
+  v.playsInline = true; v.autoplay = true;
+  v.muted = true; /* вслух не играем — звук уходит в микс */
+  v.srcObject = s;
+  camHolder.appendChild(v);
+  v.play().catch(() => {});
+  const rm = {
+    call, stream: s, video: v,
+    label: ((call.metadata && call.metadata.name) || '').slice(0, 16),
+    nx: slot.nx, ny: slot.ny, nw: slot.nw
+  };
+  const ra = s.getAudioTracks();
+  if (ra.length){ try{ rm.busNode = connectToBus(new MediaStream(ra)); }catch(e){} }
+  makeWinDom(rm);
+  remotes.push(rm);
+  $('linkWait').textContent = 'камер в эфире: ' + remotes.length;
   $('btnLink').classList.add('on');
-  linkStatus('КАМЕРА-2 · в окне');
-  showMsg('Второй телефон подключился — он в окне');
+  linkStatus('КАМЕР: ' + remotes.length);
+  showMsg((rm.label || 'Камера') + ' вошла в эфир');
+}
+function removeRemote(call){
+  const i = remotes.findIndex(r => r.call === call);
+  if (i < 0) return;
+  const rm = remotes[i];
+  try{ if (rm.busNode) rm.busNode.disconnect(); }catch(e){}
+  try{ rm.video.srcObject = null; rm.video.remove(); }catch(e){}
+  try{ rm.dom.remove(); }catch(e){}
+  remotes.splice(i, 1);
+  $('linkWait').textContent = remotes.length ? 'камер в эфире: ' + remotes.length : 'жду телефоны…';
+  linkStatus(remotes.length ? 'КАМЕР: ' + remotes.length
+                            : (linkRole === 'director' ? 'ЖДУ КАМЕРЫ' : null));
+  if (!remotes.length && linkRole !== 'director') $('btnLink').classList.remove('on');
+  showMsg((rm.label || 'Камера') + ' вышла');
 }
 function linkStop(silent){
+  remotes.slice().forEach(r => { try{ r.call.close(); }catch(e){} removeRemote(r.call); });
   if (mediaCall){ try{ mediaCall.close(); }catch(e){} mediaCall = null; }
   if (peer){ try{ peer.destroy(); }catch(e){} peer = null; }
-  remoteStream = null; linkRole = null;
+  linkRole = null;
   $('btnLink').classList.remove('on');
   linkStatus(null);
   $('linkSheet').style.display = 'none';
@@ -698,27 +1296,38 @@ function linkStop(silent){
   $('linkCameraUi').style.display = 'none';
   if (!silent) showMsg('Связь разорвана');
 }
+let linkCode = '';
 function startDirector(){
-  const code = makeCode();
-  $('linkCode').textContent = code;
-  $('linkWait').textContent = 'жду второй телефон…';
+  linkCode = makeCode();
+  $('linkCode').textContent = linkCode;
+  $('linkWait').textContent = 'жду телефоны…';
   $('linkChoose').style.display = 'none';
   $('linkDirector').style.display = 'block';
-  peer = new Peer('skrin-' + code);
+  peer = new Peer('skrin-' + linkCode);
   linkRole = 'director';
   keepAwake();
-  peer.on('call', call => {
-    mediaCall = call;
-    call.answer();
-    call.on('stream', attachRemote);
-    call.on('close', () => { remoteStream = null; linkStatus(null); showMsg('Камера-2 отвалилась'); });
+  engKey = makeCode() + makeCode().slice(0, 2);
+  $('engLine').textContent = 'ключ рубки: ' + engKey;
+  peer.on('call', onIncomingCall);
+  peer.on('connection', acceptEngineer);
+  tryLocalRubka();
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && (startDirector._tries = (startDirector._tries || 0) + 1) <= 3){
+      try{ peer.destroy(); }catch(err){}
+      peer = null;
+      startDirector();                    // код занят — перекидываем кости
+      return;
+    }
+    startDirector._tries = 0;
+    showMsg('Связь: ' + e.type, 6000);
   });
-  peer.on('error', e => showMsg('Связь: ' + e.type, 6000));
   peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+  linkStatus('ЖДУ КАМЕРЫ · ' + linkCode);
+  $('btnLink').classList.add('on');
 }
 async function startCameraRole(){
   const code = $('lnkCodeIn').value.trim().toUpperCase();
-  if (code.length < 4){ showMsg('Введи код с первого телефона'); return; }
+  if (code.length < 4){ showMsg('Введи код с телефона-режиссёра'); return; }
   try{
     if (!camStream) await openCam(facing);
     if (!micStream){
@@ -729,29 +1338,36 @@ async function startCameraRole(){
         $('btnMic').classList.add('on');
       }catch(e){}
     }
-    const out = new MediaStream([
-      ...camStream.getVideoTracks(),
-      ...(micStream ? micStream.getAudioTracks() : [])
-    ]);
+    ensureBus(); ensureMicChain();
+    /* наружу — выход шины: ⊘МИК и рация теперь честно режут звук у режиссёра */
+    const feed = new MediaStream([ ...camStream.getVideoTracks(), busTrack() ]);
     peer = new Peer();
     linkRole = 'camera';
     keepAwake();
     peer.on('open', () => {
-      mediaCall = peer.call('skrin-' + code, out);
+      mediaCall = peer.call('skrin-' + code, feed,
+        { metadata: { name: ($('lnkName').value || '').trim() } });
       mediaCall.on('close', () => { linkStatus(null); showMsg('Режиссёр закрыл связь'); });
       $('linkSheet').style.display = 'none';
       $('btnLink').classList.add('on');
       linkStatus('ОТДАЮ КАМЕРУ → ' + code);
-      showMsg('Камера ушла на первый телефон. Экран не гаси.');
+      showMsg('Камера ушла режиссёру. Экран не гаси.');
     });
     peer.on('error', e => showMsg('Связь: ' + e.type, 6000));
     peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
   }catch(e){ showMsg('Не вышло: ' + (e.message || e.name)); }
 }
 $('btnLink').onclick = () => {
-  if (linkRole){ linkStop(); return; }
+  if (linkRole === 'camera'){ linkStop(); return; }
   $('linkSheet').style.display = 'flex';
+  if (linkRole === 'director'){
+    $('linkChoose').style.display = 'none';
+    $('linkDirector').style.display = 'block';
+  }
 };
+$('linkSheet').addEventListener('click', e => {
+  if (e.target === $('linkSheet')) $('linkSheet').style.display = 'none';
+});
 $('lnkDirector').onclick = startDirector;
 $('lnkCamera').onclick = () => {
   $('linkChoose').style.display = 'none';
@@ -793,10 +1409,11 @@ function capsReport(){
 '  ' + (gdm ? 'REC в ЭФИРЕ запишет вкладку целиком, со звуком'
            : 'на iPhone этого нет: REC в ЭФИРЕ покажет путь\n  через Пункт управления') + '\n\n' +
 'запись (MediaRecorder): ' + (mr ? '✓ · ' + mime : '✗') + '\n\n' +
-'СВЯЗЬ: второй телефон входит в окно СТУДИИ,\n' +
-'  его звук — в микс записи и эфира.\n' +
-'  сейчас: ' + (linkRole ? (linkRole === 'director' ? 'режиссёр' : 'камера-2') +
-  (remoteStream ? ' · картинка идёт' : ' · жду') : 'не связаны') + '\n\n' +
+'СВЯЗЬ: друзья входят своими окнами в СТУДИЮ,\n' +
+'  их звук — в микс записи и эфира. Потолок: 4.\n' +
+'  сейчас: ' + (linkRole ? (linkRole === 'director'
+    ? 'режиссёр · камер: ' + remotes.length
+    : 'отдаю камеру') : 'не связаны') + '\n\n' +
 'Twitch · WHIP: браузер сам умеет WebRTC-эфир;\n' +
 '  сервер g.webrtc.live-video.net, ключ = stream key.\n' +
 '  Если откажет CORS — соберём мост-прокси.\n\n' +
@@ -818,6 +1435,10 @@ $('btnFlip').onclick = async () => {
       const s = mediaCall.peerConnection.getSenders().find(x => x.track && x.track.kind === 'video');
       if (s) await s.replaceTrack(camStream.getVideoTracks()[0]);
     }
+    if (twitchOn && twitchSrcKind === 'camera' && pc){
+      const s2 = pc.getSenders().find(x => x.track && x.track.kind === 'video');
+      if (s2) await s2.replaceTrack(camStream.getVideoTracks()[0]);
+    }
   }
   catch(e){ showMsg('Камера не переключилась: ' + e.name); }
 };
@@ -831,8 +1452,11 @@ $('btnMic').onclick = async () => {
   if (micOn){
     try{
       if (!micStream) micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      dropMicChain(); ensureMicChain();
+      if (micMuted) micStream.getAudioTracks().forEach(t => t.enabled = false);
     }catch(e){ micOn = false; showMsg('Микрофон не дали: ' + e.name); }
   } else if (micStream){
+    dropMicChain();
     micStream.getTracks().forEach(t => t.stop());
     micStream = null;
   }
@@ -840,7 +1464,199 @@ $('btnMic').onclick = async () => {
   $('btnMic').classList.toggle('on', micOn);
 };
 $('btnScreen').onclick = toggleScreen;
+$('btnGateMic').onclick = () => { ensureMicChain(); setMicMuted(!micMuted); };
+$('btnGateCam').onclick = () => setCamMuted(!camMuted);
 $('btnRec').onclick = toggleRec;
+
+/* РАЦИЯ на экране: удержание = говорю с Клодом (палец на телефоне) */
+const pttEl = $('btnPtt');
+let pttTapT = 0;
+pttEl.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const now = Date.now();
+  if (now - pttTapT < 320){ startPttLearn(); pttTapT = 0; return; } // двойной тап = привязать кнопку
+  pttTapT = now;
+  pttDown();
+  pttEl.setPointerCapture(e.pointerId);
+});
+pttEl.addEventListener('pointerup', pttUp);
+pttEl.addEventListener('pointercancel', pttUp);
+pttEl.addEventListener('pointerleave', () => { if (pttHeld) pttUp(); });
+
+$('btnPrompt').onclick = () => setPrompterAloud(!prompterAloud);
+
+/* ---- Внешняя Bluetooth-кнопка как рация (НЕ дужка очков) ----
+   Дешёвый BT-пульт (AB Shutter, кликер-перелистыватель) виден как
+   клавиатура и шлёт клавишу. Ловим её здесь — дужка очков остаётся
+   целиком за Meta AI, конфликта нет. Держишь пульт в руке на рулём. */
+const PTT_DEFAULT_KEYS = ['Enter', ' ', 'ArrowUp', 'ArrowDown', 'AudioVolumeUp', 'AudioVolumeDown', 'MediaPlayPause'];
+function isPttKey(k){ return pttKey ? (k === pttKey) : PTT_DEFAULT_KEYS.includes(k); }
+function startPttLearn(){
+  pttLearn = true;
+  pttEl.classList.add('learn');
+  showMsg('Нажми кнопку на пульте — привяжу её к рации', 6000);
+}
+window.addEventListener('keydown', e => {
+  if (pttLearn){
+    pttKey = e.key;
+    try { localStorage.setItem('skrin_ptt_key', pttKey); } catch (err) {}
+    pttLearn = false;
+    pttEl.classList.remove('learn');
+    showMsg('Пульт привязан: «' + (pttKey === ' ' ? 'ПРОБЕЛ' : pttKey) + '». Держи — говоришь.', 4000);
+    e.preventDefault();
+    return;
+  }
+  if (isPttKey(e.key) && !e.repeat){
+    e.preventDefault();
+    if (pttSticky){ pttSticky = false; pttUp(); return; }  // «пульс»-кликер: второе нажатие — отбой
+    pttKeyT = Date.now();
+    pttDown();
+  }
+}, true);
+window.addEventListener('keyup', e => {
+  if (isPttKey(e.key)){
+    e.preventDefault();
+    if (pttHeld && Date.now() - pttKeyT < 230){ pttSticky = true; return; } // кнопка не умеет держать — рация залипает
+    pttUp();
+  }
+}, true);
+
+$('btnBlur').onclick = () => setAutoBlur(!autoBlur);
+$('btnPanic').onclick = () => setPanic(!panic);
+
+/* ЗОНА — рисование пальцем прямоугольников блюра */
+const zoneLayer = $('zoneLayer'), zoneRub = $('zoneRub');
+let zoneDraw = null, zoneTapT = 0;
+$('btnZone').onclick = () => {
+  zoneMode = !zoneMode;
+  $('btnZone').classList.toggle('on', zoneMode);
+  zoneLayer.style.display = zoneMode ? 'block' : 'none';
+  $('zoneHint').style.display = zoneMode ? 'block' : 'none';
+};
+zoneLayer.addEventListener('pointerdown', e => {
+  const now = Date.now();
+  if (now - zoneTapT < 320){ manualZones.length = 0; linkFlash('зоны стёрты'); zoneTapT = 0; return; }
+  zoneTapT = now;
+  zoneDraw = { x0: e.clientX, y0: e.clientY };
+  zoneLayer.setPointerCapture(e.pointerId);
+});
+zoneLayer.addEventListener('pointermove', e => {
+  if (!zoneDraw) return;
+  const x = Math.min(zoneDraw.x0, e.clientX), y = Math.min(zoneDraw.y0, e.clientY);
+  const w = Math.abs(e.clientX - zoneDraw.x0), h = Math.abs(e.clientY - zoneDraw.y0);
+  zoneRub.style.display = 'block';
+  zoneRub.style.left = x + 'px'; zoneRub.style.top = y + 'px';
+  zoneRub.style.width = w + 'px'; zoneRub.style.height = h + 'px';
+});
+zoneLayer.addEventListener('pointerup', e => {
+  if (!zoneDraw) return;
+  const cw = window.innerWidth, ch = window.innerHeight;
+  const x = Math.min(zoneDraw.x0, e.clientX), y = Math.min(zoneDraw.y0, e.clientY);
+  const w = Math.abs(e.clientX - zoneDraw.x0), h = Math.abs(e.clientY - zoneDraw.y0);
+  if (w > 12 && h > 12) manualZones.push({ nx: x / cw, ny: y / ch, nw: w / cw, nh: h / ch });
+  zoneRub.style.display = 'none';
+  zoneDraw = null;
+});
+
+/* ---------- КАРМАН: замок от случайных касаний ----------
+   Экран горит, телефон в кармане: сверху лежит почти прозрачный щит,
+   ловящий ВСЕ касания. Снять — провести пальцем по «Г», не отрываясь:
+   снизу вверх по левому краю, потом направо. Трение ткани такой путь
+   не пройдёт: нужен старт у основания, коридор ±46px и ход без отката.
+   Рация с bluetooth-кнопки работает и под замком — на то и карман. */
+const LOCK = { x: 0.16, y0: 0.80, y1: 0.22, x1: 0.78, tol: 46, need: 0.93 };
+let lockTrace = null;
+const lockLen = { a: 0, b: 0 };
+function lockPts(){
+  const cw = window.innerWidth, ch = window.innerHeight;
+  return {
+    p0: { x: LOCK.x * cw, y: LOCK.y0 * ch },
+    p1: { x: LOCK.x * cw, y: LOCK.y1 * ch },
+    p2: { x: LOCK.x1 * cw, y: LOCK.y1 * ch }
+  };
+}
+function placeLockPath(){
+  const { p0, p1, p2 } = lockPts();
+  lockLen.a = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+  lockLen.b = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const pts = [p0.x, p0.y, p1.x, p1.y, p2.x, p2.y].join(',');
+  $('lockSvg').innerHTML =
+    '<polyline id="lockBase" points="' + pts + '" fill="none" stroke="#FFB454"' +
+    ' stroke-opacity="0.12" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<polyline id="lockProg" points="' + pts + '" fill="none" stroke="#FFB454"' +
+    ' stroke-opacity="0.55" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="' + p0.x + '" cy="' + p0.y + '" r="9" fill="#FFB454" fill-opacity="0.25"/>';
+  const total = lockLen.a + lockLen.b;
+  const prog = $('lockProg');
+  prog.style.strokeDasharray = total;
+  prog.style.strokeDashoffset = total;
+}
+/* проекция пальца на «Г»: u — доля пути 0..1, d — расстояние до пути */
+function lockProject(x, y){
+  const { p0, p1, p2 } = lockPts();
+  const seg = (a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+    let t = L2 ? ((x - a.x) * dx + (y - a.y) * dy) / L2 : 0;
+    t = Math.min(Math.max(t, 0), 1);
+    return { t, d: Math.hypot(x - (a.x + dx * t), y - (a.y + dy * t)) };
+  };
+  const s1 = seg(p0, p1), s2 = seg(p1, p2);
+  const total = lockLen.a + lockLen.b || 1;
+  if (s1.d <= s2.d) return { d: s1.d, u: (s1.t * lockLen.a) / total };
+  return { d: s2.d, u: (lockLen.a + s2.t * lockLen.b) / total };
+}
+function lockResetVisual(){
+  const prog = $('lockProg');
+  if (prog) prog.style.strokeDashoffset = lockLen.a + lockLen.b;
+}
+function lockPulse(){
+  const base = $('lockBase');
+  if (!base) return;
+  base.setAttribute('stroke-opacity', '0.35');
+  setTimeout(() => { const b = $('lockBase'); if (b) b.setAttribute('stroke-opacity', '0.12'); }, 350);
+}
+function setPocket(v){
+  lockOn = !!v;
+  $('lock').style.display = lockOn ? 'block' : 'none';
+  if (lockOn){
+    lockTrace = null;
+    placeLockPath();
+    keepAwake();
+    if (document.documentElement.requestFullscreen)
+      document.documentElement.requestFullscreen().catch(() => {});
+    linkFlash('КАРМАН: экран заперт — открой, проведя по «Г»');
+  } else {
+    if (document.fullscreenElement && document.exitFullscreen)
+      document.exitFullscreen().catch(() => {});
+    linkFlash('карман открыт');
+  }
+  engSend({ op: 'pocket', on: lockOn });
+}
+$('btnPocket').onclick = () => setPocket(true);
+const lockEl = $('lock');
+lockEl.addEventListener('contextmenu', e => e.preventDefault());
+lockEl.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (lockTrace){ lockTrace = null; lockResetVisual(); return; }   // второй палец = ткань: сброс
+  const pr = lockProject(e.clientX, e.clientY);
+  if (pr.d > LOCK.tol || pr.u > 0.22){ lockPulse(); return; }      // старт только у основания «Г»
+  lockTrace = { id: e.pointerId, u: pr.u };
+  try{ lockEl.setPointerCapture(e.pointerId); }catch(err){}
+});
+lockEl.addEventListener('pointermove', e => {
+  if (!lockTrace || e.pointerId !== lockTrace.id) return;
+  const pr = lockProject(e.clientX, e.clientY);
+  if (pr.d > LOCK.tol){ lockTrace = null; lockResetVisual(); return; }            // сошёл с пути
+  if (pr.u < lockTrace.u - 0.08){ lockTrace = null; lockResetVisual(); return; }  // откатился
+  lockTrace.u = Math.max(lockTrace.u, pr.u);
+  const total = lockLen.a + lockLen.b;
+  const prog = $('lockProg');
+  if (prog) prog.style.strokeDashoffset = total * (1 - lockTrace.u);
+  if (lockTrace.u >= LOCK.need){ lockTrace = null; setPocket(false); }
+});
+const lockEnd = () => { if (lockTrace){ lockTrace = null; lockResetVisual(); } };
+lockEl.addEventListener('pointerup', lockEnd);
+lockEl.addEventListener('pointercancel', lockEnd);
 
 /* ---------- старт ---------- */
 $('btnStart').onclick = async () => {
@@ -855,8 +1671,21 @@ $('btnStart').onclick = async () => {
   $('bar').style.display = 'flex';
   running = true;
   setMode('studio');
+  ensureBus();          // аудио-шина с первого жеста — iOS доволен
+  tryLocalRubka();
   frame();
 };
+
+/* iOS усыпляет AudioContext и роняет wakeLock при уходе в фон — возвращаем */
+document.addEventListener('pointerdown', () => {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  if (!wakeLock && (lockOn || linkRole || twitchOn || (recorder && recorder.state === 'recording')))
+    keepAwake();
+});
 
 fit();
 </script>
