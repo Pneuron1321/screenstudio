@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>СКРИН-СТУДИЯ · зонд</title>
+<!-- домашний экран: свой значок, полный экран без адресной строки и —
+     главное — конец семидневному вымыванию данных на iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="СКРИН">
+<meta name="theme-color" content="#0B0F14">
 <style>
   :root{
     --ink:#E8E3D8;        /* тёплый песок */
@@ -109,6 +116,17 @@
   #bar{
     position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
     display:none;justify-content:center;gap:8px;z-index:20;padding:0 8px;flex-wrap:wrap;
+    transition:transform .22s ease, opacity .18s ease;
+  }
+  /* ШТОРКА: кнопки уходят вниз — кадр виден целиком */
+  #bar.tuck{transform:translateY(150%);opacity:0;pointer-events:none}
+  #tab{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 2px);
+    width:78px;height:24px;border-radius:12px;z-index:21;display:none;
+    align-items:center;justify-content:center;touch-action:none;cursor:pointer;
+    background:rgba(18,26,34,.72);border:1px solid rgba(232,227,216,.18);
+    color:var(--ink);font-size:13px;line-height:1;backdrop-filter:blur(6px);
   }
   .btn{
     min-width:52px;height:50px;padding:0 14px;border-radius:999px;border:1px solid rgba(232,227,216,.18);
@@ -154,6 +172,26 @@
   #lockHint{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 16px);
     transform:translateX(-50%);color:var(--amber);opacity:.22;font-size:12px;
     font-family:ui-monospace,Menlo,monospace;letter-spacing:.08em;white-space:nowrap}
+
+  /* ---- КРУГ: список друзей и звонок ---- */
+  .frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(232,227,216,.08)}
+  .fdot{width:9px;height:9px;border-radius:50%;background:#3a444e;flex:0 0 auto}
+  .fdot.on{background:#7ED8A0;box-shadow:0 0 8px rgba(126,216,160,.8)}
+  .fdot.live{background:#FF5D45;box-shadow:0 0 8px rgba(255,93,69,.8)}
+  .fnick{flex:1;font-size:14px}
+  .fnote{color:var(--dim);font-size:11px;font-family:ui-monospace,Menlo,monospace}
+  .frow button{height:32px;padding:0 12px;border-radius:8px;border:1px solid #333;
+    background:#0B0F14;color:var(--ink);font-size:12px}
+  .frow button.call{border-color:var(--amber);color:var(--amber)}
+  #ring{position:absolute;left:50%;transform:translateX(-50%);z-index:26;display:none;
+    top:calc(env(safe-area-inset-top,0px) + 76px);background:#121A22;
+    border:1px solid rgba(255,180,84,.6);border-radius:14px;padding:12px 16px;
+    box-shadow:0 6px 26px rgba(0,0,0,.6);max-width:92vw}
+  #ring b{color:var(--amber)}
+  #ring .row{display:flex;gap:8px;margin-top:10px}
+  #ring button{flex:1;height:38px;border-radius:9px;border:1px solid #333;
+    background:#0B0F14;color:var(--ink)}
+  #ring button.go{background:var(--amber);color:#221500;font-weight:800;border:none}
 
   /* ---- VU-метр шины ---- */
   #vu{width:9px;height:30px;align-self:center;background:#121A22;border:1px solid #26303a;
@@ -243,6 +281,8 @@
   <button id="btnStart">СТАРТ</button>
 </div>
 
+<div id="tab">▾</div>
+
 <div id="bar">
   <button class="btn" id="btnMode">ЭФИР</button>
   <button class="btn" id="btnFlip">⟲</button>
@@ -271,6 +311,15 @@
 <div id="lock">
   <svg id="lockSvg" xmlns="http://www.w3.org/2000/svg"></svg>
   <div id="lockHint">карман · проведи по «Г» — открою</div>
+</div>
+
+<div id="ring">
+  <div><b id="ringWho">Друг</b> зовёт в эфир</div>
+  <div class="fnote" id="ringRoom"></div>
+  <div class="row">
+    <button id="ringNo">потом</button>
+    <button class="go" id="ringYes">ВОЙТИ КАМЕРОЙ</button>
+  </div>
 </div>
 
 <div id="progPip"><img id="progImg" alt=""><span>ПРОГРАММА</span></div>
@@ -318,6 +367,17 @@
         <button class="quiet" id="lnkDirector">Я СОБИРАЮ</button>
         <button class="quiet" id="lnkCamera">Я — КАМЕРА</button>
       </div>
+      <label style="margin-top:10px">…или комната для своих (имя + пароль)</label>
+      <div class="row">
+        <input id="lnkRoomD" autocomplete="off" maxlength="24" placeholder="ровинь">
+        <input id="lnkPassD" autocomplete="off" maxlength="32" placeholder="пароль">
+      </div>
+      <div class="row"><button class="quiet" id="lnkRoomGo">🔒 ПОДНЯТЬ КОМНАТУ</button></div>
+      <div class="row"><button class="quiet" id="lnkKrug">👥 МОЙ КРУГ — кто в сети</button></div>
+      <div class="row" id="roomBack" style="display:none">
+        <button class="quiet" id="lnkForget" style="flex:0 0 34%">✕ забыть</button>
+        <button class="go" id="lnkResume">↩ ВЕРНУТЬСЯ</button>
+      </div>
     </div>
     <div id="linkDirector" style="display:none">
       Дай друзьям ссылку на эту страницу и скажи код:
@@ -331,6 +391,12 @@
       <input id="lnkName" autocomplete="off" maxlength="16" placeholder="Дима">
       <label>Код с телефона-режиссёра</label>
       <input id="lnkCodeIn" autocapitalize="characters" autocomplete="off" placeholder="например K7M2">
+      <label>…или комната для своих (имя + пароль)</label>
+      <div class="row">
+        <input id="lnkRoom" autocomplete="off" maxlength="24" placeholder="ровинь">
+        <input id="lnkPass" autocomplete="off" maxlength="32" placeholder="пароль">
+      </div>
+      <div class="row"><button class="quiet" id="lnkKnock">ПОДНЯТА ЛИ?</button></div>
       <div class="row">
         <button class="quiet" id="lnkStop2">Назад</button>
         <button class="go" id="lnkGo">ОТДАТЬ КАМЕРУ</button>
@@ -341,6 +407,37 @@
     До четырёх камер на телефоне-режиссёре — дальше он закипит; много друзей собирай на ноутбуке этой же страницей.
     Одна сеть или точка доступа — надёжно; разные сети — как повезёт с NAT.
     Звук друзей идёт в запись и эфир, но вслух у режиссёра не играет — иначе завоет.</small>
+  </div>
+</div>
+
+<div class="sheet" id="krugSheet">
+  <div class="card">
+    <h3>👥 МОЙ КРУГ</h3>
+    <small>Личность живёт только в этом браузере: ник и общий секрет круга.
+    Ни регистрации, ни сервера. Кто из друзей открыл страницу — виден зелёным;
+    красным — тот, кто прямо сейчас держит эфир. Позвать можно любого.</small>
+    <div class="row">
+      <div style="flex:1"><label>мой ник</label><input id="meNick" maxlength="16" autocomplete="off" placeholder="Алекс"></div>
+      <div style="flex:1"><label>секрет круга</label><input id="meCircle" maxlength="32" autocomplete="off" placeholder="общий на всех"></div>
+    </div>
+    <div class="row"><button class="go" id="meSave">СОХРАНИТЬ ЛИЧНОСТЬ</button></div>
+    <div id="frList" style="margin-top:10px"></div>
+    <div class="row">
+      <div style="flex:1"><input id="frNew" maxlength="16" autocomplete="off" placeholder="ник друга"></div>
+      <button class="quiet" id="frAdd" style="flex:0 0 34%">+ ДРУГ</button>
+    </div>
+    <div class="row">
+      <button class="quiet" id="krugInvite">📋 ссылка-приглашение</button>
+      <button class="quiet" id="krugClose">Закрыть</button>
+    </div>
+    <h3 style="margin-top:14px">💾 МОИ ДАННЫЕ</h3>
+    <div class="fnote" id="dataNote">…</div>
+    <div class="row">
+      <button class="quiet" id="dataKeep">💾 хранить вечно</button>
+      <button class="quiet" id="dataOut">📤 в файл</button>
+      <button class="quiet" id="dataInBtn">📥 из файла</button>
+    </div>
+    <input id="dataIn" type="file" accept="application/json,.json" style="display:none">
   </div>
 </div>
 
@@ -423,6 +520,305 @@ const eyeTmp = document.createElement('canvas');
 /* сеть: свой peer-сервер и TURN (localStorage) */
 function loadNet(){ try{ return JSON.parse(localStorage.getItem('skrin-net') || '{}'); }catch(e){ return {}; } }
 let NET = loadNet();
+
+/* ---------- ПАМЯТЬ КОМНАТЫ ----------
+   Перезагрузка вкладки больше не убивает эфир: код комнаты, раскладка окон
+   (по подписи друга) и данные камеры живут 6 часов. Режиссёр поднимает ТУ ЖЕ
+   комнату — друзья, чья лесенка перезвона ещё идёт (~2 мин), возвращаются
+   сами, каждый в своё окно. Ничего не уходит наружу: только этот браузер. */
+const ROOM_KEY = 'skrin-room', ROOM_TTL = 6 * 3600 * 1000;
+function roomLoad(){
+  try{
+    const r = JSON.parse(localStorage.getItem(ROOM_KEY) || 'null');
+    if (!r || !r.t || Date.now() - r.t > ROOM_TTL) return null;
+    return r;
+  }catch(e){ return null; }
+}
+function roomSave(patch){
+  const r = Object.assign(roomLoad() || {}, patch, { t: Date.now() });
+  try{ localStorage.setItem(ROOM_KEY, JSON.stringify(r)); }catch(e){}
+  return r;
+}
+function roomForget(){
+  try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+  bb('память комнаты стёрта');
+}
+function roomSaveLayout(){
+  if (linkRole !== 'director') return;
+  const slots = {};
+  remotes.forEach(r => {
+    if (r.label) slots[r.label] = { nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh };
+  });
+  roomSave({ win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh }, slots });
+}
+setInterval(roomSaveLayout, 5000);   // раскладка догоняет память сама
+
+/* ---------- КРУГ: комната для своих без сервера ----------
+   Адрес комнаты = SHA-256(имя + пароль): кто знает пароль — вычисляет тот же
+   адрес и входит, брокер списков не выдаёт. Пароль никуда не отправляется и
+   не сохраняется — в памяти живёт только готовый адрес.
+   Честно: защита равна паролю. Короткий пароль = слабый круг. */
+async function roomIdFrom(name, pass){
+  if (!(window.crypto && crypto.subtle)) return null;   // нужен https или localhost
+  const raw = new TextEncoder().encode('skrin/' + String(name).trim().toLowerCase() + '/' + pass);
+  const buf = await crypto.subtle.digest('SHA-256', raw);
+  return 'r' + [...new Uint8Array(buf)].slice(0, 9)
+    .map(b => b.toString(36).padStart(2, '0')).join('');
+}
+/* ---------- СУНДУК: чтобы настройки не испарялись ----------
+   Данные (сеть, комната, личность, круг) живут в localStorage. На iPhone
+   Safari стирает их после 7 дней без визитов — но НЕ у страниц, добавленных
+   на домашний экран: они не часть Safari и считают свои дни. Плюс
+   storage.persist() просит браузер держать данные вечно. Третья опора —
+   файл: экспорт/импорт работает везде и переносит всё на другое устройство. */
+const KEEP_KEYS = ['skrin-net', 'skrin-room', 'skrin-me', 'skrin-friends'];
+function isStandalone(){
+  try{
+    return window.navigator.standalone === true ||
+           (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  }catch(e){ return false; }
+}
+async function storagePersist(){
+  if (!(navigator.storage && navigator.storage.persist)) return null;
+  try{
+    if (navigator.storage.persisted && await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  }catch(e){ return null; }
+}
+function stateExport(){
+  const o = { v: 1, t: new Date().toISOString(), app: 'skrin-studia' };
+  KEEP_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v !== null) o[k] = v;
+  });
+  return JSON.stringify(o, null, 1);
+}
+function stateDownload(){
+  const blob = new Blob([stateExport()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'skrin-настройки-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  bb('сундук: настройки выгружены в файл');
+}
+async function stateUpload(file){
+  try{
+    const o = JSON.parse(await file.text());
+    if (!o || o.app !== 'skrin-studia') throw new Error('это не наш файл');
+    if (!confirm('Заменить нынешние настройки, круг и комнаты содержимым файла?')) return;
+    KEEP_KEYS.forEach(k => { if (o[k] !== undefined) localStorage.setItem(k, o[k]); });
+    bb('сундук: настройки загружены из файла');
+    showMsg('Загружено — обновляю страницу', 3000);
+    setTimeout(() => location.reload(), 1400);
+  }catch(e){ showMsg('Не вышло: ' + e.message, 6000); }
+}
+/* значок и манифест — прямо здесь, чтобы файл остался одиночным */
+(function pwaSetup(){
+  const icon = size => {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const x = c.getContext('2d');
+    x.fillStyle = '#0B0F14'; x.fillRect(0, 0, size, size);
+    x.strokeStyle = '#FFB454'; x.lineWidth = size * 0.055;
+    x.beginPath(); x.arc(size / 2, size / 2, size * 0.30, 0, 6.2832); x.stroke();
+    x.strokeStyle = 'rgba(126,216,160,.85)'; x.lineWidth = size * 0.035;
+    x.beginPath(); x.arc(size / 2, size / 2, size * 0.19, -1.0, 0.25); x.stroke();
+    x.fillStyle = '#FFB454';
+    x.beginPath(); x.arc(size / 2, size / 2, size * 0.095, 0, 6.2832); x.fill();
+    return c.toDataURL('image/png');
+  };
+  try{
+    const l = document.createElement('link');
+    l.rel = 'apple-touch-icon'; l.href = icon(180);
+    document.head.appendChild(l);
+    const mf = {
+      name: 'СКРИН-СТУДИЯ', short_name: 'СКРИН',
+      start_url: location.href.split('#')[0],
+      display: 'standalone', background_color: '#0B0F14', theme_color: '#0B0F14',
+      icons: [{ src: icon(192), sizes: '192x192', type: 'image/png' },
+              { src: icon(512), sizes: '512x512', type: 'image/png' }]
+    };
+    const b = new Blob([JSON.stringify(mf)], { type: 'application/manifest+json' });
+    const m = document.createElement('link');
+    m.rel = 'manifest'; m.href = URL.createObjectURL(b);
+    document.head.appendChild(m);
+  }catch(e){}
+})();
+
+/* ---------- ДЕЖУРКА: личность, круг, присутствие ----------
+   «Аккаунт» без сервера: ник + общий секрет круга живут в этом браузере.
+   Адрес дежурки друга = SHA-256(секрет + ник), поэтому свои находят друг
+   друга без списка на чужой машине. Дежурный peer поднимается при открытии
+   страницы: отвечает «я здесь» и принимает вызовы. Опрос друзей идёт, пока
+   открыт лист КРУГ, — чтобы не дёргать брокер попусту.
+   Пределы честно: один ник = одно устройство в сети; страница закрыта —
+   тебя не видно и не дозвониться (уведомления без сервера невозможны);
+   секрет круга общий, кто его знает — видит всех и может звать. */
+const ME_KEY = 'skrin-me', FR_KEY = 'skrin-friends';
+function meLoad(){ try{ return JSON.parse(localStorage.getItem(ME_KEY) || 'null'); }catch(e){ return null; } }
+function meSave(o){ try{ localStorage.setItem(ME_KEY, JSON.stringify(o)); }catch(e){} }
+function friendsLoad(){ try{ return JSON.parse(localStorage.getItem(FR_KEY) || '[]'); }catch(e){ return []; } }
+function friendsSave(a){ try{ localStorage.setItem(FR_KEY, JSON.stringify(a.slice(0, 12))); }catch(e){} }
+async function dutyIdFrom(circle, nick){
+  if (!(window.crypto && crypto.subtle)) return null;
+  const raw = new TextEncoder().encode('duty/' + String(circle) + '/' + String(nick).trim().toLowerCase());
+  const buf = await crypto.subtle.digest('SHA-256', raw);
+  return 'd' + [...new Uint8Array(buf)].slice(0, 9)
+    .map(b => b.toString(36).padStart(2, '0')).join('');
+}
+let dutyPeer = null, dutyReady = false, pingTimer = null;
+const frState = {};   // ник → {on, room, t}
+
+function myLive(){    // что отвечать спрашивающим: держу ли эфир и какой
+  if (linkRole !== 'director') return null;
+  const r = roomLoad();
+  return { code: linkCode, room: (r && r.room) || '' };
+}
+async function dutyUp(){
+  const me = meLoad();
+  if (!me || !me.nick || !me.circle) return;
+  if (dutyPeer){ try{ dutyPeer.destroy(); }catch(e){} dutyPeer = null; dutyReady = false; }
+  const id = await dutyIdFrom(me.circle, me.nick);
+  if (!id) return;
+  try{ dutyPeer = new Peer(id, peerOpts()); }catch(e){ return; }
+  dutyPeer.on('open', () => { dutyReady = true; bb('дежурка: на связи как ' + me.nick); });
+  dutyPeer.on('error', e => {
+    if (e.type === 'unavailable-id'){
+      dutyReady = false;
+      showMsg('Ник «' + me.nick + '» уже в сети на другом устройстве', 6000);
+    }
+  });
+  dutyPeer.on('disconnected', () => { try{ dutyPeer.reconnect(); }catch(e){} });
+  dutyPeer.on('connection', c => {
+    c.on('open', () => { try{ c.send({ op: 'hello', nick: me.nick, live: myLive() }); }catch(e){} });
+    c.on('data', d => {
+      if (!d || d.op !== 'invite') return;
+      showRing(d.from || 'Друг', d.room || '', d.code || '');
+    });
+  });
+}
+function showRing(who, room, code){
+  if (!code) return;
+  $('ringWho').textContent = who;
+  $('ringRoom').textContent = room ? ('комната «' + room + '»') : ('код ' + code.slice(0, 8));
+  $('ring').style.display = 'block';
+  bb('звонок: ' + who + (room ? ' → ' + room : ''));
+  try{ navigator.vibrate && navigator.vibrate([120, 80, 120]); }catch(e){}
+  speakEar(who + ' зовёт в эфир');
+  clearTimeout(showRing.t);
+  showRing.t = setTimeout(() => { $('ring').style.display = 'none'; }, 45000);
+  showRing.code = code;
+}
+/* опрос круга: один дежурный peer звонит всем по очереди */
+async function pingFriends(){
+  const me = meLoad();
+  if (!me || !dutyPeer || !dutyReady) return;
+  for (const f of friendsLoad()){
+    if (!f.nick || f.nick.toLowerCase() === me.nick.toLowerCase()) continue;
+    const id = await dutyIdFrom(me.circle, f.nick);
+    if (!id) continue;
+    let c;
+    try{ c = dutyPeer.connect(id, { metadata: { role: 'ping' } }); }catch(e){ continue; }
+    const nick = f.nick;
+    const to = setTimeout(() => {
+      if (!frState[nick] || Date.now() - (frState[nick].t || 0) > 3000){
+        frState[nick] = { on: false, t: Date.now() };
+        renderFriends();
+      }
+      try{ c.close(); }catch(e){}
+    }, 4500);
+    c.on('data', d => {
+      if (d && d.op === 'hello'){
+        clearTimeout(to);
+        frState[nick] = { on: true, live: d.live || null, t: Date.now() };
+        renderFriends();
+        setTimeout(() => { try{ c.close(); }catch(e){} }, 200);
+      }
+    });
+  }
+}
+function renderFriends(){
+  const box = $('frList');
+  if (!box) return;
+  box.innerHTML = '';
+  const list = friendsLoad();
+  if (!list.length){
+    box.innerHTML = '<div class="fnote">друзей пока нет — добавь ник ниже</div>';
+    return;
+  }
+  list.forEach(f => {
+    const st = frState[f.nick] || {};
+    const row = document.createElement('div'); row.className = 'frow';
+    const dot = document.createElement('div');
+    dot.className = 'fdot' + (st.on ? (st.live ? ' live' : ' on') : '');
+    const nick = document.createElement('div'); nick.className = 'fnick'; nick.textContent = f.nick;
+    const note = document.createElement('div'); note.className = 'fnote';
+    note.textContent = st.on ? (st.live ? ('в эфире' + (st.live.room ? ' «' + st.live.room + '»' : '')) : 'в сети') : '—';
+    row.appendChild(dot); row.appendChild(nick); row.appendChild(note);
+    if (st.on && st.live && st.live.code){
+      const b = document.createElement('button');
+      b.textContent = 'войти';
+      b.onclick = () => {
+        camTarget = st.live.code;
+        $('krugSheet').style.display = 'none';
+        $('linkSheet').style.display = 'flex';
+        $('linkChoose').style.display = 'none';
+        $('linkCameraUi').style.display = 'block';
+        startCameraRole(true);
+      };
+      row.appendChild(b);
+    } else if (st.on && linkRole === 'director'){
+      const b = document.createElement('button'); b.className = 'call';
+      b.textContent = '📞 позвать';
+      b.onclick = () => callFriend(f.nick);
+      row.appendChild(b);
+    }
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.onclick = () => { friendsSave(friendsLoad().filter(q => q.nick !== f.nick)); renderFriends(); };
+    row.appendChild(x);
+    box.appendChild(row);
+  });
+}
+async function callFriend(nick){
+  const me = meLoad();
+  const live = myLive();
+  if (!live){ showMsg('Сначала подними комнату — тогда будет куда звать'); return; }
+  const id = await dutyIdFrom(me.circle, nick);
+  if (!id || !dutyPeer) return;
+  const c = dutyPeer.connect(id, { metadata: { role: 'call' } });
+  const to = setTimeout(() => { showMsg(nick + ' не отвечает — страница закрыта?', 5000); try{ c.close(); }catch(e){} }, 6000);
+  c.on('open', () => {
+    clearTimeout(to);
+    try{ c.send({ op: 'invite', from: me.nick, room: live.room, code: live.code }); }catch(e){}
+    showMsg('Позвал ' + nick, 4000);
+    bb('позвал: ' + nick);
+    setTimeout(() => { try{ c.close(); }catch(e){} }, 600);
+  });
+}
+
+/* стук: поднята ли комната? Соединение открылось — значит режиссёр там. */
+function knockRoom(code){
+  return new Promise(res => {
+    let done = false, t1 = 0, t2 = 0, p = null;
+    const finish = v => {
+      if (done) return;
+      done = true;
+      clearTimeout(t1); clearTimeout(t2);
+      try{ if (p) p.destroy(); }catch(e){}
+      res(v);
+    };
+    try{ p = new Peer(peerOpts()); }catch(e){ finish(false); return; }
+    t2 = setTimeout(() => finish(false), 9000);
+    p.on('open', () => {
+      const c = p.connect('skrin-' + code, { metadata: { role: 'knock' } });
+      t1 = setTimeout(() => finish(false), 4500);
+      c.on('open', () => { try{ c.close(); }catch(e){} finish(true); });
+    });
+    p.on('error', e => { if (e.type === 'peer-unavailable') finish(false); });
+  });
+}
 function iceList(){
   const ice = [{ urls: 'stun:stun.l.google.com:19302' }];
   if (NET.turnUri){
@@ -468,7 +864,7 @@ const manualZones = [];      // {nx,ny,nw,nh}
 let pttKey = (() => { try { return localStorage.getItem('skrin_ptt_key') || ''; } catch (e) { return ''; } })();
 let W = 0, H = 0, running = false;
 
-const win = { nx: 0.52, ny: 0.08, nw: 0.42 }; // нормированный прямоугольник окна
+const win = { nx: 0.52, ny: 0.08, nw: 0.42, nh: 0.42 }; // нормированный прямоугольник окна
 const camHolder = document.createElement('div'); // дом для видео-элементов камер в СТУДИИ
 /* НЕ display:none — iOS заморозил бы декодер на первом кадре и убил звук в шине.
    Уводим со сцены физически: крошечный, прозрачный, вне клика, но живой и рендерящийся. */
@@ -554,7 +950,7 @@ function drawCoverRect(c, vid, x, y, w, h, mirror){
 
 function rectPx(o){
   const cw = window.innerWidth, ch = window.innerHeight;
-  const wCss = o.nw * cw, hCss = wCss * (ch / cw);
+  const wCss = o.nw * cw, hCss = (o.nh || o.nw) * ch;   // nh: форма окна свободна
   const xCss = o.nx * cw, yCss = o.ny * ch;
   return { xCss, yCss, wCss, hCss,
            x: xCss / cw * W, y: yCss / ch * H,
@@ -697,32 +1093,80 @@ function placeWinDom(){
   winEl.style.display = winOn ? 'block' : 'none';
   remotes.forEach(r => { if (r.place) r.place(); });
 }
-let drag = null;
-winEl.addEventListener('pointerdown', e => {
-  if (e.target === grip) return;
-  drag = { modeD: 'move', px: e.clientX, py: e.clientY, nx: win.nx, ny: win.ny };
-  winEl.setPointerCapture(e.pointerId);
-});
-grip.addEventListener('pointerdown', e => {
-  e.stopPropagation();
-  drag = { modeD: 'size', px: e.clientX, nw: win.nw };
-  grip.setPointerCapture(e.pointerId);
-});
-window.addEventListener('pointermove', e => {
-  if (!drag) return;
-  const cw = window.innerWidth, ch = window.innerHeight;
-  if (drag.modeD === 'move'){
-    win.nx = Math.min(Math.max(drag.nx + (e.clientX - drag.px) / cw, 0.01), 0.98 - win.nw);
-    win.ny = Math.min(Math.max(drag.ny + (e.clientY - drag.py) / ch, 0.01), 0.98 - win.nw);
-  } else {
-    win.nw = Math.min(Math.max(drag.nw + (e.clientX - drag.px) / cw, 0.16), 0.9);
-    win.nx = Math.min(win.nx, 0.98 - win.nw);
-    win.ny = Math.min(win.ny, 0.98 - win.nw);
+/* ---------- жесты окон: палец двигает, щипок масштабирует,
+   уголок мнёт форму, двойной тап возвращает родную ---------- */
+function clampWin(o){
+  o.nw = Math.min(Math.max(o.nw, 0.14), 0.96);
+  o.nh = Math.min(Math.max(o.nh, 0.14), 0.96);
+  o.nx = Math.min(Math.max(o.nx, 0.004), 0.996 - o.nw);
+  o.ny = Math.min(Math.max(o.ny, 0.004), 0.996 - o.nh);
+}
+function attachWinGestures(el, gripEl, o, place){
+  let d = null, lastTap = 0;
+  const ptrs = new Map();
+  const dist = () => {
+    const v = [...ptrs.values()];
+    return Math.max(20, Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y));
+  };
+  el.addEventListener('pointerdown', e => {
+    if (gripEl && e.target === gripEl) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    if (ptrs.size >= 2){
+      d = { m: 'pinch', d0: dist(), nw: o.nw, nh: o.nh,
+            cx: o.nx + o.nw / 2, cy: o.ny + o.nh / 2 };
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTap < 320){          // двойной тап — родная форма
+      o.nh = o.nw; clampWin(o); place();
+      lastTap = 0; d = null;
+      return;
+    }
+    lastTap = now;
+    d = { m: 'move', px: e.clientX, py: e.clientY, nx: o.nx, ny: o.ny };
+  });
+  if (gripEl) gripEl.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    d = { m: 'size', px: e.clientX, py: e.clientY, nw: o.nw, nh: o.nh };
+    try{ gripEl.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  const mv = e => {
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!d) return;
+    const cw = window.innerWidth, ch = window.innerHeight;
+    if (d.m === 'pinch'){
+      if (ptrs.size < 2) return;
+      const k = dist() / d.d0;
+      o.nw = d.nw * k; o.nh = d.nh * k;
+      clampWin(o);
+      o.nx = d.cx - o.nw / 2; o.ny = d.cy - o.nh / 2;
+    } else if (d.m === 'move'){
+      o.nx = d.nx + (e.clientX - d.px) / cw;
+      o.ny = d.ny + (e.clientY - d.py) / ch;
+    } else {
+      o.nw = d.nw + (e.clientX - d.px) / cw;   // уголок: ширина и высота
+      o.nh = d.nh + (e.clientY - d.py) / ch;   // порознь — это и есть форма
+    }
+    clampWin(o);
+    place();
+  };
+  el.addEventListener('pointermove', mv);
+  if (gripEl) gripEl.addEventListener('pointermove', mv);
+  const up = e => {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size === 1){                      // палец отпущен — плавно в перенос
+      const v = [...ptrs.values()][0];
+      d = { m: 'move', px: v.x, py: v.y, nx: o.nx, ny: o.ny };
+    } else if (!ptrs.size) d = null;
+  };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  if (gripEl){
+    gripEl.addEventListener('pointerup', up);
+    gripEl.addEventListener('pointercancel', up);
   }
-  placeWinDom();
-});
-window.addEventListener('pointerup', () => drag = null);
-window.addEventListener('pointercancel', () => drag = null);
+}
+attachWinGestures(winEl, grip, win, placeWinDom);
 
 /* ---------- звук: постоянная шина эфира ----------
    Всё аудио — микрофон (через гейт), друзья при входе, звук вкладки —
@@ -1529,6 +1973,9 @@ const CMDS = {
     if (o.nx !== undefined) t.nx = o.nx;
     if (o.ny !== undefined) t.ny = o.ny;
     if (o.nw !== undefined) t.nw = o.nw;
+    if (o.nh !== undefined) t.nh = o.nh;
+    if (t.nh === undefined) t.nh = t.nw;
+    clampWin(t);
     placeWinDom();
   },
   winToggle: on => { winOn = !!on; $('btnWin').classList.toggle('on', winOn); placeWinDom(); },
@@ -1605,6 +2052,10 @@ function handleEngMsg(raw){
    Программа — тот же уровень доверия, что и отдача камеры: достаточно кода эфира. */
 function onDataConn(conn){
   const md = conn.metadata || {};
+  if (md.role === 'knock'){          // «поднята ли комната?» — да, и до свидания
+    setTimeout(() => { try{ conn.close(); }catch(e){} }, 400);
+    return;
+  }
   if (md.role === 'program'){
     programConns.push(conn);
     conn.on('open', () => bb('программа: смотрит ' + (md.name || '—')));
@@ -1702,35 +2153,7 @@ function makeWinDom(rm){
     el.style.left = r.xCss + 'px'; el.style.top = r.yCss + 'px';
     el.style.width = r.wCss + 'px'; el.style.height = r.hCss + 'px';
   };
-  let d = null;
-  el.addEventListener('pointerdown', e => {
-    if (e.target === g) return;
-    d = { m: 'move', px: e.clientX, py: e.clientY, nx: rm.nx, ny: rm.ny };
-    el.setPointerCapture(e.pointerId);
-  });
-  g.addEventListener('pointerdown', e => {
-    e.stopPropagation();
-    d = { m: 'size', px: e.clientX, nw: rm.nw };
-    g.setPointerCapture(e.pointerId);
-  });
-  const mv = e => {
-    if (!d) return;
-    const cw = window.innerWidth, ch = window.innerHeight;
-    if (d.m === 'move'){
-      rm.nx = Math.min(Math.max(d.nx + (e.clientX - d.px) / cw, 0.01), 0.98 - rm.nw);
-      rm.ny = Math.min(Math.max(d.ny + (e.clientY - d.py) / ch, 0.01), 0.98 - rm.nw);
-    } else {
-      rm.nw = Math.min(Math.max(d.nw + (e.clientX - d.px) / cw, 0.14), 0.9);
-      rm.nx = Math.min(rm.nx, 0.98 - rm.nw);
-      rm.ny = Math.min(rm.ny, 0.98 - rm.nw);
-    }
-    rm.place();
-  };
-  el.addEventListener('pointermove', mv);
-  g.addEventListener('pointermove', mv);
-  const up = () => d = null;
-  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
-  g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+  attachWinGestures(el, g, rm, rm.place);
   rm.place();
 }
 function onIncomingCall(call){
@@ -1788,7 +2211,11 @@ function adoptRemote(rm, call){
 }
 function addRemote(call, s){
   if (remotes.some(r => r.call === call)) return;
-  const slot = SLOTS[remotes.length % SLOTS.length];
+  const label0 = ((call.metadata && call.metadata.name) || '').slice(0, 16);
+  const memSlots = (roomLoad() || {}).slots || {};
+  /* друг с той же подписью встаёт туда, где стоял до перезагрузки */
+  const slot = (label0 && memSlots[label0]) ? memSlots[label0]
+             : SLOTS[remotes.length % SLOTS.length];
   const v = document.createElement('video');
   v.playsInline = true; v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
   v.autoplay = true; v.muted = true; /* вслух не играем — звук уходит в микс через шину */
@@ -1802,8 +2229,8 @@ function addRemote(call, s){
   setTimeout(kick, 300); setTimeout(kick, 1200);
   const rm = {
     call, stream: s, video: v,
-    label: ((call.metadata && call.metadata.name) || '').slice(0, 16),
-    nx: slot.nx, ny: slot.ny, nw: slot.nw,
+    label: label0,
+    nx: slot.nx, ny: slot.ny, nw: slot.nw, nh: slot.nh || slot.nw,
     lost: 0, freeze: null
   };
   const ra = s.getAudioTracks();
@@ -1875,12 +2302,23 @@ function cameraRedial(){
   linkStatus('ПЕРЕПОДКЛЮЧЕНИЕ · попытка ' + camRetry);
   try{ if (peer) peer.destroy(); }catch(e){}
   peer = null; mediaCall = null; progConn = null;
-  setTimeout(() => { if (!linkStopping && linkRole === 'camera') startCameraRole(); }, wait * 1000);
+  setTimeout(() => { if (!linkStopping && linkRole === 'camera') startCameraRole(true); }, wait * 1000);
 }
 let linkCode = '';
-function startDirector(){
-  linkCode = makeCode();
-  $('linkCode').textContent = linkCode;
+function startDirector(keep){
+  /* onclick подсунул бы сюда PointerEvent — берём только строку */
+  const want = (typeof keep === 'string' ? keep : '').trim().toUpperCase();
+  linkCode = want || makeCode();
+  roomSave({ role: 'director', code: linkCode });
+  if (want){
+    const r = roomLoad();
+    if (r && r.win){ Object.assign(win, r.win); clampWin(win); placeWinDom(); }
+    bb('комната возвращена: ' + linkCode);
+  }
+  const rmem = roomLoad();
+  $('linkCode').textContent = (linkCode[0] === 'r' && linkCode.length > 6)
+    ? '🔒 ' + ((rmem && rmem.room) || 'комната')
+    : linkCode;
   $('linkWait').textContent = 'жду телефоны…';
   $('linkChoose').style.display = 'none';
   $('linkDirector').style.display = 'block';
@@ -1906,9 +2344,24 @@ function startDirector(){
   linkStatus('ЖДУ КАМЕРЫ · ' + linkCode);
   $('btnLink').classList.add('on');
 }
-async function startCameraRole(){
-  const code = $('lnkCodeIn').value.trim().toUpperCase();
-  if (code.length < 4){ showMsg('Введи код с телефона-режиссёра'); return; }
+let camTarget = '';   // адрес режиссёра: код или хеш комнаты
+async function startCameraRole(reuse){
+  let code = '', rn = '';
+  if (reuse === true && camTarget){
+    code = camTarget;                       // перезвон и возврат — по тому же адресу
+  } else {
+    rn = ($('lnkRoom').value || '').trim();
+    const rp = $('lnkPass').value || '';
+    if (rn && rp){
+      code = await roomIdFrom(rn, rp);
+      if (!code){ showMsg('Комната с паролем требует https — открой страницу по ссылке', 6000); return; }
+    } else {
+      code = $('lnkCodeIn').value.trim().toUpperCase();
+    }
+  }
+  if (!code || code.length < 4){ showMsg('Введи код — или имя комнаты и пароль'); return; }
+  camTarget = code;
+  roomSave({ role: 'camera', code, name: ($('lnkName').value || '').trim(), room: rn });
   try{
     if (!camStream) await openCam(facing);
     if (!micStream){
@@ -1963,6 +2416,17 @@ async function startCameraRole(){
 $('btnLink').onclick = () => {
   if (linkRole === 'camera'){ linkStop(); return; }
   $('linkSheet').style.display = 'flex';
+  const mem = linkRole ? null : roomLoad();
+  if (mem && mem.code){
+    $('roomBack').style.display = 'flex';
+    $('lnkResume').textContent = (mem.role === 'director'
+      ? '↩ ВЕРНУТЬ КОМНАТУ ' : '↩ ВЕРНУТЬСЯ В ЭФИР ')
+      + (mem.room ? '«' + mem.room + '»' : mem.code);
+    if (mem.role === 'camera'){
+      if (!$('lnkCodeIn').value) $('lnkCodeIn').value = mem.code;
+      if (!$('lnkName').value && mem.name) $('lnkName').value = mem.name;
+    }
+  } else $('roomBack').style.display = 'none';
   if (linkRole === 'director'){
     $('linkChoose').style.display = 'none';
     $('linkDirector').style.display = 'block';
@@ -1971,7 +2435,135 @@ $('btnLink').onclick = () => {
 $('linkSheet').addEventListener('click', e => {
   if (e.target === $('linkSheet')) $('linkSheet').style.display = 'none';
 });
-$('lnkDirector').onclick = startDirector;
+$('lnkDirector').onclick = () => startDirector();   // новая комната — новый код
+$('lnkKrug').onclick = () => {
+  const me = meLoad() || {};
+  $('meNick').value = me.nick || '';
+  $('meCircle').value = me.circle || '';
+  $('krugSheet').style.display = 'flex';
+  dataNoteRender();
+  renderFriends();
+  pingFriends();
+  clearInterval(pingTimer);
+  pingTimer = setInterval(pingFriends, 25000);   // опрос только пока лист открыт
+};
+async function dataNoteRender(){
+  const home = isStandalone();
+  let pers = false, used = '';
+  try{
+    if (navigator.storage && navigator.storage.persisted) pers = await navigator.storage.persisted();
+    if (navigator.storage && navigator.storage.estimate){
+      const e = await navigator.storage.estimate();
+      if (e && e.usage) used = ' · занято ' + (e.usage / 1048576).toFixed(1) + ' МБ';
+    }
+  }catch(e){}
+  $('dataNote').textContent =
+    (home ? 'с домашнего экрана ✓' : 'из браузера — на iPhone Safari стирает данные после 7 дней без визитов; добавь на домашний экран') +
+    (pers ? ' · хранение постоянное ✓' : ' · хранение «по возможности»') + used;
+}
+$('dataKeep').onclick = async () => {
+  const r = await storagePersist();
+  showMsg(r === true ? 'Браузер обещал хранить вечно'
+        : r === false ? 'Браузер отказал — помогает добавление на домашний экран'
+        : 'Этот браузер такого не умеет — надёжнее всего домашний экран', 6000);
+  dataNoteRender();
+};
+$('dataOut').onclick = () => stateDownload();
+$('dataInBtn').onclick = () => $('dataIn').click();
+$('dataIn').onchange = e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) stateUpload(f);
+};
+$('krugClose').onclick = () => {
+  $('krugSheet').style.display = 'none';
+  clearInterval(pingTimer); pingTimer = null;
+};
+$('meSave').onclick = async () => {
+  const nick = ($('meNick').value || '').trim(), circle = ($('meCircle').value || '').trim();
+  if (nick.length < 2 || circle.length < 3){ showMsg('Ник и секрет круга (от 3 знаков)'); return; }
+  meSave({ nick, circle });
+  await dutyUp();
+  showMsg(dutyReady ? 'Ты в сети как ' + nick : 'Личность сохранена', 4000);
+  renderFriends();
+  pingFriends();
+};
+$('frAdd').onclick = () => {
+  const n = ($('frNew').value || '').trim();
+  if (n.length < 2) return;
+  const list = friendsLoad();
+  if (!list.some(f => f.nick.toLowerCase() === n.toLowerCase())) list.push({ nick: n });
+  friendsSave(list);
+  $('frNew').value = '';
+  renderFriends();
+  pingFriends();
+};
+$('krugInvite').onclick = () => {
+  const me = meLoad();
+  if (!me){ showMsg('Сначала сохрани личность'); return; }
+  const url = location.origin + location.pathname +
+    '#krug=' + encodeURIComponent(me.circle) + '&me=' + encodeURIComponent(me.nick);
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
+    .then(() => showMsg('Ссылка в буфере — отправь другу', 5000),
+          () => showMsg(url, 9000));
+};
+$('ringNo').onclick = () => { $('ring').style.display = 'none'; };
+$('ringYes').onclick = () => {
+  $('ring').style.display = 'none';
+  if (!showRing.code) return;
+  camTarget = showRing.code;
+  $('linkSheet').style.display = 'flex';
+  $('linkChoose').style.display = 'none';
+  $('linkCameraUi').style.display = 'block';
+  startCameraRole(true);
+};
+$('lnkRoomGo').onclick = async () => {
+  const n = ($('lnkRoomD').value || '').trim(), p = $('lnkPassD').value || '';
+  if (n.length < 2 || p.length < 3){ showMsg('Имя комнаты и пароль (от 3 знаков)'); return; }
+  const id = await roomIdFrom(n, p);
+  if (!id){ showMsg('Комната с паролем требует https — открой страницу по ссылке', 6000); return; }
+  roomSave({ room: n });
+  startDirector(id);
+  bb('комната поднята: ' + n);
+  showMsg('Комната «' + n + '» в эфире. Друзьям: то же имя и тот же пароль.', 6000);
+};
+$('lnkKnock').onclick = async () => {
+  const n = ($('lnkRoom').value || '').trim(), p = $('lnkPass').value || '';
+  let code = '';
+  if (n && p){
+    code = await roomIdFrom(n, p);
+    if (!code){ showMsg('Комната с паролем требует https', 5000); return; }
+  } else {
+    code = $('lnkCodeIn').value.trim().toUpperCase();
+  }
+  if (code.length < 4){ showMsg('Введи код — или имя комнаты и пароль'); return; }
+  const btn = $('lnkKnock');
+  btn.textContent = 'стучу…';
+  const up = await knockRoom(code);
+  btn.textContent = 'ПОДНЯТА ЛИ?';
+  showMsg(up ? '✓ комната в эфире — отдавай камеру'
+             : '· тишина: комната не поднята (или имя/пароль другие)', 5000);
+};
+$('lnkResume').onclick = () => {
+  const mem = roomLoad();
+  if (!mem || !mem.code){ $('roomBack').style.display = 'none'; return; }
+  if (mem.role === 'director'){
+    startDirector(mem.code);
+    showMsg('Комната ' + mem.code + ' поднята — друзья дозвонятся сами (у них ~2 минуты)', 6000);
+  } else {
+    camTarget = mem.code;
+    if (mem.name) $('lnkName').value = mem.name;
+    if (!mem.room) $('lnkCodeIn').value = mem.code;
+    $('linkChoose').style.display = 'none';
+    $('linkCameraUi').style.display = 'block';
+    startCameraRole(true);
+  }
+};
+$('lnkForget').onclick = () => {
+  roomForget();
+  $('roomBack').style.display = 'none';
+  showMsg('Память комнаты стёрта');
+};
 $('lnkCamera').onclick = () => {
   $('linkChoose').style.display = 'none';
   $('linkCameraUi').style.display = 'block';
@@ -2232,6 +2824,33 @@ setInterval(() => {
   }
 }, 150);
 
+/* ---------- ШТОРКА: кнопки уходят, кадр остаётся ----------
+   Бар с двадцатью кнопками закрывал окно друга. Теперь он убирается:
+   тап по язычку внизу или свайп вниз по самому бару. КАРМАН — другое:
+   он запирает касания; шторка просто освобождает обзор. */
+let barOn = true;
+function setBar(v){
+  barOn = !!v;
+  $('bar').classList.toggle('tuck', !barOn);
+  $('tab').textContent = barOn ? '▾' : '▴';
+  bb('шторка: кнопки ' + (barOn ? 'видны' : 'спрятаны'));
+}
+$('tab').onclick = () => setBar(!barOn);
+let barSwipe = null, barSwiped = false;
+$('bar').addEventListener('pointerdown', e => { barSwipe = e.clientY; barSwiped = false; });
+$('bar').addEventListener('pointermove', e => {
+  if (barSwipe === null) return;
+  if (e.clientY - barSwipe > 42){        // свайп вниз по бару — спрятать
+    barSwipe = null; barSwiped = true;
+    setBar(false);
+  }
+});
+$('bar').addEventListener('pointerup', () => { barSwipe = null; });
+$('bar').addEventListener('pointercancel', () => { barSwipe = null; });
+$('bar').addEventListener('click', e => {
+  if (barSwiped){ e.preventDefault(); e.stopPropagation(); barSwiped = false; }
+}, true);                                 // свайп не должен нажимать кнопку
+
 /* ---------- КАРМАН: замок от случайных касаний ----------
    Экран горит, телефон в кармане: сверху лежит почти прозрачный щит,
    ловящий ВСЕ касания. Снять — провести пальцем по «Г», не отрываясь:
@@ -2463,6 +3082,22 @@ $('checkRun').onclick = async () => {
     ckLine(NET.turnUri ? '✓ TURN задан: ' + NET.turnUri
                        : '· TURN не задан — чужие NAT как повезёт', NET.turnUri ? 'ok' : 'warn');
 
+    /* 10 · сундук: где живут настройки и надолго ли */
+    try{
+      const home = isStandalone();
+      let pers = false;
+      if (navigator.storage && navigator.storage.persisted) pers = await navigator.storage.persisted();
+      if (navigator.storage && navigator.storage.estimate){
+        const e = await navigator.storage.estimate();
+        if (e && e.quota) ckLine('· хранилище: занято ' + (e.usage / 1048576).toFixed(1) +
+          ' МБ из ' + (e.quota / 1048576).toFixed(0) + ' МБ');
+      }
+      ckLine(pers ? '✓ хранение постоянное — браузер не вымоет настройки'
+                  : '⚠ хранение «по возможности» — жми 💾 в листе КРУГ', pers ? 'ok' : 'warn');
+      ckLine(home ? '✓ запущено с домашнего экрана — семидневное вымывание не грозит'
+                  : '⚠ открыто из браузера: на iPhone данные сайта живут 7 дней без визитов — добавь на домашний экран',
+             home ? 'ok' : 'warn');
+    }catch(e){ ckLine('· хранилище: спросить не вышло (' + (e.name || e) + ')', 'warn'); }
     ckLine('— прогон завершён —');
     bb('прогон выполнен');
   }catch(e){ ckLine('✗ прогон упал: ' + e, 'fail'); }
@@ -2480,6 +3115,14 @@ $('btnStart').onclick = async () => {
   }
   $('start').style.display = 'none';
   $('bar').style.display = 'flex';
+  $('tab').style.display = 'flex';
+  /* один раз в жизни: как сделать настройки долговечными */
+  try{
+    if (!isStandalone() && !localStorage.getItem('skrin-hint')){
+      localStorage.setItem('skrin-hint', '1');
+      setTimeout(() => showMsg('Совет: «Поделиться» → «На экран Домой». Полный экран без адресной строки — и настройки перестанут стираться', 9000), 25000);
+    }
+  }catch(e){}
   running = true;
   setMode('studio');
   ensureBus();          // аудио-шина с первого жеста — iOS доволен
@@ -2505,6 +3148,28 @@ document.addEventListener('visibilitychange', () => {
     keepAwake();
 });
 
+/* ссылка-приглашение: #krug=секрет&me=ник — принять круг одним тапом */
+(function inviteFromLink(){
+  const h = location.hash || '';
+  if (h.indexOf('krug=') < 0) return;
+  const p = new URLSearchParams(h.replace(/^#/, ''));
+  const circle = p.get('krug'), who = (p.get('me') || '').trim();
+  if (!circle) return;
+  setTimeout(() => {
+    if (!confirm((who ? who + ' зовёт' : 'Тебя зовут') + ' в круг. Принять?')) return;
+    const me = meLoad() || {};
+    meSave({ nick: me.nick || '', circle });
+    if (who){
+      const list = friendsLoad();
+      if (!list.some(f => f.nick.toLowerCase() === who.toLowerCase())) list.push({ nick: who });
+      friendsSave(list);
+    }
+    history.replaceState(null, '', location.pathname);
+    showMsg(me.nick ? 'Круг принят' : 'Круг принят — открой 👥 МОЙ КРУГ и впиши свой ник', 8000);
+    dutyUp();
+  }, 900);
+})();
+dutyUp();
 rescueScan();
 fit();
 </script>
