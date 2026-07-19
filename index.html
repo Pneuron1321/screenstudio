@@ -118,6 +118,31 @@
     display:none;justify-content:center;gap:8px;z-index:20;padding:0 8px;flex-wrap:wrap;
     transition:transform .22s ease, opacity .18s ease;
   }
+  /* вкладки категорий: бар перестаёт быть стеной кнопок */
+  #tabs{
+    width:100%;display:flex;justify-content:center;gap:5px;margin-bottom:7px;flex-wrap:wrap;
+  }
+  #tabs .tab{
+    padding:6px 11px;border-radius:999px;font-size:11px;letter-spacing:.03em;
+    background:rgba(18,26,34,.7);border:1px solid rgba(232,227,216,.14);
+    color:var(--dim);cursor:pointer;user-select:none;-webkit-user-select:none;
+    backdrop-filter:blur(6px);white-space:nowrap;
+  }
+  #tabs .tab.on{color:var(--amber);border-color:var(--amber);background:rgba(18,26,34,.95)}
+  /* плашка «значок на экран» — одно касание, без нытья */
+  #instBar{
+    position:absolute;left:50%;transform:translateX(-50%);z-index:25;display:none;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 190px);
+    align-items:center;gap:8px;padding:9px 10px 9px 14px;border-radius:14px;
+    background:rgba(18,26,34,.96);border:1px solid rgba(255,180,84,.45);
+    box-shadow:0 6px 22px rgba(0,0,0,.5);max-width:92vw;
+  }
+  #instBar span{font-size:12px;color:var(--ink);line-height:1.4}
+  #instBar button{height:36px;padding:0 14px;border-radius:9px;border:none;
+    background:var(--amber);color:#221500;font-weight:800;font-size:12px;white-space:nowrap}
+  #instBar .x{width:32px;height:32px;border-radius:50%;background:transparent;
+    color:var(--dim);border:1px solid rgba(232,227,216,.2);font-weight:400;padding:0}
+
   /* ШТОРКА: кнопки уходят вниз — кадр виден целиком */
   #bar.tuck{transform:translateY(150%);opacity:0;pointer-events:none}
   #tab{
@@ -300,29 +325,36 @@
 <div id="tab">▾</div>
 
 <div id="bar">
-  <button class="btn" id="btnMode">ЭФИР</button>
-  <button class="btn" id="btnFlip">⟲</button>
-  <button class="btn on" id="btnWin">ОКНО</button>
-  <button class="btn" id="btnScreen" style="display:none">ЭКРАН</button>
-  <button class="btn" id="btnMic">МИК·выкл</button>
-  <div id="vu"><i></i></div>
-  <button class="btn" id="btnGateMic">⊘МИК</button>
-  <button class="btn" id="btnGateCam">⊘КАМ</button>
-  <button class="btn" id="btnMon">🎧 НАУШНИКИ</button>
-  <button class="btn" id="btnPtt">◉ РАЦИЯ</button>
-  <button class="btn" id="btnPrompt">СУФЛЁР·ухо</button>
-  <button class="btn" id="btnBlur">БЛЮР</button>
-  <button class="btn" id="btnZone">ЗОНА</button>
-  <button class="btn" id="btnPanic">ПАНИКА</button>
-  <button class="btn" id="btnPocket">КАРМАН</button>
+  <div id="tabs">
+    <div class="tab" data-g="эфир">🎬 ЭФИР</div>
+    <div class="tab" data-g="звук">🔊 ЗВУК</div>
+    <div class="tab" data-g="кадр">👁 КАДР</div>
+    <div class="tab" data-g="круг">🔗 КРУГ</div>
+    <div class="tab" data-g="ещё">⚙ ЕЩЁ</div>
+  </div>
   <button class="btn" id="btnRec">● REC</button>
-  <button class="btn" id="btnRing">КОЛЬЦО</button>
-  <button class="btn" id="btnClip">КЛИП</button>
-  <button class="btn" id="btnTwitch">TWITCH</button>
-  <button class="btn" id="btnLink">СВЯЗЬ</button>
-  <button class="btn" id="btnKrug">👥</button>
-  <button class="btn" id="btnCheck">ПРОГОН</button>
-  <button class="btn" id="btnInfo">ⓘ</button>
+  <div id="vu"><i></i></div>
+  <button class="btn" id="btnPanic">ПАНИКА</button>
+  <button class="btn" id="btnMode" data-g="эфир">ЭФИР</button>
+  <button class="btn" id="btnRing" data-g="эфир">КОЛЬЦО</button>
+  <button class="btn" id="btnClip" data-g="эфир">КЛИП</button>
+  <button class="btn" id="btnTwitch" data-g="эфир">TWITCH</button>
+  <button class="btn" id="btnMic" data-g="звук">МИК·выкл</button>
+  <button class="btn" id="btnGateMic" data-g="звук">⊘МИК</button>
+  <button class="btn" id="btnMon" data-g="звук">🎧 НАУШНИКИ</button>
+  <button class="btn" id="btnPtt" data-g="звук">◉ РАЦИЯ</button>
+  <button class="btn" id="btnPrompt" data-g="звук">СУФЛЁР·ухо</button>
+  <button class="btn" id="btnFlip" data-g="кадр">⟲</button>
+  <button class="btn" id="btnWin" data-g="кадр">ОКНО</button>
+  <button class="btn" id="btnScreen" data-g="кадр" style="display:none">ЭКРАН</button>
+  <button class="btn" id="btnGateCam" data-g="кадр">⊘КАМ</button>
+  <button class="btn" id="btnBlur" data-g="кадр">БЛЮР</button>
+  <button class="btn" id="btnZone" data-g="кадр">ЗОНА</button>
+  <button class="btn" id="btnLink" data-g="круг">СВЯЗЬ</button>
+  <button class="btn" id="btnKrug" data-g="круг">👥 КРУГ</button>
+  <button class="btn" id="btnPocket" data-g="ещё">КАРМАН</button>
+  <button class="btn" id="btnCheck" data-g="ещё">ПРОГОН</button>
+  <button class="btn" id="btnInfo" data-g="ещё">ⓘ</button>
 </div>
 
 <div id="lock">
@@ -427,6 +459,28 @@
   </div>
 </div>
 
+<div id="instBar">
+  <span>Добавить значок на экран? Полный экран и настройки не сотрутся.</span>
+  <button id="instGo">📲 ДА</button>
+  <button class="x" id="instNo">✕</button>
+</div>
+
+<div class="sheet" id="welcomeSheet">
+  <div class="card">
+    <h3>Привет! Это СКРИН-СТУДИЯ</h3>
+    <small>Можно просто пользоваться — ничего вводить не нужно, эфир работает и так.<br>
+    А если назовёшься, друзья увидят, когда ты в сети, и смогут позвать в эфир одним касанием.
+    Имя живёт только в этом телефоне.</small>
+    <label>Как тебя звать в эфире?</label>
+    <input id="wcNick" maxlength="16" autocomplete="off" placeholder="Алекс">
+    <div class="row"><button class="go" id="wcGo">ГОТОВО</button></div>
+    <div class="row">
+      <button class="quiet" id="wcInstall">📲 значок на экран</button>
+      <button class="quiet" id="wcSkip">просто пользоваться</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet" id="krugSheet">
   <div class="card">
     <h3>👥 МОЙ КРУГ</h3>
@@ -506,7 +560,8 @@ let mode = 'studio';                          // studio | efir
 let camVideo = null, camStream = null, facing = 'environment';
 let dispVideo = null, dispStream = null;      // реальный экран для окна СТУДИИ
 let micStream = null, micOn = false;
-let winOn = true, screenMode = false;
+let winOn = false, screenMode = false;   // эхо-окно поднимается по кнопке ОКНО
+let curGroup = 'эфир', screenAvail = false;
 let recorder = null, chunks = [], recStream = null, recT0 = 0, timerId = null, blobUrl = null;
 let audioCtx = null;
 let pc = null, whipResource = null, twitchOn = false;
@@ -1836,9 +1891,15 @@ function setMode(m){
   $('urlRow').style.display = efir ? 'flex' : 'none';
   cv.style.display = efir ? 'none' : 'block';
   $('btnMode').textContent = efir ? 'СТУДИЯ' : 'ЭФИР';
-  $('btnScreen').style.display =
-    (!efir && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) ? 'inline-block' : 'none';
+  screenAvail = !!(!efir && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  setGroup(curGroup);
   winEl.classList.toggle('solid', efir);
+  /* в режиме ЭФИР окно — это и есть твоя камера поверх сайта: поднимаем его,
+     даже если в студии оно было опущено */
+  if (efir && !winOn){
+    winOn = true;
+    $('btnWin').classList.add('on');
+  }
   if (camVideo){
     if (efir) winEl.appendChild(camVideo);
     else camHolder.appendChild(camVideo);
@@ -3134,17 +3195,7 @@ $('btnStart').onclick = async () => {
   $('start').style.display = 'none';
   $('bar').style.display = 'flex';
   $('tab').style.display = 'flex';
-  /* по разу в жизни: своё имя в круге и значок на экране */
-  try{
-    if (!meLoad() && !localStorage.getItem('skrin-hint-me')){
-      localStorage.setItem('skrin-hint-me', '1');
-      setTimeout(() => showMsg('Кнопка 👥 в баре — заведи имя и круг: друзья будут видеть, когда ты в сети, и смогут звать', 9000), 7000);
-    }
-    if (!isStandalone() && !localStorage.getItem('skrin-hint')){
-      localStorage.setItem('skrin-hint', '1');
-      setTimeout(() => showMsg('👥 → 📲 на экран: полноэкранный режим без адресной строки, и настройки перестанут стираться', 9000), 22000);
-    }
-  }catch(e){}
+  /* знакомство и значок предлагаются отдельно — тосты больше не нужны */
   running = true;
   setMode('studio');
   ensureBus();          // аудио-шина с первого жеста — iOS доволен
@@ -3245,6 +3296,71 @@ async function askInstall(){
 }
 $('dataInstall').onclick = askInstall;
 $('btnKrug').onclick = () => $('lnkKrug').onclick();
+
+/* ---------- ЛИЦО: кнопки по категориям ----------
+   Двадцать кнопок в ряд закрывали кадр. Теперь всегда под рукой REC,
+   уровень и ПАНИКА, остальное — по вкладкам. Выбор запоминается. */
+function setGroup(g){
+  curGroup = g;
+  document.querySelectorAll('#bar .btn').forEach(b => {
+    const bg = b.dataset.g;
+    const show = !bg || bg === g;
+    if (b.id === 'btnScreen'){ b.style.display = (show && screenAvail) ? 'inline-block' : 'none'; return; }
+    b.style.display = show ? 'inline-block' : 'none';
+  });
+  document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('on', t.dataset.g === g));
+  try{ localStorage.setItem('skrin-group', g); }catch(e){}
+}
+document.querySelectorAll('#tabs .tab').forEach(t => {
+  t.addEventListener('pointerdown', e => { e.stopPropagation(); setGroup(t.dataset.g); });
+});
+try{ setGroup(localStorage.getItem('skrin-group') || 'эфир'); }catch(e){ setGroup('эфир'); }
+
+/* ---------- ЗНАКОМСТВО: имя за одно касание, и всё необязательно ---------- */
+function welcomeDone(){
+  try{ localStorage.setItem('skrin-welcome', '1'); }catch(e){}
+  hideSheet($('welcomeSheet'));
+}
+$('wcGo').onclick = async () => {
+  const nick = ($('wcNick').value || '').trim();
+  if (nick.length < 2){ showMsg('Впиши имя — хотя бы две буквы'); return; }
+  /* свой круг рождается сам: друзья входят по ссылке-приглашению */
+  const circle = 'k' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  meSave({ nick, circle });
+  welcomeDone();
+  await dutyUp();
+  bb('знакомство: ' + nick);
+  showMsg('Готово, ' + nick + '! Зови друзей ссылкой: 👥 КРУГ → 📋', 8000);
+  setTimeout(offerInstall, 12000);
+};
+$('wcSkip').onclick = () => { welcomeDone(); setTimeout(offerInstall, 15000); };
+$('wcInstall').onclick = () => { welcomeDone(); askInstall(); };
+
+/* ---------- ЗНАЧОК НА ЭКРАН: одно касание, одно предложение ---------- */
+function offerInstall(){
+  if (isStandalone()) return;
+  try{ if (localStorage.getItem('skrin-inst')) return; }catch(e){}
+  $('instBar').style.display = 'flex';
+}
+$('instGo').onclick = () => {
+  try{ localStorage.setItem('skrin-inst', '1'); }catch(e){}
+  $('instBar').style.display = 'none';
+  askInstall();
+};
+$('instNo').onclick = () => {
+  try{ localStorage.setItem('skrin-inst', '1'); }catch(e){}
+  $('instBar').style.display = 'none';
+};
+/* через 2 секунды после открытия: если ещё не знакомы — предложить имя */
+setTimeout(() => {
+  try{
+    if (!meLoad() && !localStorage.getItem('skrin-welcome')){
+      $('welcomeSheet').style.display = 'flex';
+      return;
+    }
+  }catch(e){}
+  setTimeout(offerInstall, 18000);
+}, 2000);
 
 dutyUp();
 rescueScan();
