@@ -222,6 +222,12 @@
   #saveWrap{
     position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
     transform:translateX(-50%);z-index:22;display:none;
+    align-items:center;gap:6px;
+  }
+  #saveX{
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;background:rgba(18,26,34,.9);color:var(--ink);
+    border:1px solid rgba(232,227,216,.2);font-size:15px;cursor:pointer;flex:0 0 auto;
   }
   #saveLink{
     display:inline-block;padding:13px 26px;border-radius:999px;background:var(--amber);
@@ -235,10 +241,20 @@
     background:rgba(11,15,20,.86);padding:22px;
   }
   .sheet .card{
+    position:relative;
     max-width:440px;width:100%;background:var(--surface);border:1px solid rgba(255,180,84,.3);
     border-radius:18px;padding:20px;font-size:14px;line-height:1.7;
     max-height:82vh;overflow:auto;
   }
+  /* крестик: любой лист закрывается пальцем, без поиска пустого места */
+  .sheetX{
+    position:absolute;right:6px;top:4px;width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:19px;
+    color:var(--dim);background:rgba(11,15,20,.55);cursor:pointer;
+    user-select:none;-webkit-user-select:none;z-index:3;
+  }
+  .sheetX:active{color:var(--amber);background:rgba(11,15,20,.9)}
+  .sheet .card h3:first-child{padding-right:46px}
   .card.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;white-space:pre-wrap}
   .card b{color:var(--amber)}
   .card h3{font-size:16px;margin-bottom:10px;letter-spacing:.04em}
@@ -304,6 +320,7 @@
   <button class="btn" id="btnClip">КЛИП</button>
   <button class="btn" id="btnTwitch">TWITCH</button>
   <button class="btn" id="btnLink">СВЯЗЬ</button>
+  <button class="btn" id="btnKrug">👥</button>
   <button class="btn" id="btnCheck">ПРОГОН</button>
   <button class="btn" id="btnInfo">ⓘ</button>
 </div>
@@ -329,7 +346,7 @@
   <div class="row"><button id="rescueDel">удалить</button><button class="go" id="rescueGet">СПАСТИ</button></div>
 </div>
 
-<div id="saveWrap"><a id="saveLink" href="#" download>Сохранить видео</a></div>
+<div id="saveWrap"><a id="saveLink" href="#" download>Сохранить видео</a><div id="saveX">✕</div></div>
 
 <div class="sheet" id="info"><div class="card mono" id="infoText"></div></div>
 
@@ -433,6 +450,7 @@
     <h3 style="margin-top:14px">💾 МОИ ДАННЫЕ</h3>
     <div class="fnote" id="dataNote">…</div>
     <div class="row">
+      <button class="quiet" id="dataInstall">📲 на экран</button>
       <button class="quiet" id="dataKeep">💾 хранить вечно</button>
       <button class="quiet" id="dataOut">📤 в файл</button>
       <button class="quiet" id="dataInBtn">📥 из файла</button>
@@ -1504,7 +1522,7 @@ async function rescueScan(){
       a.href = URL.createObjectURL(blob);
       a.download = 'skrin-спасено-' + new Date(meta.t0).toISOString().slice(0, 16).replace(/[:T]/g, '-')
         + ((meta.mime || '').indexOf('mp4') >= 0 ? '.mp4' : '.webm');
-      $('saveWrap').style.display = 'block';
+      $('saveWrap').style.display = 'flex';
       $('rescueWrap').style.display = 'none';
       bb('запись спасена: ' + (size / 1048576).toFixed(1) + ' МБ');
       idbClear();
@@ -1657,7 +1675,7 @@ function takeClip(){
     a.href = URL.createObjectURL(blob);
     a.download = 'клип-' + new Date().toISOString().slice(11, 19).replace(/:/g, '-') +
       (type.indexOf('mp4') >= 0 ? '.mp4' : '.webm');
-    $('saveWrap').style.display = 'block';
+    $('saveWrap').style.display = 'flex';
     bb('клип: ' + depth.toFixed(0) + ' с · ' + (blob.size / 1048576).toFixed(1) + ' МБ');
     linkFlash('КЛИП вырезан: ' + depth.toFixed(0) + ' с — забери файл');
     engSend({ op: 'result', of: 'clip',
@@ -1770,7 +1788,7 @@ async function toggleRec(){
     a.href = blobUrl;
     a.download = 'skrin-studia.' + (type.includes('mp4') ? 'mp4' : 'webm');
     a.textContent = 'Сохранить видео · ' + (blob.size / 1048576).toFixed(1) + ' МБ';
-    $('saveWrap').style.display = 'block';
+    $('saveWrap').style.display = 'flex';
   };
   if ($('rescueWrap').style.display === 'block'){
     $('rescueWrap').style.display = 'none';
@@ -3116,11 +3134,15 @@ $('btnStart').onclick = async () => {
   $('start').style.display = 'none';
   $('bar').style.display = 'flex';
   $('tab').style.display = 'flex';
-  /* один раз в жизни: как сделать настройки долговечными */
+  /* по разу в жизни: своё имя в круге и значок на экране */
   try{
+    if (!meLoad() && !localStorage.getItem('skrin-hint-me')){
+      localStorage.setItem('skrin-hint-me', '1');
+      setTimeout(() => showMsg('Кнопка 👥 в баре — заведи имя и круг: друзья будут видеть, когда ты в сети, и смогут звать', 9000), 7000);
+    }
     if (!isStandalone() && !localStorage.getItem('skrin-hint')){
       localStorage.setItem('skrin-hint', '1');
-      setTimeout(() => showMsg('Совет: «Поделиться» → «На экран Домой». Полный экран без адресной строки — и настройки перестанут стираться', 9000), 25000);
+      setTimeout(() => showMsg('👥 → 📲 на экран: полноэкранный режим без адресной строки, и настройки перестанут стираться', 9000), 22000);
     }
   }catch(e){}
   running = true;
@@ -3169,6 +3191,61 @@ document.addEventListener('visibilitychange', () => {
     dutyUp();
   }, 900);
 })();
+/* ---------- ПРИБОРКА: всё, что открылось, обязано закрываться ----------
+   Полевой урок: лист во весь экран не закрыть «кликом мимо» — пальцу некуда
+   попасть. Потому у каждого листа крестик, плюс фон и Escape. */
+function hideSheet(sh){
+  sh.style.display = 'none';
+  if (sh.id === 'krugSheet'){ clearInterval(pingTimer); pingTimer = null; }
+}
+function closeSheets(){ document.querySelectorAll('.sheet').forEach(hideSheet); }
+document.querySelectorAll('.sheet').forEach(sh => {
+  const card = sh.querySelector('.card');
+  if (card && !card.querySelector('.sheetX')){
+    const x = document.createElement('div');
+    x.className = 'sheetX';
+    x.textContent = '✕';
+    x.addEventListener('pointerdown', e => { e.stopPropagation(); hideSheet(sh); });
+    card.appendChild(x);
+  }
+  sh.addEventListener('pointerdown', e => { if (e.target === sh) hideSheet(sh); });
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
+
+/* кнопка сохранения больше не висит вечно */
+$('saveX').onclick = () => { $('saveWrap').style.display = 'none'; };
+$('saveLink').addEventListener('click', () => {
+  setTimeout(() => { $('saveWrap').style.display = 'none'; }, 1800);
+});
+
+/* установка на домашний экран: где браузер даёт — предложением, где нет — словами */
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  bb('установка: браузер готов предложить');
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  bb('установлено на домашний экран');
+  showMsg('Готово — запускай с домашнего экрана: полный экран и настройки не стираются', 7000);
+});
+async function askInstall(){
+  if (isStandalone()){ showMsg('Уже запущено с домашнего экрана ✓', 4000); return; }
+  if (installPrompt){
+    installPrompt.prompt();
+    try{ await installPrompt.userChoice; }catch(e){}
+    installPrompt = null;
+    return;
+  }
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  showMsg(ios ? 'Safari внизу: «Поделиться» → «На экран Домой» → Добавить'
+              : 'Меню браузера ⋮ → «Установить приложение» или «Добавить на главный экран»', 11000);
+}
+$('dataInstall').onclick = askInstall;
+$('btnKrug').onclick = () => $('lnkKrug').onclick();
+
 dutyUp();
 rescueScan();
 fit();
