@@ -113,17 +113,27 @@
   #win.solid video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 
   /* ---- панель кнопок ---- */
+  /* ПУЛЬТ СЛЕВА: кнопки уходят с низа кадра на левый край, колонкой
+     снизу вверх — там их держит большой палец, и они не закрывают ни
+     окно друга, ни радар, ни субтитры внизу кадра. */
   #bar{
-    position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
-    display:none;justify-content:center;gap:8px;z-index:20;padding:0 8px;flex-wrap:wrap;
+    position:absolute;left:calc(env(safe-area-inset-left,0px) + 7px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 46px);
+    right:auto;top:auto;z-index:20;padding:0;
+    display:none;flex-direction:column-reverse;align-items:flex-start;gap:6px;
+    max-height:74vh;overflow-y:auto;overflow-x:hidden;
     transition:transform .22s ease, opacity .18s ease;
+    scrollbar-width:none;
   }
+  #bar::-webkit-scrollbar{display:none}
+  #bar .btn{white-space:nowrap}
   /* вкладки категорий: бар перестаёт быть стеной кнопок */
   #tabs{
-    width:100%;display:flex;justify-content:center;gap:5px;margin-bottom:7px;flex-wrap:wrap;
+    display:flex;justify-content:flex-start;gap:4px;margin:0 0 2px;flex-wrap:wrap;
+    max-width:min(62vw,320px);
   }
   #tabs .tab{
-    padding:6px 11px;border-radius:999px;font-size:11px;letter-spacing:.03em;
+    padding:7px 9px;border-radius:999px;font-size:11px;letter-spacing:.03em;
     background:rgba(18,26,34,.7);border:1px solid rgba(232,227,216,.14);
     color:var(--dim);cursor:pointer;user-select:none;-webkit-user-select:none;
     backdrop-filter:blur(6px);white-space:nowrap;
@@ -144,11 +154,11 @@
     color:var(--dim);border:1px solid rgba(232,227,216,.2);font-weight:400;padding:0}
 
   /* ШТОРКА: кнопки уходят вниз — кадр виден целиком */
-  #bar.tuck{transform:translateY(150%);opacity:0;pointer-events:none}
+  #bar.tuck{transform:translateX(-120%);opacity:0;pointer-events:none}
   #tab{
-    position:absolute;left:50%;transform:translateX(-50%);
-    bottom:calc(env(safe-area-inset-bottom,0px) + 2px);
-    width:78px;height:24px;border-radius:12px;z-index:21;display:none;
+    position:absolute;left:calc(env(safe-area-inset-left,0px) + 7px);
+    bottom:calc(env(safe-area-inset-bottom,0px) + 10px);
+    width:46px;height:30px;border-radius:12px;z-index:21;display:none;
     align-items:center;justify-content:center;touch-action:none;cursor:pointer;
     background:rgba(18,26,34,.72);border:1px solid rgba(232,227,216,.18);
     color:var(--ink);font-size:13px;line-height:1;backdrop-filter:blur(6px);
@@ -198,7 +208,36 @@
     transform:translateX(-50%);color:var(--amber);opacity:.22;font-size:12px;
     font-family:ui-monospace,Menlo,monospace;letter-spacing:.08em;white-space:nowrap}
 
+  /* ---- список игроков: кто в игре и чем участвует ---- */
+  .prow{display:flex;align-items:center;gap:7px;padding:8px 0;
+    border-bottom:1px solid rgba(232,227,216,.08)}
+  .pmark{width:44px;flex:0 0 auto;font-size:13px;letter-spacing:-1px;white-space:nowrap}
+  .pname{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pnote{color:var(--dim);font-size:11px;font-family:ui-monospace,Menlo,monospace;
+    white-space:nowrap}
+  .prow button{height:30px;min-width:32px;padding:0 8px;border-radius:8px;
+    border:1px solid #333;background:#0B0F14;color:var(--ink);font-size:12px}
+  .prow button.on{border-color:var(--amber);color:var(--amber)}
+  .prow.dim{opacity:.5}
+  #rosterHead{display:flex;gap:8px;color:var(--dim);font-size:11px;margin-bottom:4px;
+    font-family:ui-monospace,Menlo,monospace}
+
   /* ---- панель окна друга: закрыть, звук в эфир, звук мне ---- */
+  /* ступени радара: три кнопки под ним, крупнее пультовых — попадать
+     пальцем на воде, не глядя */
+  #zoombar{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:-46px;
+    display:flex;gap:7px;z-index:3;
+  }
+  #zoombar .zbtn{
+    width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-size:17px;line-height:1;cursor:pointer;
+    background:rgba(4,7,16,.82);border:1px solid rgba(0,255,80,.28);
+    color:rgba(0,255,80,.62);touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  #zoombar .zbtn.on{
+    color:#0B0F14;background:rgba(0,255,80,.85);border-color:rgba(0,255,80,.9);font-weight:800;
+  }
   .rwin .wbar, #win .wbar{position:absolute;left:5px;top:5px;display:flex;gap:4px;z-index:2;flex-wrap:wrap;max-width:calc(100% - 10px)}
   .rwin .wbtn, #win .wbtn{
     width:27px;height:27px;border-radius:8px;display:flex;align-items:center;
@@ -353,7 +392,7 @@
   <button id="btnStart">СТАРТ</button>
 </div>
 
-<div id="tab">▾</div>
+<div id="tab">◂</div>
 
 <div id="bar">
   <div id="tabs">
@@ -374,6 +413,9 @@
   <button class="btn" id="btnMic" data-g="звук">МИК·выкл</button>
   <button class="btn" id="btnGateMic" data-g="звук">⊘МИК</button>
   <button class="btn" id="btnMon" data-g="звук">🎧 НАУШНИКИ</button>
+  <button class="btn" id="btnEar" data-g="звук">👂 УХО</button>
+  <button class="btn" id="btnSubs" data-g="звук">💬 СУБТИТРЫ</button>
+  <button class="btn" id="btnDuty" data-g="ещё">🤖 ДЕЖУРНЫЙ</button>
   <button class="btn" id="btnPtt" data-g="звук">◉ РАЦИЯ</button>
   <button class="btn" id="btnPrompt" data-g="звук">СУФЛЁР·ухо</button>
   <button class="btn" id="btnDash" data-g="мир">◎ ПРИБОРЫ</button>
@@ -387,6 +429,7 @@
   <button class="btn" id="btnZone" data-g="кадр">ЗОНА</button>
   <button class="btn" id="btnLink" data-g="круг">СВЯЗЬ</button>
   <button class="btn" id="btnKrug" data-g="круг">👥 КРУГ</button>
+  <button class="btn" id="btnRoster" data-g="круг">🎽 ИГРОКИ</button>
   <button class="btn" id="btnPocket" data-g="ещё">КАРМАН</button>
   <button class="btn" id="btnCheck" data-g="ещё">ПРОГОН</button>
   <button class="btn" id="btnInfo" data-g="ещё">ⓘ</button>
@@ -423,6 +466,14 @@
 </div>
 
 <div class="rwin" id="mapWin" style="display:none"><div class="grip"></div></div>
+<div class="rwin" id="radarWin" style="display:none">
+  <div class="grip"></div>
+  <div id="zoombar">
+    <div class="zbtn on" data-z="0">◉</div>
+    <div class="zbtn" data-z="1">◎</div>
+    <div class="zbtn" data-z="2">○</div>
+  </div>
+</div>
 
 <div id="progPip"><img id="progImg" alt=""><span>ПРОГРАММА</span></div>
 
@@ -533,6 +584,19 @@
     <div class="row">
       <button class="quiet" id="wcInstall">📲 значок на экран</button>
       <button class="quiet" id="wcSkip">просто пользоваться</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="rosterSheet">
+  <div class="card">
+    <h3>🎽 ИГРОКИ</h3>
+    <div id="rosterHead">📍 место · 🎥 камера · ★ главный экран</div>
+    <div id="rosterList"></div>
+    <small id="rosterNote"></small>
+    <div class="row">
+      <button class="quiet" id="rosterMe">◎ карту на себя</button>
+      <button class="quiet" id="rosterClose">Закрыть</button>
     </div>
   </div>
 </div>
@@ -1278,6 +1342,77 @@ function drawCoverRect(c, vid, x, y, w, h, mirror){
   c.restore();
 }
 
+/* ---------- ГЕРОЙ И ЗЕРКАЛО ----------
+   Одна камера может стать фоном на весь кадр. Если она снимает вертикально
+   (а очки Meta Vanguard иначе и не умеют), альбомный кадр не режем и не
+   растягиваем: центр остаётся в своих пропорциях, а бока дорисовываются
+   размытым продолжением той же картинки — приём из рилсов.
+   Размытие делаем не фильтром (его нет в части браузеров), а честным
+   уменьшением до 40 пикселей и обратным растягиванием: дёшево и везде. */
+let heroName = '';                      // '' — фон обычный, 'я' — своя камера
+const blurCv = document.createElement('canvas');
+blurCv.width = 40; blurCv.height = 40;
+const blurCtx = blurCv.getContext('2d');
+
+function drawSpun(c, vid, cx, cy, boxW, boxH, rot, cover, mirror){
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw || !vh) return;
+  const swap = (rot === 90 || rot === 270);
+  const ew = swap ? vh : vw, eh = swap ? vw : vh;      // размеры после поворота
+  const s = cover ? Math.max(boxW / ew, boxH / eh) : Math.min(boxW / ew, boxH / eh);
+  c.save();
+  c.translate(cx, cy);
+  if (rot) c.rotate(rot * Math.PI / 180);
+  if (mirror) c.scale(-1, 1);
+  c.drawImage(vid, -vw * s / 2, -vh * s / 2, vw * s, vh * s);
+  c.restore();
+}
+function drawHero(c, vid, rot, mirror){
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw || !vh) return false;
+  const swap = (rot === 90 || rot === 270);
+  const ew = swap ? vh : vw, eh = swap ? vw : vh;
+  const fits = Math.abs(ew / eh - W / H) < 0.12;       // пропорции почти совпали
+  if (fits){                                          // ложится ровно — без боков
+    drawSpun(c, vid, W / 2, H / 2, W, H, rot, true, mirror);
+    return true;
+  }
+  /* бока: та же картинка, уменьшенная в сорок пикселей и растянутая обратно */
+  try{
+    blurCtx.imageSmoothingEnabled = true;
+    blurCtx.clearRect(0, 0, 40, 40);
+    drawSpun(blurCtx, vid, 20, 20, 40, 40, rot, true, mirror);
+    c.save();
+    c.imageSmoothingEnabled = true;
+    c.globalAlpha = 1;
+    c.drawImage(blurCv, 0, 0, 40, 40, -W * 0.06, -H * 0.06, W * 1.12, H * 1.12);
+    c.fillStyle = 'rgba(11,15,20,0.42)';               // притемняем, чтобы центр читался
+    c.fillRect(0, 0, W, H);
+    c.restore();
+  }catch(e){}
+  drawSpun(c, vid, W / 2, H / 2, W, H, rot, false, mirror);   // центр целиком
+  return true;
+}
+function heroVideo(){
+  if (heroName === 'я') return { vid: camVideo, rot: 0, mirror: facing === 'user' };
+  if (!heroName) return null;
+  const rm = remotes.find(r => !r.lost && r.label === heroName);
+  if (!rm || !rm.video || !rm.video.videoWidth) return null;
+  return { vid: rm.video, rot: ((rm.orient || 0) % 360 + 360) % 360, mirror: false };
+}
+function setHero(name){
+  const n = String(name == null ? '' : name);
+  if (n && n !== 'я' && !remotes.some(r => r.label === n)){
+    engSend({ op: 'result', of: 'hero', error: 'нет камеры с подписью «' + n + '»' });
+    return 'нет такой камеры';
+  }
+  heroName = n;
+  remotes.forEach(r => { if (r.bHero) r.bHero.classList.toggle('on', r.label === n); });
+  bb('герой: ' + (n || 'обычный фон'));
+  linkFlash(n ? ('ГЛАВНЫЙ ЭКРАН: ' + n) : 'фон вернулся к своей камере');
+  return n || 'обычный фон';
+}
+
 function rectPx(o){
   const cw = window.innerWidth, ch = window.innerHeight;
   const wCss = o.nw * cw, hCss = (o.nh || o.nw) * ch;   // nh: форма окна свободна
@@ -1325,7 +1460,9 @@ function frame(){
 
   ctx.fillStyle = '#0B0F14';
   ctx.fillRect(0, 0, W, H);
-  if (camVideo) drawCoverRect(ctx, camVideo, 0, 0, W, H, facing === 'user');
+  const hero = heroVideo();
+  if (hero) drawHero(ctx, hero.vid, hero.rot, hero.mirror);
+  else if (camVideo) drawCoverRect(ctx, camVideo, 0, 0, W, H, facing === 'user');
 
   if (winOn){
     const r = winRectPx(), rad = Math.min(r.w, r.h) * 0.06;
@@ -1355,6 +1492,7 @@ function frame(){
   }
 
   for (const rm of remotes){
+    if (heroName && rm.label === heroName) continue;   // герой уже во весь фон
     const live = !rm.lost && rm.video && rm.video.videoWidth;
     if (!live && !rm.lost) continue;               // картинка ещё не пошла
     const rp = rectPx(rm), rad2 = Math.min(rp.w, rp.h) * 0.06;
@@ -1721,6 +1859,7 @@ function pttDown(){
   if (pttHeld) return;
   pttHeld = true;
   bb('рация: слушаю');
+  if (earOn && earMode === 'idle') earCapture('ptt');   // зажал — говори без «код рут»
   ensureMicChain();
   applyMicGate();
   $('btnPtt').classList.add('on');
@@ -2087,95 +2226,585 @@ function takeClip(){
   try{ r.rec.stop(); }catch(e){ clipBusy = false; }
 }
 
+/* ---------- НЕБО: солнце и луна на настоящих местах ----------
+   Формулы перенесены из PNEURADEN как есть — они там выверены.
+   Первый порядок, ошибка меньше градуса: для радара более чем достаточно. */
+function _eotMin(d){
+  const start = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const B = 2 * Math.PI * ((d.getTime() - start) / 864e5) / 365.2422;
+  return 229.18 * (0.000075 + 0.001868 * Math.cos(B) - 0.032077 * Math.sin(B)
+    - 0.014615 * Math.cos(2 * B) - 0.040849 * Math.sin(2 * B));
+}
+function moonPhase(date){
+  const d = (date - new Date(2000, 0, 6)) / 864e5;
+  return ((d % 29.53058867) + 29.53058867) % 29.53058867;
+}
+function solarPosition(date, lat, lng){
+  lat = lat || 45.08; lng = lng || 13.64;
+  const d = (date.getTime() - 946728000000) / 86400000;
+  const g = (357.529 + 0.98560028 * d) * Math.PI / 180;
+  const L = (280.459 + 0.98564736 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * Math.PI / 180;
+  const sD = Math.sin(0.40928) * Math.sin(L), cD = Math.sqrt(1 - sD * sD);
+  const ha = ((date.getUTCHours() + date.getUTCMinutes() / 60 + _eotMin(date) / 60 + lng / 15 - 12) * 15) * Math.PI / 180;
+  const lR = lat * Math.PI / 180;
+  const sinAlt = Math.sin(lR) * sD + Math.cos(lR) * cD * Math.cos(ha);
+  const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * 180 / Math.PI;
+  const cA = Math.cos(lR) * Math.cos(alt * Math.PI / 180);
+  let az = Math.acos(Math.max(-1, Math.min(1, cA < 1e-4 ? 0 : (sD - Math.sin(lR) * sinAlt) / cA))) * 180 / Math.PI;
+  if (Math.sin(ha) > 0) az = 360 - az;
+  return { alt, az };
+}
+function moonPos(date, lat, lng){
+  lat = lat || 45.08; lng = lng || 13.64;
+  const d = (date.getTime() - 946728000000) / 86400000;
+  const L0 = ((218.316 + 13.176396 * d) % 360 + 360) % 360;
+  const M = ((134.963 + 13.064993 * d) % 360 + 360) % 360;
+  const lon = (L0 + 6.289 * Math.sin(M * Math.PI / 180)) * Math.PI / 180;
+  const sD = Math.sin(0.40928) * Math.sin(lon), cD = Math.sqrt(1 - sD * sD);
+  const ra = Math.atan2(Math.cos(0.40928) * Math.sin(lon), Math.cos(lon)) * 180 / Math.PI;
+  const gmst = ((280.46061837 + 360.98564736629 * d) % 360 + 360) % 360;
+  const haDeg = ((gmst + lng - ra) % 360 + 360) % 360;
+  const ha = (haDeg > 180 ? haDeg - 360 : haDeg) * Math.PI / 180;
+  const lR = lat * Math.PI / 180;
+  const sinAlt = Math.sin(lR) * sD + Math.cos(lR) * cD * Math.cos(ha);
+  const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * 180 / Math.PI;
+  const cA = Math.cos(lR) * Math.cos(alt * Math.PI / 180);
+  let az = Math.acos(Math.max(-1, Math.min(1, cA < 1e-4 ? 0 : (sD - Math.sin(lR) * sinAlt) / cA))) * 180 / Math.PI;
+  if (Math.sin(ha) > 0) az = 360 - az;
+  return { alt, az };
+}
+
 /* ---------- РАДАР И ПОКАЗАТЕЛИ: прибор прямо в кадре ----------
    Рисуется на эфирном полотне, потому виден зрителям. Геометрия — как у
    окна (доли экрана), чтобы раскладка могла его учитывать. */
-const radar = { nx: 0.035, ny: 0.62, nw: 0.30, nh: 0.30, range: 500 };
-function drawDash(c, w, h){
-  const r = { x: radar.nx * w, y: radar.ny * h, w: radar.nw * w };
-  const R = r.w / 2, cx = r.x + R, cy = r.y + R;
-  const head = (tilt.head != null ? tilt.head : (geo.head || 0));
-
+const radar = { nx: 0.035, ny: 0.40, nw: 0.30, nh: 0.30, rot: 0, range: 500, zoom: 0 };
+const ZOOM_R = [0.002, 0.005, 0.011];      // радиус радара в градусах
+const ZOOM_TILE = [17, 16, 15];            // и соответствующий зум тайлов
+/* Радар PNEURADEN, перенесённый в эфир. Отличие одно: подложка рисуется
+   нашими тайлами прямо на полотно — Leaflet живёт в DOM и до зрителя бы
+   не дошёл. Всё остальное — его язык: кольца, компасное кольцо с
+   делениями, N красным, солнце и луна на настоящих азимутах, блипы. */
+function radarTiles(c, cx, cy, R, angle){
+  if (geo.lat == null) return;
+  const z = ZOOM_TILE[radar.zoom || 0], T = 256;
+  const px = lonToTx(geo.lon, z) * T, py = latToTy(geo.lat, z) * T;
+  const S = R * 2.2;                       // с запасом: круг ещё и крутится
   c.save();
-  /* круг радара */
-  c.beginPath(); c.arc(cx, cy, R, 0, 6.2832);
-  c.fillStyle = 'rgba(11,15,20,0.55)'; c.fill();
-  c.lineWidth = Math.max(1.5, w * 0.0025);
-  c.strokeStyle = 'rgba(255,180,84,0.75)'; c.stroke();
-  /* кольца дальности */
-  c.strokeStyle = 'rgba(255,180,84,0.22)';
-  c.lineWidth = Math.max(1, w * 0.0012);
-  [0.33, 0.66].forEach(k => { c.beginPath(); c.arc(cx, cy, R * k, 0, 6.2832); c.stroke(); });
-  /* перекрестье */
-  c.beginPath();
-  c.moveTo(cx - R, cy); c.lineTo(cx + R, cy);
-  c.moveTo(cx, cy - R); c.lineTo(cx, cy + R);
-  c.stroke();
-  /* стрелка севера — крутится по компасу */
-  c.save();
-  c.translate(cx, cy); c.rotate(-head * Math.PI / 180);
-  c.beginPath();
-  c.moveTo(0, -R * 0.86); c.lineTo(-R * 0.09, -R * 0.66); c.lineTo(R * 0.09, -R * 0.66);
-  c.closePath();
-  c.fillStyle = '#FF5D45'; c.fill();
-  c.font = '700 ' + Math.round(R * 0.22) + 'px ui-monospace,Menlo,monospace';
-  c.fillStyle = '#FF5D45'; c.textAlign = 'center';
-  c.fillText('N', 0, -R * 0.9);
-  c.restore();
-  /* точки вокруг: друзья и метки (заполнит маяк) */
-  (radar.dots || []).forEach(d => {
-    const rel = Math.min(1, (d.dist || 0) / radar.range);
-    const a = ((d.brg || 0) - head) * Math.PI / 180;
-    const px = cx + Math.sin(a) * rel * R * 0.92;
-    const py = cy - Math.cos(a) * rel * R * 0.92;
-    c.beginPath(); c.arc(px, py, R * 0.055, 0, 6.2832);
-    c.fillStyle = d.color || '#7ED8A0'; c.fill();
-  });
-  /* я — в центре */
-  c.beginPath(); c.arc(cx, cy, R * 0.06, 0, 6.2832);
-  c.fillStyle = '#E8E3D8'; c.fill();
-
-  /* показатели столбиком справа от радара */
-  const fs = Math.max(11, w * 0.017);
-  const lx = r.x + r.w + w * 0.018;
-  let ly = r.y + fs * 1.1;
-  const line = (txt, col, big) => {
-    c.textAlign = 'left';
-    c.font = (big ? '800 ' + Math.round(fs * 1.7) : '700 ' + Math.round(fs)) +
-             'px ui-monospace,Menlo,monospace';
-    c.fillStyle = 'rgba(11,15,20,0.5)';
-    const tw = c.measureText(txt).width;
-    c.fillRect(lx - fs * 0.3, ly - (big ? fs * 1.5 : fs * 0.95), tw + fs * 0.6, (big ? fs * 1.9 : fs * 1.25));
-    c.fillStyle = col || '#E8E3D8';
-    c.fillText(txt, lx, ly);
-    ly += (big ? fs * 2.0 : fs * 1.45);
-  };
-  line((geo.spd * 3.6).toFixed(1) + ' км/ч', '#FFB454', true);
-  if (head != null) line('курс ' + Math.round(head) + '°');
-  if (geo.trk) line('путь ' + (geo.trk / 1000).toFixed(2) + ' км');
-  if (meteo.wind != null)
-    line('ветер ' + meteo.wind.toFixed(1) + ' м/с' +
-         (meteo.dir != null ? ' ' + Math.round(meteo.dir) + '°' : ''), '#7ED8A0');
-  if (meteo.temp != null) line(meteo.temp.toFixed(0) + '°C', '#7ED8A0');
-  if (Math.abs(tilt.gamma) > 4) line('крен ' + Math.round(tilt.gamma) + '°');
-  if (!geo.ok) line('GPS ждёт…', '#FF5D45');
+  c.translate(cx, cy);
+  c.rotate(-angle * Math.PI / 180);
+  const x0 = px - S / 2, y0 = py - S / 2;
+  const tx0 = Math.floor(x0 / T), ty0 = Math.floor(y0 / T);
+  const tx1 = Math.floor((x0 + S) / T), ty1 = Math.floor((y0 + S) / T);
+  for (let ty = ty0; ty <= ty1; ty++){
+    for (let tx = tx0; tx <= tx1; tx++){
+      const im = getTile(z, tx, ty);
+      if (im) c.drawImage(im, tx * T - x0 - S / 2, ty * T - y0 - S / 2, T, T);
+    }
+  }
   c.restore();
 }
+function drawDash(c, w, h){
+  const r = { x: radar.nx * w, y: radar.ny * h, w: radar.nw * w };
+  const R = r.w / 2 - Math.max(3, w * 0.004), cx = r.x + r.w / 2, cy = r.y + r.w / 2;
+  const angle = (tilt.head != null ? tilt.head : (geo.head || 0));
+  const G = '0,255,80';                    // зелёный Pneuraden
+
+  c.save();
+  c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.clip();
+  c.fillStyle = 'rgba(4,7,16,0.92)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
+  radarTiles(c, cx, cy, R, angle);
+  c.fillStyle = 'rgba(4,7,16,0.18)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+  /* кольца дальности */
+  [0.33, 0.66, 1].forEach((s, i) => {
+    c.beginPath(); c.arc(cx, cy, R * s, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(' + G + ',' + (0.10 + i * 0.06).toFixed(2) + ')';
+    c.lineWidth = Math.max(1, w * 0.0012); c.stroke();
+  });
+  /* крест */
+  c.strokeStyle = 'rgba(' + G + ',.09)';
+  c.beginPath(); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
+  c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.stroke();
+
+  /* компасное кольцо: деления через 5°, крупные на сторонах света */
+  c.save(); c.translate(cx, cy); c.rotate(-angle * Math.PI / 180);
+  for (let d = 0; d < 360; d += 5){
+    const rad = d * Math.PI / 180, isC = d % 90 === 0, isS = d % 45 === 0;
+    const tl = (isC ? 0.075 : isS ? 0.047 : 0.023) * R * 2;
+    const op = isC ? 0.9 : isS ? 0.55 : 0.25;
+    c.beginPath();
+    c.moveTo(Math.sin(rad) * (R - tl), -Math.cos(rad) * (R - tl));
+    c.lineTo(Math.sin(rad) * R, -Math.cos(rad) * R);
+    c.strokeStyle = 'rgba(' + G + ',' + op + ')';
+    c.lineWidth = isC ? Math.max(2, w * 0.0025) : Math.max(1, w * 0.0012);
+    c.stroke();
+  }
+  const fsC = Math.max(9, R * 0.16);
+  c.font = '900 ' + fsC + 'px ui-monospace,Menlo,monospace';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  ['N', 'E', 'S', 'W'].forEach((l, i) => {
+    const rad = i * 90 * Math.PI / 180;
+    const x = Math.sin(rad) * (R - fsC * 1.5), y = -Math.cos(rad) * (R - fsC * 1.5);
+    c.fillStyle = l === 'N' ? 'rgba(255,55,55,.98)' : 'rgba(' + G + ',.92)';
+    c.shadowColor = l === 'N' ? 'rgba(255,50,50,.7)' : 'rgba(' + G + ',.5)';
+    c.shadowBlur = R * 0.09;
+    c.fillText(l, x, y);
+  });
+  c.shadowBlur = 0;
+  c.restore();
+
+  /* солнце и луна — там, где они на самом деле */
+  if (geo.lat != null){
+    const now = new Date();
+    const sol = solarPosition(now, geo.lat, geo.lon);
+    const mp = moonPos(now, geo.lat, geo.lon);
+    const ph = moonPhase(now) / 29.53;
+    const skyXY = (az, alt) => {
+      const rr = Math.max(0, (90 - alt) / 90 * (R - R * 0.1));
+      return [Math.sin(az * Math.PI / 180) * rr, -Math.cos(az * Math.PI / 180) * rr];
+    };
+    c.save(); c.translate(cx, cy); c.rotate(-angle * Math.PI / 180);
+    if (sol.alt > -12){
+      const [sx, sy] = skyXY(sol.az, sol.alt);
+      const sA = sol.alt < 0 ? Math.max(0, 1 + sol.alt / 12) : 0.9;
+      const sC = sol.alt > 8 ? '255,240,140' : sol.alt > 0 ? '255,170,55' : '255,90,20';
+      const rr = R * 0.17;
+      const g = c.createRadialGradient(sx, sy, rr * 0.15, sx, sy, rr);
+      g.addColorStop(0, 'rgba(' + sC + ',' + sA.toFixed(2) + ')');
+      g.addColorStop(0.45, 'rgba(' + sC + ',' + (sA * 0.3).toFixed(2) + ')');
+      g.addColorStop(1, 'rgba(' + sC + ',0)');
+      c.fillStyle = g; c.beginPath(); c.arc(sx, sy, rr, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.arc(sx, sy, rr * 0.5, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(' + sC + ',' + (sA * 0.98).toFixed(2) + ')'; c.fill();
+    }
+    if (mp.alt > -8){
+      const [mx, my] = skyXY(mp.az, mp.alt);
+      const mr = R * 0.105;
+      const mg = c.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 2.5);
+      mg.addColorStop(0, 'rgba(235,228,195,' + (0.18 + ph * 0.25).toFixed(2) + ')');
+      mg.addColorStop(1, 'rgba(235,228,195,0)');
+      c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr * 2.5, 0, Math.PI * 2); c.fill();
+      c.save();
+      c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.clip();
+      c.fillStyle = 'rgba(235,228,195,.95)'; c.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+      c.fillStyle = 'rgba(4,7,16,.97)'; c.beginPath();
+      if (ph <= 0.5) c.arc(mx - 4 * mr * ph, my, mr, 0, Math.PI * 2);
+      else c.arc(mx + 4 * mr * (1 - ph), my, mr, 0, Math.PI * 2);
+      c.fill(); c.restore();
+    }
+    c.restore();
+  }
+
+  /* блипы: люди с общей карты */
+  const deg = ZOOM_R[radar.zoom || 0];
+  (radar.dots || []).forEach(d => {
+    let bx, by;
+    if (d.lat != null && geo.lat != null){
+      const ca = Math.cos(geo.lat * Math.PI / 180);
+      bx = cx + ((d.lon - geo.lon) * ca) / deg * R * 0.85;
+      by = cy - (d.lat - geo.lat) / deg * R * 0.85;
+    } else {
+      const rel = Math.min(1, (d.dist || 0) / radar.range);
+      const a = ((d.brg || 0) - angle) * Math.PI / 180;
+      bx = cx + Math.sin(a) * rel * R * 0.85;
+      by = cy - Math.cos(a) * rel * R * 0.85;
+    }
+    if ((bx - cx) ** 2 + (by - cy) ** 2 > R * R * 1.05) return;
+    const col = d.color || '#4ade80';
+    const g = c.createRadialGradient(bx, by, 0, bx, by, R * 0.075);
+    g.addColorStop(0, col + 'cc'); g.addColorStop(1, col + '00');
+    c.fillStyle = g; c.beginPath(); c.arc(bx, by, R * 0.075, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(bx, by, R * 0.034, 0, Math.PI * 2); c.fillStyle = col; c.fill();
+  });
+
+  /* я — стрелка по курсу, как в Pneuraden */
+  c.save(); c.translate(cx, cy);
+  const s = R * 0.13;
+  c.beginPath();
+  c.moveTo(0, -s); c.lineTo(s * 0.62, s * 0.72); c.lineTo(0, s * 0.3); c.lineTo(-s * 0.62, s * 0.72);
+  c.closePath();
+  c.fillStyle = '#FFB454'; c.fill();
+  c.lineWidth = Math.max(1, w * 0.0015); c.strokeStyle = 'rgba(4,7,16,.9)'; c.stroke();
+  c.restore();
+  c.restore();
+
+  /* обод */
+  c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2);
+  c.lineWidth = Math.max(2, w * 0.003);
+  c.strokeStyle = 'rgba(' + G + ',.55)'; c.stroke();
+
+  /* показатели компактно: скорость под радаром, остальное строкой */
+  const fs = Math.max(11, w * 0.019);
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  const by0 = cy + R + fs * 1.5;
+  const spd = (geo.spd * 3.6).toFixed(1) + ' км/ч';
+  c.font = '800 ' + Math.round(fs * 1.6) + 'px ui-monospace,Menlo,monospace';
+  let tw = c.measureText(spd).width;
+  c.fillStyle = 'rgba(4,7,16,0.55)';
+  c.fillRect(cx - tw / 2 - fs * 0.4, by0 - fs * 1.4, tw + fs * 0.8, fs * 1.85);
+  c.fillStyle = '#FFB454'; c.fillText(spd, cx, by0);
+
+  const bits = [];
+  if (tilt.head != null || geo.head != null) bits.push(Math.round(angle) + '°');
+  if (geo.trk > 30) bits.push((geo.trk / 1000).toFixed(2) + ' км');
+  if (meteo.wind != null) bits.push('💨 ' + meteo.wind.toFixed(1) + ' м/с');
+  if (meteo.temp != null) bits.push(meteo.temp.toFixed(0) + '°');
+  if (!geo.ok) bits.push('GPS…');
+  if (bits.length){
+    const line = bits.join('  ·  ');
+    c.font = '700 ' + Math.round(fs) + 'px ui-monospace,Menlo,monospace';
+    tw = c.measureText(line).width;
+    const ly = by0 + fs * 1.6;
+    c.fillStyle = 'rgba(4,7,16,0.55)';
+    c.fillRect(cx - tw / 2 - fs * 0.4, ly - fs * 0.95, tw + fs * 0.8, fs * 1.3);
+    c.fillStyle = 'rgba(' + G + ',.9)'; c.fillText(line, cx, ly);
+  }
+  c.textAlign = 'left';
+}
+
 async function setDash(v){
   dashOn = !!v;
   if (dashOn){
     geoStart(); tiltStart(); meteoMaybe();
     presenceStart();          // слушаем круг молча: видим других, себя не выставляем
+    $('radarWin').style.display = 'block';
+    placeRadarWin();
     setTimeout(tidyLayout, 200);
     layers.set('приборы', (c, w, h) => { if (dashOn) drawDash(c, w, h); });
     linkFlash('ПРИБОРЫ в эфире: скорость, курс, путь, ветер');
   } else {
     layers.delete('приборы');
+    $('radarWin').style.display = 'none';
     geoStop();
     linkFlash('приборы убраны');
   }
   $('btnDash').classList.toggle('on', dashOn);
   bb('приборы ' + (dashOn ? 'вкл' : 'выкл'));
+}
+
+/* ---------- УХО СТУДИИ: браузер слышит сам ----------
+   Раньше слух жил только в рубке — значит на воде без ноутбука голос никуда
+   не долетал. Теперь распознаёт сама страница: команды исполняются на месте
+   и мгновенно, даже когда компьютер выключен. Если мост с рубкой поднят,
+   всё, что не команда, уходит Клоду в журнал.
+   Честно: распознаёт облачная служба браузера (Chrome/Google, Safari/Apple) —
+   локальное ухо без облаков по-прежнему живёт на ноуте. */
+let earOn = false, earRec = null, earMode = 'idle', earSrc = '';
+let dutyWanted = false;
+let earBuf = '', earQuiet = null, earHard = null, earWasGate = false;
+const EAR_WAKE = /(code\s*root|ко[дт]\s*?ру[дт]|год\s*?ру[дт]|вот\s*ру[дт]|коде\s*ру[дт])/i;
+const EAR_TABLE = [
+
+  [['отбой', 'отмена'], null],
+  [['глухо', 'паника'], { op: 'cmd', name: 'panic', args: [true] }],
+  [['ясно'], { op: 'cmd', name: 'panic', args: [false] }],
+  [['пауза'], { op: 'cmd', name: 'camMute', args: [true] }],
+  [['картинка'], { op: 'cmd', name: 'camMute', args: [false] }],
+  [['тихо'], { op: 'cmd', name: 'micGate', args: [true] }],
+  [['звук'], { op: 'cmd', name: 'micGate', args: [false] }],
+  [['запись'], { op: 'cmd', name: 'rec', args: [true] }],
+  [['снято', 'стоп запись'], { op: 'cmd', name: 'rec', args: [false] }],
+  [['карман'], { op: 'cmd', name: 'pocket', args: [true] }],
+  [['без блюра'], { op: 'cmd', name: 'blur', args: [false] }],
+  [['блюр', 'блур'], { op: 'cmd', name: 'blur', args: [true] }],
+  [['без наушников', 'без монитора'], { op: 'cmd', name: 'monitor', args: [false] }],
+  [['наушники', 'монитор', 'мониторинг'], { op: 'cmd', name: 'monitor', args: [true] }],
+  [['скрой меня', 'убери меня с карты'], { op: 'cmd', name: 'mayak', args: [false] }],
+  [['открой карту', 'карта'], { op: 'cmd', name: 'map', args: ['full'] }],
+  [['мини карта', 'карта в угол', 'маленькая карта'], { op: 'cmd', name: 'map', args: ['mini'] }],
+  [['убери карту', 'без карты'], { op: 'cmd', name: 'map', args: ['off'] }],
+  [['разложи', 'разложи окна'], { op: 'cmd', name: 'tidy', args: [] }],
+  [['на весь экран', 'главный экран'], { op: 'cmd', name: 'hero', args: ['я'] }],
+  [['обычный фон', 'верни фон'], { op: 'cmd', name: 'hero', args: [''] }],
+  [['приборы', 'радар'], { op: 'cmd', name: 'dash', args: [true] }],
+  [['без приборов', 'убери радар'], { op: 'cmd', name: 'dash', args: [false] }],
+  [['скрин', 'скриншот', 'кадр'], { op: 'cmd', name: 'frame', args: [] }],
+  [['субтитры', 'титры речи'], { op: 'cmd', name: 'subs', args: [true] }],
+  [['субтитры по английски', 'английские субтитры'], { op: 'cmd', name: 'subs', args: ['en'] }],
+  [['без субтитров', 'убери субтитры'], { op: 'cmd', name: 'subs', args: [false] }],
+  [['дежурный проснись', 'разбуди клода'], { op: 'cmd', name: 'duty', args: [true] }],
+  [['дежурный спи', 'клод спи'], { op: 'cmd', name: 'duty', args: [false] }],
+  [['эхо'], { op: 'cmd', name: 'echo', args: [true] }],
+  [['без эха'], { op: 'cmd', name: 'echo', args: [false] }],
+  [['клип'], { op: 'cmd', name: 'clip', args: [] }],
+  [['кольцо'], { op: 'cmd', name: 'clipRing', args: [true] }],
+  [['стоп кольцо', 'без кольца'], { op: 'cmd', name: 'clipRing', args: [false] }],
+  [['убери титр'], { op: 'cmd', name: 'text', args: ['титр', ''] }],
+  [['статус'], { op: 'cmd', name: 'state', args: [] }]
+];
+function earNorm(s){
+  return String(s || '').toLowerCase()
+    .replace(/[.,!?;:—–\-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function earSay(t){ if (!earSilent) speakEar(t); }
+let earSilent = false;
+function earDo(name, args){
+  try{
+    const fn = CMDS[name];
+    if (!fn) return false;
+    fn.apply(null, args || []);
+    engSend({ op: 'result', of: name, result: 'ухо студии', via: 'ear' });
+    return true;
+  }catch(e){
+    engSend({ op: 'result', of: name, error: String(e), via: 'ear' });
+    return false;
+  }
+}
+const EAR_ECHO = {
+  rec: on => on ? 'запись пошла' : 'снято',
+  micGate: on => on ? 'тихо' : 'звук вернулся',
+  camMute: on => on ? 'пауза' : 'картинка',
+  panic: on => on ? 'глухо' : 'ясно',
+  blur: on => on ? 'блюр включён' : 'блюр снят',
+  monitor: on => on ? 'наушники' : 'наушники выключены',
+  pocket: () => 'карман заперт',
+  clipRing: on => on ? 'кольцо крутится' : 'кольцо остановлено',
+  clip: () => 'клип режется',
+  frame: () => 'скрин снят',
+  map: m => m === 'off' ? 'карта убрана' : m === 'mini' ? 'мини карта' : 'карта',
+  dash: on => on ? 'приборы' : 'приборы убраны',
+  hero: n => n ? 'главный экран' : 'обычный фон',
+  tidy: () => 'разложил',
+  text: () => 'титр стоит'
+};
+/* ---------- ПОНИМАНИЕ: живая речь вместо заклинаний ----------
+   Точные фразы остаются главными (и сверяются с двумя другими ушами).
+   Но человек говорит «давай запись», «останови кольцо», «убери блюр» —
+   если дословного совпадения нет, разбираем смысл: корень действия плюс
+   отрицание. Отрицание сильнее: «останови запись» содержит слово «запись»,
+   и без этого правила включило бы её вместо остановки. */
+const EAR_NEG = /(^|\s)(стоп|стой|останов|выключ|убер|убра|отмен|прекрат|хват|без|сними|снять|туши|погаси|долой|спи(?=\s|$)|спать|усни|уснуть|отбой)/;
+const EAR_POS = /(^|\s)(включ|давай|начн|начин|запус|поставь|сделай|дай|поехали|врубай)/;
+const EAR_LOOSE = [
+  { w: ['запис', 'пишем', 'пиши', 'снимаем'], cmd: 'rec' },
+  { w: ['блюр', 'блур', 'размыт', 'замаж'], cmd: 'blur' },
+  { w: ['паник', 'глух', 'мозаик'], cmd: 'panic' },
+  { w: ['кольц'], cmd: 'clipRing' },
+  { w: ['клип', 'момент', 'вырежи'], cmd: 'clip', once: true },
+  { w: ['скрин', 'кадр', 'снимок'], cmd: 'frame', once: true },
+  { w: ['карман', 'замок'], cmd: 'pocket' },
+  { w: ['наушник', 'монитор'], cmd: 'monitor' },
+  { w: ['прибор', 'радар'], cmd: 'dash' },
+  { w: ['карт'], cmd: 'map', on: ['mini'], off: ['off'] },
+  { w: ['микрофон', 'гейт', 'тихо', 'молч'], cmd: 'micGate' },
+  { w: ['пауз', 'чёрн', 'черн'], cmd: 'camMute' },
+  { w: ['разлож', 'разбер'], cmd: 'tidy', once: true },
+  { w: ['субтитр', 'титры речи'], cmd: 'subs' },
+  { w: ['дежурн'], cmd: 'duty' }
+];
+function earLoose(t){
+  const hits = EAR_LOOSE.filter(g => g.w.some(w => t.indexOf(w) >= 0));
+  if (hits.length !== 1) return null;          // ноль или спор — не гадаем
+  const g = hits[0];
+  if (g.once) return { name: g.cmd, args: [] };
+  const neg = EAR_NEG.test(' ' + t), pos = EAR_POS.test(' ' + t);
+  const off = neg && !pos;
+  const args = off ? (g.off || [false]) : (g.on || [true]);
+  return { name: g.cmd, args };
+}
+
+function earRoute(t, from){
+  if (t.indexOf('титр ') === 0){
+    earDo('text', ['титр', t.slice(5).toUpperCase()]);
+    earSay('титр стоит');
+    bb('ухо: титр «' + t.slice(5) + '»');
+    return;
+  }
+  for (const [words, cmd] of EAR_TABLE){
+    if (words.indexOf(t) < 0) continue;
+    if (!cmd){ bb('ухо: отбой'); return; }
+    if (cmd.name === 'echo'){                    // тумблер подтверждений
+      earSilent = !(cmd.args && cmd.args[0]);
+      earSay(earSilent ? '' : 'эхо включено');
+      bb('ухо: эхо ' + (earSilent ? 'выкл' : 'вкл'));
+      return;
+    }
+    const okDone = earDo(cmd.name, cmd.args);
+    const f = EAR_ECHO[cmd.name];
+    earSay(okDone ? (f ? f(cmd.args && cmd.args[0]) : 'есть') : 'не вышло');
+    bb('ухо ⚡ «' + t + '» → ' + cmd.name);
+    linkFlash('⚡ ' + t);
+    return;
+  }
+  /* дословно не совпало — пробуем понять смысл */
+  const guess = earLoose(t);
+  if (guess){
+    const okDone = earDo(guess.name, guess.args);
+    const f = EAR_ECHO[guess.name];
+    earSay(okDone ? (f ? f(guess.args[0]) : 'есть') : 'не вышло');
+    bb('ухо ≈ «' + t + '» → ' + guess.name + ' ' + JSON.stringify(guess.args));
+    linkFlash('≈ ' + t);
+    return;
+  }
+  /* не команда — Клоду, если мост поднят */
+  const sent = engSend({ op: 'voice', text: t, via: 'ear' });
+  bb('ухо 🎙 «' + t + '»');
+  linkFlash('🎙 ' + t + (engConns.length ? '' : ' (рубки нет — не услышит)'));
+  if (!engConns.length) earSay('рубка не на связи');
+  else earSay('передал Клоду');
+}
+/* ---------- СУБТИТРЫ: речь эфира становится текстом ----------
+   То же ухо, вторая работа: всё распознанное ложится строкой на полотно.
+   Перевод — встроенным переводчиком браузера (Chrome на компьютере; на
+   телефонах его нет — тогда идут субтитры на языке речи, честно и молча).
+   ВАЖНО: субтитры показывают ВСЁ, что слышит микрофон. Включаются явно. */
+let subsOn = false, subsLang = '', subsTr = null;
+const subsLines = [];        // {ru, en, t}
+async function subsTranslator(to){
+  if (!to) return null;
+  try{
+    if (!('Translator' in self)) return null;
+    const av = await Translator.availability({ sourceLanguage: 'ru', targetLanguage: to });
+    if (av === 'unavailable') return null;
+    return await Translator.create({ sourceLanguage: 'ru', targetLanguage: to });
+  }catch(e){ return null; }
+}
+function subsPush(text){
+  const t = String(text || '').trim();
+  if (!t) return;
+  const row = { ru: t, en: '', t: Date.now() };
+  subsLines.push(row);
+  while (subsLines.length > 3) subsLines.shift();
+  if (subsTr){
+    subsTr.translate(t).then(r => {
+      row.en = (r && r.output) ? r.output : (typeof r === 'string' ? r : '');
+    }).catch(() => {});
+  }
+}
+function drawSubs(c, w, h){
+  const live = subsLines.filter(r => Date.now() - r.t < 9000);
+  if (!live.length) return;
+  const fs = Math.max(15, w * 0.028);
+  c.save();
+  c.font = '700 ' + Math.round(fs) + 'px system-ui,-apple-system,Segoe UI,sans-serif';
+  c.textAlign = 'center';
+  let y = h - fs * 1.6;
+  for (let i = live.length - 1; i >= 0 && i >= live.length - 2; i--){
+    const r = live[i];
+    const txt = (subsLang && r.en) ? r.en : r.ru;
+    if (!txt) continue;
+    const tw = Math.min(w * 0.92, c.measureText(txt).width);
+    c.fillStyle = 'rgba(11,15,20,0.62)';
+    c.fillRect(w / 2 - tw / 2 - fs * 0.5, y - fs * 1.05, tw + fs, fs * 1.45);
+    c.fillStyle = (i === live.length - 1) ? '#E8E3D8' : 'rgba(232,227,216,0.55)';
+    c.fillText(txt, w / 2, y, w * 0.92);
+    y -= fs * 1.7;
+  }
+  c.restore();
+}
+async function setSubs(v, lang){
+  const want = (v === 'en' || lang === 'en') ? 'en' : (v ? '' : null);
+  if (v === false || v === 'off' || v === null){
+    subsOn = false; subsLang = ''; subsTr = null;
+    layers.delete('субтитры');
+    subsLines.length = 0;
+    $('btnSubs').classList.remove('on');
+    linkFlash('субтитры выключены');
+    bb('субтитры: выкл');
+    return 'выкл';
+  }
+  subsOn = true;
+  subsLang = want || '';
+  layers.set('субтитры', (c, w, h) => { if (subsOn) drawSubs(c, w, h); });
+  $('btnSubs').classList.add('on');
+  if (!earOn) setEar(true);                    // без уха субтитрам нечего писать
+  if (subsLang === 'en'){
+    subsTr = await subsTranslator('en');
+    if (!subsTr){
+      subsLang = '';
+      linkFlash('СУБТИТРЫ включены. Перевод браузер не даёт — на телефонах его нет, нужен Chrome на компьютере');
+      bb('субтитры: перевод недоступен');
+      return 'вкл (без перевода)';
+    }
+    linkFlash('СУБТИТРЫ на английском — всё, что слышит микрофон, увидят зрители');
+  } else {
+    subsTr = null;
+    linkFlash('СУБТИТРЫ включены — всё, что слышит микрофон, увидят зрители');
+  }
+  bb('субтитры: вкл' + (subsLang ? ' (' + subsLang + ')' : ''));
+  return 'вкл' + (subsLang ? ' ' + subsLang : '');
+}
+
+function earCapture(src){
+  if (earMode === 'capture') return;
+  earMode = 'capture'; earSrc = src; earBuf = '';
+  if (src === 'wake'){                            /* режем свой голос из эфира */
+    earWasGate = micMuted;
+    if (!micMuted) CMDS.micGate(true);
+  }
+  linkFlash('слушаю…');
+  clearTimeout(earHard);
+  earHard = setTimeout(earFinish, 9000);
+}
+function earFinish(){
+  if (earMode !== 'capture') return;
+  clearTimeout(earQuiet); clearTimeout(earHard);
+  const t = earNorm(earBuf), src = earSrc;
+  earMode = 'idle'; earSrc = ''; earBuf = '';
+  if (src === 'wake' && !earWasGate) CMDS.micGate(false);   // гейт ДО команды
+  if (!t) return;
+  earRoute(t, src);
+}
+function earBump(ms){
+  clearTimeout(earQuiet);
+  earQuiet = setTimeout(earFinish, ms || 1200);
+}
+function setEar(v){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){
+    linkFlash('этот браузер не слышит речь — нужен Chrome или Safari');
+    return;
+  }
+  earOn = !!v;
+  $('btnEar').classList.toggle('on', earOn);
+  if (!earOn){
+    try{ if (earRec) earRec.stop(); }catch(e){}
+    if (earMode === 'capture') earFinish();
+    bb('ухо студии: спит');
+    linkFlash('ухо студии выключено');
+    return;
+  }
+  if (!earRec){
+    earRec = new SR();
+    earRec.lang = 'ru-RU'; earRec.continuous = true; earRec.interimResults = true;
+    earRec.onresult = e => {
+      let fin = '', mid = '';
+      for (let i = e.resultIndex; i < e.results.length; i++){
+        const tx = e.results[i][0].transcript;
+        if (e.results[i].isFinal) fin += tx + ' '; else mid += tx + ' ';
+      }
+      const f = earNorm(fin), m = earNorm(mid);
+      if (subsOn && fin.trim() && earMode !== 'capture')
+        subsPush(fin.replace(EAR_WAKE, ' ').trim());   // титр без слова-триггера
+      if (earMode === 'idle'){
+        const hit = f.match(EAR_WAKE);
+        if (hit){
+          earCapture('wake');
+          const tail = f.slice(f.indexOf(hit[0]) + hit[0].length).trim();
+          if (tail){ earBuf = tail + ' '; earBump(700); } else earBump(1600);
+        } else if (EAR_WAKE.test(m)){
+          earCapture('wake'); earBump(1600);
+        }
+        return;
+      }
+      if (f){
+        const clean = f.replace(EAR_WAKE, ' ').replace(/\s+/g, ' ').trim();
+        if (clean) earBuf += clean + ' ';
+      }
+      if (f || m) earBump(f ? 700 : 1400);
+    };
+    earRec.onerror = e => {
+      if (e.error === 'not-allowed'){
+        earOn = false;
+        $('btnEar').classList.remove('on');
+        linkFlash('микрофон для распознавания не разрешён');
+      } else if (e.error !== 'no-speech') bb('ухо: ' + e.error);
+    };
+    earRec.onend = () => { if (earOn) setTimeout(() => { try{ earRec.start(); }catch(e){} }, 300); };
+  }
+  try{ earRec.start(); }catch(e){}
+  bb('ухо студии: слушает «код рут»');
+  linkFlash('УХО СТУДИИ: скажи «код рут, запись» — работает и без компьютера');
 }
 
 /* ---------- ПРИСУТСТВИЕ: общая карта людей ----------
@@ -2226,6 +2855,112 @@ function presenceList(list){
   const gone = [...presenceSeen].filter(id => !mine.some(p => p.id === id));
   gone.forEach(id => presenceSeen.delete(id));
 }
+/* ---------- КТО В ИГРЕ ----------
+   Один список из трёх источников: камеры (кто отдаёт картинку), точки с
+   общей карты (кто поделился местом) и круг (кто просто в сети).
+   Порядок — по силе присутствия: место и камера · место · камера · в сети. */
+let mapFocus = null;                   // {lat, lon, name} — карта смотрит на игрока
+function rosterBuild(){
+  const box = new Map();
+  const put = (nm, patch) => {
+    const name = String(nm || '').trim();
+    if (!name) return;
+    const k = name.toLowerCase();
+    const r = box.get(k) || { name, cam: false, geo: null, online: false,
+                              hero: false, lost: false, rm: null, live: null };
+    Object.assign(r, patch);
+    box.set(k, r);
+  };
+  remotes.forEach(rm => put(rm.label || 'камера', {
+    cam: true, lost: !!rm.lost, hero: heroName === rm.label, rm
+  }));
+  try{
+    if (window.mayak) mayak.points(true).forEach(p => put(p.name, { geo: p }));
+  }catch(e){}
+  try{
+    Object.keys(frState || {}).forEach(nick => {
+      if (frState[nick] && frState[nick].on)
+        put(nick, { online: true, live: frState[nick].live });
+    });
+  }catch(e){}
+  const me = meLoad() || {};
+  const arr = [...box.values()].filter(r => r.name.toLowerCase() !== (me.nick || '').toLowerCase());
+  arr.forEach(r => {
+    r.rank = (r.geo ? 2 : 0) + (r.cam && !r.lost ? 1 : 0);
+    r.km = (r.geo && geo.lat != null)
+      ? +(distBrg(geo.lat, geo.lon, r.geo.lat, r.geo.lon).dist / 1000).toFixed(1) : null;
+  });
+  arr.sort((a, b) => b.rank - a.rank || (a.km == null) - (b.km == null) ||
+                     (a.km || 0) - (b.km || 0) || a.name.localeCompare(b.name));
+  return arr;
+}
+function renderRoster(){
+  const box = $('rosterList');
+  if (!box) return;
+  const list = rosterBuild();
+  box.innerHTML = '';
+  if (!list.length){
+    box.innerHTML = '<div class="pnote">пока никого: ни камер, ни точек, ни своих в сети</div>';
+    $('rosterNote').textContent = '';
+    return;
+  }
+  list.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'prow' + (r.lost ? ' dim' : '');
+    const mark = document.createElement('div');
+    mark.className = 'pmark';
+    mark.textContent = (r.geo ? '📍' : '　') + (r.cam ? '🎥' : '　');
+    const nm = document.createElement('div');
+    nm.className = 'pname';
+    nm.textContent = r.name + (r.hero ? ' ★' : '');
+    const note = document.createElement('div');
+    note.className = 'pnote';
+    note.textContent = r.lost ? 'ушёл'
+      : r.km != null ? (r.km + ' км')
+      : r.geo ? 'на карте'
+      : r.cam ? 'в кадре'
+      : 'в сети';
+    row.appendChild(mark); row.appendChild(nm); row.appendChild(note);
+    if (r.cam && !r.lost){
+      const b = document.createElement('button');
+      b.textContent = '★';
+      b.className = r.hero ? 'on' : '';
+      b.onclick = () => { setHero(r.hero ? '' : r.name); renderRoster(); };
+      row.appendChild(b);
+    }
+    if (r.geo){
+      const b = document.createElement('button');
+      b.textContent = '🗺';
+      b.onclick = () => {
+        mapFocus = { lat: r.geo.lat, lon: r.geo.lon, name: r.name };
+        if (mapMode === 'off') setMap('mini');
+        linkFlash('карта смотрит на ' + r.name);
+        bb('карта наведена: ' + r.name);
+        hideSheet($('rosterSheet'));
+      };
+      row.appendChild(b);
+    }
+    if (r.online && !r.cam){
+      const b = document.createElement('button');
+      b.textContent = '📞';
+      b.onclick = () => callFriend(r.name);
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  });
+  const withGeo = list.filter(x => x.geo).length, withCam = list.filter(x => x.cam && !x.lost).length;
+  $('rosterNote').textContent = 'всего ' + list.length + ' · с местом ' + withGeo +
+    ' · с камерой ' + withCam + (mapFocus ? ' · карта смотрит на ' + mapFocus.name : '');
+}
+let rosterTimer = null;
+function openRoster(){
+  $('rosterSheet').style.display = 'flex';
+  renderRoster();
+  try{ if (window.mayak) pingFriends(); }catch(e){}
+  clearInterval(rosterTimer);
+  rosterTimer = setInterval(renderRoster, 5000);
+}
+
 async function presenceStart(){
   if (!await loadMayak()){
     linkFlash('карта людей недоступна: рядом нет mayak.js');
@@ -2307,7 +3042,8 @@ function getTile(z, x, y){
   return null;
 }
 function drawMap(c, x, y, w, h, z){
-  if (geo.lat == null){
+  const eye = mapFocus || (geo.lat != null ? { lat: geo.lat, lon: geo.lon } : null);
+  if (eye == null){
     c.fillStyle = 'rgba(11,15,20,0.75)'; c.fillRect(x, y, w, h);
     c.fillStyle = '#FF5D45';
     c.font = '700 ' + Math.max(12, w * 0.05) + 'px ui-monospace,Menlo,monospace';
@@ -2316,7 +3052,7 @@ function drawMap(c, x, y, w, h, z){
     return;
   }
   const T = 256;
-  const cx = lonToTx(geo.lon, z), cy = latToTy(geo.lat, z);
+  const cx = lonToTx(eye.lon, z), cy = latToTy(eye.lat, z);
   const px = cx * T, py = cy * T;            // центр в пикселях мира
   const x0 = px - w / 2, y0 = py - h / 2;    // левый верх окна в мире
   const tx0 = Math.floor(x0 / T), ty0 = Math.floor(y0 / T);
@@ -2340,10 +3076,12 @@ function drawMap(c, x, y, w, h, z){
     c.fillStyle = d.color || '#7ED8A0'; c.fill();
     c.lineWidth = 2; c.strokeStyle = '#0B0F14'; c.stroke();
   });
-  /* я — стрелкой по курсу */
+  /* я — стрелкой по курсу (на своём месте, даже если смотрим на другого) */
   const head = (tilt.head != null ? tilt.head : (geo.head || 0));
   c.save();
-  c.translate(x + w / 2, y + h / 2);
+  if (geo.lat != null)
+    c.translate(x + (lonToTx(geo.lon, z) * T - x0), y + (latToTy(geo.lat, z) * T - y0));
+  else c.translate(x + w / 2, y + h / 2);
   c.rotate(head * Math.PI / 180);
   const s = Math.max(7, w * 0.022);
   c.beginPath();
@@ -2360,6 +3098,11 @@ function drawMap(c, x, y, w, h, z){
   c.textAlign = 'right';
   c.fillStyle = 'rgba(232,227,216,0.55)';
   c.fillText('© OpenStreetMap', x + w - 6, y + h - 6);
+  if (mapFocus){                       // видно, что смотрим не на себя
+    c.textAlign = 'left';
+    c.fillStyle = 'rgba(255,180,84,0.95)';
+    c.fillText('◎ ' + mapFocus.name, x + 8, y + h - 6);
+  }
   c.restore();
 }
 function setMap(mode, z){
@@ -2738,6 +3481,28 @@ const CMDS = {
   clipRing: on => setClipRing(!!on),
   entry: on => setEntryLock(!on),   // entry true = вход открыт
   dash: on => setDash(!!on),
+  hero: name => setHero(name),
+  /* Дежурный живёт на ноуте; отсюда мы шлём ему просьбу через журнал —
+     он читает свои же voice-строки и слушается «дежурный спи/проснись». */
+  duty: on => {
+    const word = on ? 'дежурный проснись' : 'дежурный спи';
+    const sent = engSend({ op: 'voice', text: word, via: 'cmd' });
+    dutyWanted = !!on;
+    $('btnDuty').classList.toggle('on', dutyWanted);
+    bb('дежурный: просьба ' + (on ? 'проснуться' : 'спать'));
+    linkFlash(engConns.length
+      ? ('дежурный: ' + (on ? 'проснись' : 'спи'))
+      : 'рубки нет — дежурный не услышит');
+    return engConns.length ? 'передано' : 'рубка не на связи';
+  },
+  subs: (v, lang) => setSubs(v, lang),
+  radarZoom: i => {
+    radar.zoom = Math.max(0, Math.min(2, +i || 0));
+    document.querySelectorAll('#zoombar .zbtn').forEach(x =>
+      x.classList.toggle('on', +x.dataset.z === radar.zoom));
+    bb('радар: зум ' + radar.zoom);
+    return radar.zoom;
+  },
   map: (mode, z) => setMap(mode, z),
   tidy: () => tidyLayout(),
   /* Клод вправе СКРЫТЬ человека с карты, но не выставить: согласие
@@ -2749,6 +3514,19 @@ const CMDS = {
     }
     presenceHide();
     return 'скрыт';
+  },
+  roster: () => rosterBuild().map(r => ({
+    name: r.name, cam: r.cam && !r.lost, geo: !!r.geo, online: r.online,
+    hero: r.hero, km: r.km
+  })),
+  look: name => {
+    if (!name){ mapFocus = null; return 'карта на себе'; }
+    const r = rosterBuild().find(x => x.name.toLowerCase() === String(name).toLowerCase());
+    if (!r || !r.geo) return 'нет места для «' + name + '»';
+    mapFocus = { lat: r.geo.lat, lon: r.geo.lon, name: r.name };
+    if (mapMode === 'off') setMap('mini');
+    linkFlash('карта смотрит на ' + r.name);
+    return 'смотрю на ' + r.name;
   },
   people: () => (window.mayak ? mayak.points(true).map(p => ({
     name: p.name,
@@ -2802,8 +3580,13 @@ const CMDS = {
     ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
     pocket: lockOn,
     entryOpen: !entryLocked,
+    ear: earOn,
+    subs: subsOn ? (subsLang || 'ru') : false,
+    duty: dutyWanted,
+    hero: heroName || null,
     dash: dashOn,
     map: mapMode,
+    lookAt: mapFocus ? mapFocus.name : null,
     onMap: !!(window.mayak && mayak.state().visible),
     people: window.mayak ? mayak.state().people : 0,
     monitor: monitorOn,
@@ -2858,6 +3641,16 @@ function onDataConn(conn){
   }
   if (md.role === 'program'){
     programConns.push(conn);
+    conn.on('data', d => {
+      if (!d || d.op !== 'orient') return;
+      const who = (md.name || '').slice(0, 16);
+      const rm = remotes.find(r => r.label === who);
+      if (!rm) return;
+      const a = ((+d.angle || 0) % 360 + 360) % 360;
+      if (rm.orient === a) return;
+      rm.orient = a;
+      bb('камера ' + (who || '—') + ': поворот ' + a + '°');
+    });
     conn.on('open', () => bb('программа: смотрит ' + (md.name || '—')));
     conn.on('close', () => { programConns = programConns.filter(c => c !== conn); });
     startProgFeed();
@@ -2965,6 +3758,7 @@ function makeWinDom(rm){
     wbar.appendChild(b);
     return b;
   };
+  rm.bHero = mkBtn('★', '', () => setHero(heroName === rm.label ? '' : rm.label));
   mkBtn('↺', '', () => rotWin(rm, -Math.PI / 2, rm.place));
   mkBtn('↻', '', () => rotWin(rm, Math.PI / 2, rm.place));
   rm.bEfir = mkBtn('🔊', 'on', () => setRemoteAudio(rm, 'efir', !rm.onEfir));
@@ -3264,9 +4058,26 @@ async function startCameraRole(reuse){
         showMsg('Связь с режиссёром оборвалась — перезваниваю…');
         cameraRedial();
       });
+      /* Ориентация: телефон крутят на ходу, и режиссёр должен узнать об этом
+         сам — гадать по размерам потока ненадёжно. Шлём угол при входе и
+         при каждом повороте экрана. */
+      const sendOrient = () => {
+        let a = 0;
+        try{
+          a = (screen.orientation && typeof screen.orientation.angle === 'number')
+              ? screen.orientation.angle : (window.orientation || 0);
+        }catch(e){}
+        try{ if (progConn && progConn.open) progConn.send({ op: 'orient', angle: a }); }catch(e){}
+      };
+      window.addEventListener('orientationchange', () => setTimeout(sendOrient, 350));
+      try{
+        if (screen.orientation && screen.orientation.addEventListener)
+          screen.orientation.addEventListener('change', () => setTimeout(sendOrient, 350));
+      }catch(e){}
       /* ПРОГРАММА: миниатюра собранного эфира — вижу, как меня смонтировали */
       try{
         progConn = peer.connect('skrin-' + code, { metadata: { role: 'program', name: nm } });
+        progConn.on('open', () => { sendOrient(); setInterval(sendOrient, 15000); });
         progConn.on('data', d => {
           if (d && d.op === 'prog'){
             $('progImg').src = d.jpg;
@@ -3640,6 +4451,10 @@ zoneLayer.addEventListener('pointerup', e => {
 
 /* ---------- сеть: лист СЕРВЕР/TURN ---------- */
 $('btnMon').onclick = () => setMonitor(!monitorOn);
+$('btnEar').onclick = () => setEar(!earOn);
+/* по кругу: выкл → русские → английские → выкл */
+$('btnSubs').onclick = () => setSubs(!subsOn ? true : (subsLang === 'en' ? false : 'en'));
+$('btnDuty').onclick = () => CMDS.duty(!dutyWanted);
 $('btnDash').onclick = () => setDash(!dashOn);
 /* кнопка гоняет по кругу: выкл → мини → весь экран → выкл */
 $('btnMap').onclick = () => setMap(mapMode === 'off' ? 'mini' : mapMode === 'mini' ? 'full' : 'off');
@@ -3650,6 +4465,33 @@ $('btnMe').onclick = () => {
 (function mapWinGestures(){
   const el = $('mapWin');
   attachWinGestures(el, el.querySelector('.grip'), mapWin, () => { placeMapWin(); });
+})();
+/* радар тоже двигается пальцем: на экране бар мешает, в эфире его нет */
+function placeRadarWin(){
+  const el = $('radarWin');
+  const cw = window.innerWidth, ch = window.innerHeight;
+  el.style.left = (radar.nx * cw) + 'px';
+  el.style.top = (radar.ny * ch) + 'px';
+  el.style.width = (radar.nw * cw) + 'px';
+  el.style.height = (radar.nw * cw) + 'px';   // радар круглый: высота = ширине
+}
+(function zoomButtons(){
+  document.querySelectorAll('#zoombar .zbtn').forEach(b => {
+    b.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      CMDS.radarZoom(+b.dataset.z);
+      document.querySelectorAll('#zoombar .zbtn').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      linkFlash('радар: ' + ['близко', 'средне', 'широко'][+b.dataset.z]);
+    });
+  });
+})();
+(function radarWinGestures(){
+  const el = $('radarWin');
+  attachWinGestures(el, el.querySelector('.grip'), radar, () => {
+    radar.nh = radar.nw;          // держим круг круглым
+    placeRadarWin();
+  });
 })();
 $('btnRing').onclick = () => setClipRing(!clipOn);
 $('btnClip').onclick = () => takeClip();
@@ -3755,15 +4597,15 @@ let barOn = true;
 function setBar(v){
   barOn = !!v;
   $('bar').classList.toggle('tuck', !barOn);
-  $('tab').textContent = barOn ? '▾' : '▴';
+  $('tab').textContent = barOn ? '◂' : '▸';
   bb('шторка: кнопки ' + (barOn ? 'видны' : 'спрятаны'));
 }
 $('tab').onclick = () => setBar(!barOn);
 let barSwipe = null, barSwiped = false;
-$('bar').addEventListener('pointerdown', e => { barSwipe = e.clientY; barSwiped = false; });
+$('bar').addEventListener('pointerdown', e => { barSwipe = e.clientX; barSwiped = false; });
 $('bar').addEventListener('pointermove', e => {
   if (barSwipe === null) return;
-  if (e.clientY - barSwipe > 42){        // свайп вниз по бару — спрятать
+  if (barSwipe - e.clientX > 42){        // свайп влево по пульту — спрятать
     barSwipe = null; barSwiped = true;
     setBar(false);
   }
@@ -4107,6 +4949,7 @@ document.addEventListener('visibilitychange', () => {
 function hideSheet(sh){
   sh.style.display = 'none';
   if (sh.id === 'krugSheet'){ clearInterval(pingTimer); pingTimer = null; }
+  if (sh.id === 'rosterSheet'){ clearInterval(rosterTimer); rosterTimer = null; }
 }
 function closeSheets(){ document.querySelectorAll('.sheet').forEach(hideSheet); }
 document.querySelectorAll('.sheet').forEach(sh => {
@@ -4155,6 +4998,13 @@ async function askInstall(){
 }
 $('dataInstall').onclick = askInstall;
 $('btnKrug').onclick = () => $('lnkKrug').onclick();
+$('btnRoster').onclick = openRoster;
+$('rosterClose').onclick = () => { hideSheet($('rosterSheet')); clearInterval(rosterTimer); };
+$('rosterMe').onclick = () => {
+  mapFocus = null;
+  renderRoster();
+  linkFlash('карта вернулась к тебе');
+};
 
 /* ---------- ЛИЦО: кнопки по категориям ----------
    Двадцать кнопок в ряд закрывали кадр. Теперь всегда под рукой REC,
