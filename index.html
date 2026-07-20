@@ -360,6 +360,7 @@
     <div class="tab" data-g="эфир">🎬 ЭФИР</div>
     <div class="tab" data-g="звук">🔊 ЗВУК</div>
     <div class="tab" data-g="кадр">👁 КАДР</div>
+    <div class="tab" data-g="мир">🌍 МИР</div>
     <div class="tab" data-g="круг">🔗 КРУГ</div>
     <div class="tab" data-g="ещё">⚙ ЕЩЁ</div>
   </div>
@@ -375,6 +376,9 @@
   <button class="btn" id="btnMon" data-g="звук">🎧 НАУШНИКИ</button>
   <button class="btn" id="btnPtt" data-g="звук">◉ РАЦИЯ</button>
   <button class="btn" id="btnPrompt" data-g="звук">СУФЛЁР·ухо</button>
+  <button class="btn" id="btnDash" data-g="мир">◎ ПРИБОРЫ</button>
+  <button class="btn" id="btnMap" data-g="мир">🗺 КАРТА</button>
+  <button class="btn" id="btnMe" data-g="мир">👋 ПОКАЗАТЬСЯ</button>
   <button class="btn" id="btnFlip" data-g="кадр">⟲</button>
   <button class="btn" id="btnWin" data-g="кадр">ОКНО</button>
   <button class="btn" id="btnScreen" data-g="кадр" style="display:none">ЭКРАН</button>
@@ -417,6 +421,8 @@
     <button class="go" id="ringYes">ВОЙТИ КАМЕРОЙ</button>
   </div>
 </div>
+
+<div class="rwin" id="mapWin" style="display:none"><div class="grip"></div></div>
 
 <div id="progPip"><img id="progImg" alt=""><span>ПРОГРАММА</span></div>
 
@@ -643,6 +649,89 @@ const eyeTmp = document.createElement('canvas');
 /* сеть: свой peer-сервер и TURN (localStorage) */
 function loadNet(){ try{ return JSON.parse(localStorage.getItem('skrin-net') || '{}'); }catch(e){ return {}; } }
 let NET = loadNet();
+
+/* ---------- ПРИБОРЫ: живые датчики телефона ----------
+   Скорость и место — GPS, курс — компас, наклон — гироскоп, ветер —
+   Open-Meteo по координатам (тот же открытый источник, что у Pneuraden).
+   Всё считается на телефоне; наружу уходит только то, что ты сам покажешь
+   в кадре. GPS на воде честен: скорость берётся из доплеровского сдвига,
+   а не из разницы точек — потому она живая и без рывков. */
+const geo = { lat: null, lon: null, spd: 0, alt: null, acc: null, head: null,
+              trk: 0, t0: 0, last: null, ok: false };
+const tilt = { head: null, beta: 0, gamma: 0 };
+const meteo = { wind: null, dir: null, temp: null, t: 0 };
+let dashOn = false, geoWatch = null;
+
+function geoStart(){
+  if (geoWatch !== null || !navigator.geolocation) return;
+  geoWatch = navigator.geolocation.watchPosition(p => {
+    const c = p.coords;
+    geo.ok = true;
+    if (geo.last && c.latitude != null){    // считаем пройденный путь
+      const R = 6371000, rad = Math.PI / 180;
+      const dLat = (c.latitude - geo.last.lat) * rad;
+      const dLon = (c.longitude - geo.last.lon) * rad;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(c.latitude * rad) *
+                Math.cos(geo.last.lat * rad) * Math.sin(dLon / 2) ** 2;
+      const d = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+      if (d > 3 && d < 500) geo.trk += d;   // отсекаем дрожание и телепорты
+    }
+    geo.last = { lat: c.latitude, lon: c.longitude };
+    geo.lat = c.latitude; geo.lon = c.longitude;
+    geo.alt = c.altitude; geo.acc = c.accuracy;
+    geo.spd = (c.speed != null && c.speed >= 0) ? c.speed : geo.spd;
+    if (c.heading != null && !isNaN(c.heading)) geo.head = c.heading;
+    if (!geo.t0) geo.t0 = Date.now();
+    meteoMaybe();
+  }, err => {
+    bb('GPS: ' + (err.code === 1 ? 'запрещён' : 'нет сигнала'));
+    if (err.code === 1) linkFlash('GPS запрещён — разреши доступ к геопозиции');
+  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+  bb('приборы: GPS слушает');
+}
+function geoStop(){
+  if (geoWatch !== null){ navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
+}
+/* компас и наклон */
+function tiltHandler(e){
+  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)){
+    tilt.head = e.webkitCompassHeading;            // iOS даёт истинный курс
+  } else if (e.alpha != null && !isNaN(e.alpha)){
+    tilt.head = e.absolute === false ? tilt.head : (360 - e.alpha) % 360;
+  }
+  if (e.beta != null) tilt.beta = e.beta;
+  if (e.gamma != null) tilt.gamma = e.gamma;
+}
+async function tiltStart(){
+  try{
+    const D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function'){   // iOS спрашивает явно
+      const r = await D.requestPermission();
+      if (r !== 'granted'){ linkFlash('компас не разрешён'); return; }
+    }
+    window.addEventListener('deviceorientationabsolute', tiltHandler, true);
+    window.addEventListener('deviceorientation', tiltHandler, true);
+    bb('приборы: компас слушает');
+  }catch(e){}
+}
+/* ветер: раз в 10 минут, по текущим координатам */
+function meteoMaybe(){
+  if (!geo.lat || Date.now() - meteo.t < 600000) return;
+  meteo.t = Date.now();
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=' + geo.lat.toFixed(3) +
+        '&longitude=' + geo.lon.toFixed(3) +
+        '&current=temperature_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms')
+    .then(r => r.json())
+    .then(j => {
+      const c = j && j.current;
+      if (!c) return;
+      meteo.wind = c.wind_speed_10m;
+      meteo.dir = c.wind_direction_10m;
+      meteo.temp = c.temperature_2m;
+      bb('ветер: ' + meteo.wind + ' м/с, ' + meteo.temp + '°');
+    })
+    .catch(() => {});
+}
 
 /* ---------- ПАМЯТЬ КОМНАТЫ ----------
    Перезагрузка вкладки больше не убивает эфир: код комнаты, раскладка окон
@@ -1998,6 +2087,352 @@ function takeClip(){
   try{ r.rec.stop(); }catch(e){ clipBusy = false; }
 }
 
+/* ---------- РАДАР И ПОКАЗАТЕЛИ: прибор прямо в кадре ----------
+   Рисуется на эфирном полотне, потому виден зрителям. Геометрия — как у
+   окна (доли экрана), чтобы раскладка могла его учитывать. */
+const radar = { nx: 0.035, ny: 0.62, nw: 0.30, nh: 0.30, range: 500 };
+function drawDash(c, w, h){
+  const r = { x: radar.nx * w, y: radar.ny * h, w: radar.nw * w };
+  const R = r.w / 2, cx = r.x + R, cy = r.y + R;
+  const head = (tilt.head != null ? tilt.head : (geo.head || 0));
+
+  c.save();
+  /* круг радара */
+  c.beginPath(); c.arc(cx, cy, R, 0, 6.2832);
+  c.fillStyle = 'rgba(11,15,20,0.55)'; c.fill();
+  c.lineWidth = Math.max(1.5, w * 0.0025);
+  c.strokeStyle = 'rgba(255,180,84,0.75)'; c.stroke();
+  /* кольца дальности */
+  c.strokeStyle = 'rgba(255,180,84,0.22)';
+  c.lineWidth = Math.max(1, w * 0.0012);
+  [0.33, 0.66].forEach(k => { c.beginPath(); c.arc(cx, cy, R * k, 0, 6.2832); c.stroke(); });
+  /* перекрестье */
+  c.beginPath();
+  c.moveTo(cx - R, cy); c.lineTo(cx + R, cy);
+  c.moveTo(cx, cy - R); c.lineTo(cx, cy + R);
+  c.stroke();
+  /* стрелка севера — крутится по компасу */
+  c.save();
+  c.translate(cx, cy); c.rotate(-head * Math.PI / 180);
+  c.beginPath();
+  c.moveTo(0, -R * 0.86); c.lineTo(-R * 0.09, -R * 0.66); c.lineTo(R * 0.09, -R * 0.66);
+  c.closePath();
+  c.fillStyle = '#FF5D45'; c.fill();
+  c.font = '700 ' + Math.round(R * 0.22) + 'px ui-monospace,Menlo,monospace';
+  c.fillStyle = '#FF5D45'; c.textAlign = 'center';
+  c.fillText('N', 0, -R * 0.9);
+  c.restore();
+  /* точки вокруг: друзья и метки (заполнит маяк) */
+  (radar.dots || []).forEach(d => {
+    const rel = Math.min(1, (d.dist || 0) / radar.range);
+    const a = ((d.brg || 0) - head) * Math.PI / 180;
+    const px = cx + Math.sin(a) * rel * R * 0.92;
+    const py = cy - Math.cos(a) * rel * R * 0.92;
+    c.beginPath(); c.arc(px, py, R * 0.055, 0, 6.2832);
+    c.fillStyle = d.color || '#7ED8A0'; c.fill();
+  });
+  /* я — в центре */
+  c.beginPath(); c.arc(cx, cy, R * 0.06, 0, 6.2832);
+  c.fillStyle = '#E8E3D8'; c.fill();
+
+  /* показатели столбиком справа от радара */
+  const fs = Math.max(11, w * 0.017);
+  const lx = r.x + r.w + w * 0.018;
+  let ly = r.y + fs * 1.1;
+  const line = (txt, col, big) => {
+    c.textAlign = 'left';
+    c.font = (big ? '800 ' + Math.round(fs * 1.7) : '700 ' + Math.round(fs)) +
+             'px ui-monospace,Menlo,monospace';
+    c.fillStyle = 'rgba(11,15,20,0.5)';
+    const tw = c.measureText(txt).width;
+    c.fillRect(lx - fs * 0.3, ly - (big ? fs * 1.5 : fs * 0.95), tw + fs * 0.6, (big ? fs * 1.9 : fs * 1.25));
+    c.fillStyle = col || '#E8E3D8';
+    c.fillText(txt, lx, ly);
+    ly += (big ? fs * 2.0 : fs * 1.45);
+  };
+  line((geo.spd * 3.6).toFixed(1) + ' км/ч', '#FFB454', true);
+  if (head != null) line('курс ' + Math.round(head) + '°');
+  if (geo.trk) line('путь ' + (geo.trk / 1000).toFixed(2) + ' км');
+  if (meteo.wind != null)
+    line('ветер ' + meteo.wind.toFixed(1) + ' м/с' +
+         (meteo.dir != null ? ' ' + Math.round(meteo.dir) + '°' : ''), '#7ED8A0');
+  if (meteo.temp != null) line(meteo.temp.toFixed(0) + '°C', '#7ED8A0');
+  if (Math.abs(tilt.gamma) > 4) line('крен ' + Math.round(tilt.gamma) + '°');
+  if (!geo.ok) line('GPS ждёт…', '#FF5D45');
+  c.restore();
+}
+async function setDash(v){
+  dashOn = !!v;
+  if (dashOn){
+    geoStart(); tiltStart(); meteoMaybe();
+    presenceStart();          // слушаем круг молча: видим других, себя не выставляем
+    setTimeout(tidyLayout, 200);
+    layers.set('приборы', (c, w, h) => { if (dashOn) drawDash(c, w, h); });
+    linkFlash('ПРИБОРЫ в эфире: скорость, курс, путь, ветер');
+  } else {
+    layers.delete('приборы');
+    geoStop();
+    linkFlash('приборы убраны');
+  }
+  $('btnDash').classList.toggle('on', dashOn);
+  bb('приборы ' + (dashOn ? 'вкл' : 'выкл'));
+}
+
+/* ---------- ПРИСУТСТВИЕ: общая карта людей ----------
+   Модуль mayak.js общий у студии и Pneuraden — лежит рядом на Pages.
+   Нет файла — присутствие просто не включится, эфир не пострадает.
+   Право показать себя есть ТОЛЬКО у человека: Клод может скрыть, но не
+   выставить — согласие не делегируется. */
+let mayakReady = false, presenceSeen = new Set();
+function loadMayak(){
+  return new Promise(res => {
+    if (window.mayak){ mayakReady = true; return res(true); }
+    const s = document.createElement('script');
+    s.src = 'mayak.js';
+    s.onload = () => { mayakReady = !!window.mayak; res(mayakReady); };
+    s.onerror = () => { res(false); };
+    document.head.appendChild(s);
+  });
+}
+function distBrg(lat1, lon1, lat2, lon2){
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  const y = Math.sin(dLon) * Math.cos(lat2 * rad);
+  const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) -
+            Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos(dLon);
+  return { dist, brg: ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360 };
+}
+function presenceList(list){
+  const me = meLoad() || {};
+  const mine = (list || []).filter(p => p.name !== me.nick);
+  /* на радар и карту — всегда огрублённые: они видны зрителям */
+  radar.dots = mine.map(p => {
+    const d = (geo.lat != null) ? distBrg(geo.lat, geo.lon, p.lat, p.lon) : { dist: 0, brg: 0 };
+    return { lat: p.lat, lon: p.lon, dist: d.dist, brg: d.brg, name: p.name,
+             color: (p.spd > 1.5) ? '#FFB454' : '#7ED8A0' };
+  });
+  mine.forEach(p => {
+    if (presenceSeen.has(p.id)) return;
+    presenceSeen.add(p.id);
+    const d = (geo.lat != null) ? distBrg(geo.lat, geo.lon, p.lat, p.lon).dist : null;
+    bb('на карте появился: ' + p.name + (d ? ' (' + (d / 1000).toFixed(1) + ' км)' : ''));
+    engSend({ op: 'presence', name: p.name,
+              km: d ? +(d / 1000).toFixed(1) : null, people: mine.length });
+    showMsg('👋 ' + p.name + ' на карте' + (d ? ' · ' + (d / 1000).toFixed(1) + ' км' : ''), 5000);
+  });
+  const gone = [...presenceSeen].filter(id => !mine.some(p => p.id === id));
+  gone.forEach(id => presenceSeen.delete(id));
+}
+async function presenceStart(){
+  if (!await loadMayak()){
+    linkFlash('карта людей недоступна: рядом нет mayak.js');
+    return false;
+  }
+  const me = meLoad() || {};
+  window.PEER_OPTS = peerOpts();
+  mayak.start({ круг: 'pneuraden', имя: me.nick || 'гость', onList: presenceList,
+                onNote: t => bb('маяк: ' + t) });
+  geoStart();
+  setInterval(() => {
+    if (geo.lat != null && window.mayak)
+      mayak.feed(geo.lat, geo.lon, geo.spd, tilt.head != null ? tilt.head : geo.head);
+  }, 5000);
+  bb('присутствие: слушаю круг');
+  return true;
+}
+/* показать себя может только человек — здесь и нигде больше */
+async function presenceAsk(){
+  if (!await presenceStart()) return;
+  const onAir = twitchOn || screenMode || (recorder && recorder.state === 'recording');
+  if (mayak.ask(onAir)){
+    $('btnMe').classList.add('on');
+    $('btnMe').textContent = '👋 Я НА КАРТЕ';
+    linkFlash('ты на карте районом · погаснет само через 2 часа');
+  }
+}
+function presenceHide(){
+  if (window.mayak) mayak.hide();
+  $('btnMe').classList.remove('on');
+  $('btnMe').textContent = '👋 ПОКАЗАТЬСЯ';
+  linkFlash('скрыт с карты');
+}
+
+/* ---------- КАРТА В ЭФИРЕ ----------
+   Leaflet живёт в DOM и на полотно не попадёт, поэтому карта своя: тайлы —
+   обычные картинки, их можно рисовать самим. Тёмная схема CARTO под нашу
+   палитру, поверх — OSM как запас.
+   ВАЖНО: crossOrigin='anonymous' обязателен. Без него полотно «портится»
+   и captureStream перестаёт отдавать кадры — эфир умрёт молча. Картинка
+   без CORS просто не загрузится: это безопасный отказ. */
+const TILE_SRC = [
+  z => 'https://a.basemaps.cartocdn.com/dark_all/' + z + '/{x}/{y}.png',
+  z => 'https://tile.openstreetmap.org/' + z + '/{x}/{y}.png'
+];
+const tiles = new Map();        // url → Image
+let tileSrcIdx = 0, tileFails = 0;
+let mapMode = 'off', mapZoom = 15;
+const mapWin = { nx: 0.62, ny: 0.05, nw: 0.34, nh: 0.26, rot: 0 };
+
+function lonToTx(lon, z){ return (lon + 180) / 360 * Math.pow(2, z); }
+function latToTy(lat, z){
+  const r = lat * Math.PI / 180;
+  return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z);
+}
+function getTile(z, x, y){
+  const n = Math.pow(2, z);
+  if (y < 0 || y >= n) return null;
+  x = ((x % n) + n) % n;
+  const url = TILE_SRC[tileSrcIdx](z).replace('{x}', x).replace('{y}', y);
+  let im = tiles.get(url);
+  if (im) return im.ok ? im : null;
+  im = new Image();
+  im.crossOrigin = 'anonymous';         // без этого полотно испортится
+  im.ok = false;
+  im.onload = () => { im.ok = true; };
+  im.onerror = () => {
+    if (++tileFails > 6 && tileSrcIdx < TILE_SRC.length - 1){
+      tileSrcIdx++; tileFails = 0; tiles.clear();
+      bb('карта: перехожу на запасные тайлы');
+    }
+  };
+  im.src = url;
+  tiles.set(url, im);
+  if (tiles.size > 400){              // не растим память бесконечно
+    const first = tiles.keys().next().value;
+    tiles.delete(first);
+  }
+  return null;
+}
+function drawMap(c, x, y, w, h, z){
+  if (geo.lat == null){
+    c.fillStyle = 'rgba(11,15,20,0.75)'; c.fillRect(x, y, w, h);
+    c.fillStyle = '#FF5D45';
+    c.font = '700 ' + Math.max(12, w * 0.05) + 'px ui-monospace,Menlo,monospace';
+    c.textAlign = 'center';
+    c.fillText('GPS ждёт сигнала…', x + w / 2, y + h / 2);
+    return;
+  }
+  const T = 256;
+  const cx = lonToTx(geo.lon, z), cy = latToTy(geo.lat, z);
+  const px = cx * T, py = cy * T;            // центр в пикселях мира
+  const x0 = px - w / 2, y0 = py - h / 2;    // левый верх окна в мире
+  const tx0 = Math.floor(x0 / T), ty0 = Math.floor(y0 / T);
+  const tx1 = Math.floor((x0 + w) / T), ty1 = Math.floor((y0 + h) / T);
+  c.save();
+  c.beginPath(); c.rect(x, y, w, h); c.clip();
+  c.fillStyle = '#0B0F14'; c.fillRect(x, y, w, h);
+  for (let ty = ty0; ty <= ty1; ty++){
+    for (let tx = tx0; tx <= tx1; tx++){
+      const im = getTile(z, tx, ty);
+      const dx = x + tx * T - x0, dy = y + ty * T - y0;
+      if (im) c.drawImage(im, dx, dy, T, T);
+      else { c.fillStyle = 'rgba(18,26,34,0.8)'; c.fillRect(dx, dy, T, T); }
+    }
+  }
+  /* точки друзей и меток (заполняет маяк) */
+  (radar.dots || []).forEach(d => {
+    if (d.lat == null) return;
+    const dx = x + (lonToTx(d.lon, z) * T - x0), dy = y + (latToTy(d.lat, z) * T - y0);
+    c.beginPath(); c.arc(dx, dy, Math.max(4, w * 0.012), 0, 6.2832);
+    c.fillStyle = d.color || '#7ED8A0'; c.fill();
+    c.lineWidth = 2; c.strokeStyle = '#0B0F14'; c.stroke();
+  });
+  /* я — стрелкой по курсу */
+  const head = (tilt.head != null ? tilt.head : (geo.head || 0));
+  c.save();
+  c.translate(x + w / 2, y + h / 2);
+  c.rotate(head * Math.PI / 180);
+  const s = Math.max(7, w * 0.022);
+  c.beginPath();
+  c.moveTo(0, -s); c.lineTo(s * 0.7, s * 0.8); c.lineTo(0, s * 0.35); c.lineTo(-s * 0.7, s * 0.8);
+  c.closePath();
+  c.fillStyle = '#FFB454'; c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = '#0B0F14'; c.stroke();
+  c.restore();
+  /* рамка и подпись источника — атрибуция обязательна */
+  c.lineWidth = Math.max(2, w * 0.006);
+  c.strokeStyle = 'rgba(255,180,84,0.8)';
+  c.strokeRect(x, y, w, h);
+  c.font = Math.max(9, w * 0.022) + 'px ui-monospace,Menlo,monospace';
+  c.textAlign = 'right';
+  c.fillStyle = 'rgba(232,227,216,0.55)';
+  c.fillText('© OpenStreetMap', x + w - 6, y + h - 6);
+  c.restore();
+}
+function setMap(mode, z){
+  const m = String(mode || 'off').toLowerCase();
+  mapZoom = Math.min(19, Math.max(3, +z || mapZoom));
+  if (m === 'off' || m === 'false'){
+    mapMode = 'off';
+    layers.delete('карта');
+    $('mapWin').style.display = 'none';
+    linkFlash('карта убрана');
+  } else {
+    mapMode = (m === 'full' || m === 'полный') ? 'full' : 'mini';
+    geoStart();
+    layers.set('карта', (c, w, h) => {
+      if (mapMode === 'full') drawMap(c, 0, 0, w, h, mapZoom);
+      else drawMap(c, mapWin.nx * w, mapWin.ny * h, mapWin.nw * w, mapWin.nh * h, mapZoom);
+    });
+    $('mapWin').style.display = (mapMode === 'mini') ? 'block' : 'none';
+    if (mapMode === 'mini'){ placeMapWin(); tidyLayout(); }
+    linkFlash(mapMode === 'full' ? 'КАРТА на весь экран' : 'мини-карта в углу');
+  }
+  $('btnMap').classList.toggle('on', mapMode !== 'off');
+  bb('карта: ' + mapMode + (mapMode !== 'off' ? ' (зум ' + mapZoom + ')' : ''));
+}
+function placeMapWin(){
+  const el = $('mapWin');
+  const cw = window.innerWidth, ch = window.innerHeight;
+  el.style.left = (mapWin.nx * cw) + 'px';
+  el.style.top = (mapWin.ny * ch) + 'px';
+  el.style.width = (mapWin.nw * cw) + 'px';
+  el.style.height = (mapWin.nh * ch) + 'px';
+}
+
+/* ---------- РАСКЛАДКА: ничто не лезет на чужое место ----------
+   Радар с показателями и мини-карта — «якоря», их не двигаем. Окна камер,
+   если налезли, переезжают на ближайшее свободное место сетки. */
+function rectsHit(a, b){
+  return !(a.nx + a.nw <= b.nx || b.nx + b.nw <= a.nx ||
+           a.ny + a.nh <= b.ny || b.ny + b.nh <= a.ny);
+}
+function tidyLayout(){
+  const taken = [];
+  if (dashOn) taken.push({ nx: radar.nx, ny: radar.ny,
+                           nw: radar.nw + 0.26, nh: radar.nh });   // + столбик показателей
+  if (mapMode === 'mini') taken.push({ nx: mapWin.nx, ny: mapWin.ny, nw: mapWin.nw, nh: mapWin.nh });
+  const CAND = [];
+  for (let gy = 0; gy < 3; gy++)
+    for (let gx = 0; gx < 2; gx++)
+      CAND.push({ nx: 0.025 + gx * 0.5, ny: 0.04 + gy * 0.31 });
+  let moved = 0;
+  remotes.filter(r => !r.lost).forEach(rm => {
+    const cur = { nx: rm.nx, ny: rm.ny, nw: rm.nw, nh: rm.nh };
+    if (!taken.some(t => rectsHit(cur, t))){ taken.push(cur); return; }
+    for (const cand of CAND){
+      const test = { nx: cand.nx, ny: cand.ny, nw: rm.nw, nh: rm.nh };
+      clampWin(test);
+      if (!taken.some(t => rectsHit(test, t))){
+        rm.nx = test.nx; rm.ny = test.ny;
+        rm.place();
+        taken.push(test);
+        moved++;
+        return;
+      }
+    }
+    taken.push(cur);   // свободного места нет — оставляем как есть
+  });
+  if (moved){
+    bb('раскладка: подвинуто окон — ' + moved);
+    linkFlash('разложил: ' + moved + ' окно(а) переехало');
+  }
+  return moved;
+}
+
 /* ---------- ГЛАЗ РУБКИ: кадр эфира инженеру ----------
    Снимаем с эфирного out (страховка блюра — и во взгляде Клода), жмём в
    jpeg ~1024px и шлём по инженерному каналу. Рубка положит в
@@ -2302,6 +2737,28 @@ const CMDS = {
   clip: () => takeClip(),
   clipRing: on => setClipRing(!!on),
   entry: on => setEntryLock(!on),   // entry true = вход открыт
+  dash: on => setDash(!!on),
+  map: (mode, z) => setMap(mode, z),
+  tidy: () => tidyLayout(),
+  /* Клод вправе СКРЫТЬ человека с карты, но не выставить: согласие
+     принадлежит человеку и не делегируется. */
+  mayak: on => {
+    if (on){
+      linkFlash('показаться на карте можно только своей рукой — кнопка 👋');
+      return 'согласие не делегируется: нужна кнопка 👋';
+    }
+    presenceHide();
+    return 'скрыт';
+  },
+  people: () => (window.mayak ? mayak.points(true).map(p => ({
+    name: p.name,
+    km: (geo.lat != null) ? +(distBrg(geo.lat, geo.lon, p.lat, p.lon).dist / 1000).toFixed(1) : null,
+    spd: +(p.spd * 3.6).toFixed(1)
+  })) : []),
+  geo: () => ({ lat: geo.lat, lon: geo.lon, spd: +(geo.spd * 3.6).toFixed(1),
+                head: tilt.head != null ? Math.round(tilt.head) : null,
+                trk: +(geo.trk / 1000).toFixed(2), alt: geo.alt,
+                acc: geo.acc, wind: meteo.wind, windDir: meteo.dir, temp: meteo.temp }),
   frame: () => sendFrame('req'),
   eye: sec => setEye(sec),
   winSet: o => {
@@ -2345,6 +2802,10 @@ const CMDS = {
     ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
     pocket: lockOn,
     entryOpen: !entryLocked,
+    dash: dashOn,
+    map: mapMode,
+    onMap: !!(window.mayak && mayak.state().visible),
+    people: window.mayak ? mayak.state().people : 0,
     monitor: monitorOn,
     tempo: FPS_LEVELS[perf.level],
     clipRing: clipOn,
@@ -2635,6 +3096,7 @@ function addRemote(call, s){
   makeWinDom(rm);
   try{ attachRemoteAudio(rm, s); }catch(e){}
   remotes.push(rm);
+  if (dashOn || mapMode === 'mini') setTimeout(tidyLayout, 300);   // не налезть на приборы
   bb('камера вошла: ' + (rm.label || '—') + ' · видео ' +
      (s.getVideoTracks().length ? 'есть' : 'НЕТ') + ', звук ' +
      (ra.length ? 'есть' : 'НЕТ'));
@@ -3178,6 +3640,17 @@ zoneLayer.addEventListener('pointerup', e => {
 
 /* ---------- сеть: лист СЕРВЕР/TURN ---------- */
 $('btnMon').onclick = () => setMonitor(!monitorOn);
+$('btnDash').onclick = () => setDash(!dashOn);
+/* кнопка гоняет по кругу: выкл → мини → весь экран → выкл */
+$('btnMap').onclick = () => setMap(mapMode === 'off' ? 'mini' : mapMode === 'mini' ? 'full' : 'off');
+$('btnMe').onclick = () => {
+  const st = window.mayak && mayak.state();
+  if (st && st.visible) presenceHide(); else presenceAsk();
+};
+(function mapWinGestures(){
+  const el = $('mapWin');
+  attachWinGestures(el, el.querySelector('.grip'), mapWin, () => { placeMapWin(); });
+})();
 $('btnRing').onclick = () => setClipRing(!clipOn);
 $('btnClip').onclick = () => takeClip();
 /* ПРОГРАММА у друга: теперь её можно двигать, тянуть и вращать —
