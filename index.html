@@ -198,6 +198,17 @@
     transform:translateX(-50%);color:var(--amber);opacity:.22;font-size:12px;
     font-family:ui-monospace,Menlo,monospace;letter-spacing:.08em;white-space:nowrap}
 
+  /* ---- панель окна друга: закрыть, звук в эфир, звук мне ---- */
+  .rwin .wbar, #win .wbar{position:absolute;left:5px;top:5px;display:flex;gap:4px;z-index:2;flex-wrap:wrap;max-width:calc(100% - 10px)}
+  .rwin .wbtn, #win .wbtn{
+    width:27px;height:27px;border-radius:8px;display:flex;align-items:center;
+    justify-content:center;font-size:13px;background:rgba(11,15,20,.75);
+    border:1px solid rgba(232,227,216,.18);color:var(--dim);cursor:pointer;
+    touch-action:none;user-select:none;-webkit-user-select:none;
+  }
+  .rwin .wbtn.on, #win .wbtn.on{color:#7ED8A0;border-color:rgba(126,216,160,.55)}
+  .rwin .wbtn.x, #win .wbtn.x{color:#FF5D45;border-color:rgba(255,93,69,.4)}
+
   /* ---- КРУГ: список друзей и звонок ---- */
   .frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(232,227,216,.08)}
   .fdot{width:9px;height:9px;border-radius:50%;background:#3a444e;flex:0 0 auto}
@@ -208,6 +219,26 @@
   .frow button{height:32px;padding:0 12px;border-radius:8px;border:1px solid #333;
     background:#0B0F14;color:var(--ink);font-size:12px}
   .frow button.call{border-color:var(--amber);color:var(--amber)}
+  /* плашка возврата: браузер свернули — эфир ждёт одного касания */
+  #comeback{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:28;display:none;
+    flex-direction:column;gap:10px;align-items:stretch;text-align:center;
+    background:#121A22;border:1px solid rgba(255,180,84,.6);border-radius:16px;
+    padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.6);max-width:88vw;
+  }
+  #comeback b{color:var(--amber)}
+  #comeback button{height:44px;border-radius:11px;border:1px solid #333;
+    background:#0B0F14;color:var(--ink);font-size:14px}
+  #comeback button.go{background:var(--amber);color:#221500;font-weight:800;border:none;font-size:15px}
+  #entry{position:absolute;left:50%;transform:translateX(-50%);z-index:27;display:none;
+    top:calc(env(safe-area-inset-top,0px) + 76px);background:#121A22;
+    border:1px solid rgba(126,216,160,.6);border-radius:14px;padding:12px 16px;
+    box-shadow:0 6px 26px rgba(0,0,0,.6);max-width:92vw}
+  #entry b{color:#7ED8A0}
+  #entry .row{display:flex;gap:8px;margin-top:10px}
+  #entry button{flex:1;height:38px;border-radius:9px;border:1px solid #333;
+    background:#0B0F14;color:var(--ink);font-size:13px}
+  #entry button.go{background:#7ED8A0;color:#04180d;font-weight:800;border:none}
   #ring{position:absolute;left:50%;transform:translateX(-50%);z-index:26;display:none;
     top:calc(env(safe-area-inset-top,0px) + 76px);background:#121A22;
     border:1px solid rgba(255,180,84,.6);border-radius:14px;padding:12px 16px;
@@ -362,6 +393,22 @@
   <div id="lockHint">карман · проведи по «Г» — открою</div>
 </div>
 
+<div id="comeback">
+  <div>Ты был в эфире как <b id="cbName">камера</b></div>
+  <button class="go" id="cbGo">↩ ВЕРНУТЬСЯ В ЭФИР</button>
+  <button id="cbNo">не сейчас</button>
+</div>
+
+<div id="entry">
+  <div><b id="entryWho">Гость</b> просится камерой в эфир</div>
+  <div class="fnote" id="entryNote"></div>
+  <div class="row">
+    <button id="entryNo">отказать</button>
+    <button class="go" id="entryYes">ВПУСТИТЬ</button>
+  </div>
+  <div class="row"><button id="entryAdd">впустить и запомнить как своего</button></div>
+</div>
+
 <div id="ring">
   <div><b id="ringWho">Друг</b> зовёт в эфир</div>
   <div class="fnote" id="ringRoom"></div>
@@ -433,7 +480,10 @@
       <div class="bigcode" id="linkCode">····</div>
       <div id="linkWait" style="color:var(--dim)">жду телефоны…</div>
       <div id="engLine" style="color:var(--dim);font-size:12px;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></div>
-      <div class="row"><button class="quiet" id="lnkStop1">Разорвать всё</button></div>
+      <div class="row">
+        <button class="quiet" id="lnkLock">🔓 ВХОД ОТКРЫТ</button>
+        <button class="quiet" id="lnkStop1">Разорвать всё</button>
+      </div>
     </div>
     <div id="linkCameraUi" style="display:none">
       <label>Подпись в эфире (имя)</label>
@@ -620,11 +670,114 @@ function roomSaveLayout(){
   if (linkRole !== 'director') return;
   const slots = {};
   remotes.forEach(r => {
-    if (r.label) slots[r.label] = { nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh };
+    if (r.label) slots[r.label] = { nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh, rot: r.rot || 0 };
   });
-  roomSave({ win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh }, slots });
+  roomSave({ win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh, rot: win.rot || 0 }, slots });
 }
 setInterval(roomSaveLayout, 5000);   // раскладка догоняет память сама
+
+/* ---------- код на экране: под точками ----------
+   Экран стримера видят зрители (захват вкладки, трансляция iOS). Код,
+   написанный крупно, — это ключ в эфир. Потому маска: раскрываем тапом на
+   10 секунд, а если прямо сейчас идёт эфир — сначала спросим. У комнаты с
+   паролем маскировать нечего: на экране только имя, адрес без пароля не
+   вычислить. */
+function renderCode(){
+  const el = $('linkCode');
+  if (!el) return;
+  if (!linkCode){ el.textContent = '····'; return; }
+  if (linkCode[0] === 'r' && linkCode.length > 6){
+    const r = roomLoad();
+    el.textContent = '🔒 ' + ((r && r.room) || 'комната');
+    el.style.fontSize = '';
+    return;
+  }
+  el.textContent = codeShown ? linkCode : '•• ••';
+  el.style.fontSize = codeShown ? '' : '0.8em';
+}
+function toggleCode(){
+  if (!linkCode || (linkCode[0] === 'r' && linkCode.length > 6)) return;
+  if (codeShown){ codeShown = false; renderCode(); return; }
+  const onAir = twitchOn || screenMode || (recorder && recorder.state === 'recording');
+  if (onAir && !confirm('Идёт эфир — экран могут видеть зрители. Всё равно показать код?')) return;
+  codeShown = true;
+  renderCode();
+  bb('код показан на экране');
+  clearTimeout(toggleCode.t);
+  toggleCode.t = setTimeout(() => { codeShown = false; renderCode(); }, 10000);
+}
+
+/* ---------- ЗАМОК ВХОДА: утёкший код перестаёт быть ключом ----------
+   Свой — тот, кто вошёл по комнате с паролем (адрес без пароля не узнать),
+   либо чья подпись есть в круге. Остальные стучатся, и решаешь ты.
+   Честно: подпись подделать легко — это удобство, а не крепость;
+   крепость — комната с паролем и замок. */
+function setEntryLock(v){
+  entryLocked = !!v;
+  const b = $('lnkLock');
+  if (b){
+    b.textContent = entryLocked ? '🔒 ВХОД ЗАКРЫТ' : '🔓 ВХОД ОТКРЫТ';
+    b.classList.toggle('on', entryLocked);
+  }
+  bb('вход ' + (entryLocked ? 'закрыт' : 'открыт'));
+  linkFlash(entryLocked
+    ? 'ВХОД ЗАКРЫТ: свои в эфире остаются, новые камеры не примутся'
+    : 'вход открыт');
+}
+function isTrusted(name){
+  if (linkCode && linkCode[0] === 'r' && linkCode.length > 6) return true;   // знал пароль
+  if (!name) return false;
+  try{
+    return friendsLoad().some(f => (f.nick || '').toLowerCase() === name.toLowerCase());
+  }catch(e){ return false; }
+}
+function askEntry(call, name){
+  entryQueue.push({ call, name, t: Date.now() });
+  call.on('close', () => {
+    const i = entryQueue.findIndex(q => q.call === call);
+    if (i >= 0){ entryQueue.splice(i, 1); renderEntry(); }
+  });
+  bb('стучится: ' + (name || 'без имени'));
+  try{ navigator.vibrate && navigator.vibrate([90, 60, 90]); }catch(e){}
+  speakEar((name || 'Гость') + ' просится в эфир');
+  renderEntry();
+  setTimeout(() => {                       // не ответили за минуту — вежливый отказ
+    const i = entryQueue.findIndex(q => q.call === call);
+    if (i >= 0){ try{ call.close(); }catch(e){} entryQueue.splice(i, 1); renderEntry(); }
+  }, 60000);
+}
+function renderEntry(){
+  const el = $('entry');
+  if (!el) return;
+  if (!entryQueue.length){ el.style.display = 'none'; return; }
+  const q = entryQueue[0];
+  $('entryWho').textContent = q.name || 'Гость без имени';
+  $('entryNote').textContent = entryQueue.length > 1
+    ? ('ждут ещё: ' + (entryQueue.length - 1)) : '';
+  el.style.display = 'block';
+}
+function entryDecide(allow, remember){
+  const q = entryQueue.shift();
+  renderEntry();
+  if (!q) return;
+  if (!allow){
+    try{ q.call.close(); }catch(e){}
+    bb('отказано: ' + (q.name || '—'));
+    return;
+  }
+  if (remember && q.name){
+    try{
+      const list = friendsLoad();
+      if (!list.some(f => (f.nick || '').toLowerCase() === q.name.toLowerCase())){
+        list.push({ nick: q.name });
+        friendsSave(list);
+        showMsg(q.name + ' теперь в твоём круге', 5000);
+      }
+    }catch(e){}
+  }
+  bb('впущен: ' + (q.name || '—'));
+  admitCall(q.call);
+}
 
 /* ---------- КРУГ: комната для своих без сервера ----------
    Адрес комнаты = SHA-256(имя + пароль): кто знает пароль — вычисляет тот же
@@ -841,7 +994,7 @@ function renderFriends(){
         startCameraRole(true);
       };
       row.appendChild(b);
-    } else if (st.on && linkRole === 'director'){
+    } else if (st.on){
       const b = document.createElement('button'); b.className = 'call';
       b.textContent = '📞 позвать';
       b.onclick = () => callFriend(f.nick);
@@ -856,8 +1009,23 @@ function renderFriends(){
 }
 async function callFriend(nick){
   const me = meLoad();
-  const live = myLive();
-  if (!live){ showMsg('Сначала подними комнату — тогда будет куда звать'); return; }
+  let live = myLive();
+  if (!live){
+    /* комнаты нет — поднимем сами, звать иначе некуда */
+    if (!confirm('Комната не поднята. Поднять и позвать ' + nick + '?')) return;
+    if (!running){ try{ await $('btnStart').onclick(); }catch(e){} }
+    const mem = roomLoad();
+    startDirector(mem && mem.role === 'director' ? mem.code : '');
+    showMsg('Поднимаю комнату…', 3000);
+    live = await new Promise(res => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const l = myLive();
+        if ((l && peer && peer.open) || Date.now() - t0 > 9000){ clearInterval(iv); res(l); }
+      }, 300);
+    });
+    if (!live){ showMsg('Комната не поднялась — проверь связь', 5000); return; }
+  }
   const id = await dutyIdFrom(me.circle, nick);
   if (!id || !dutyPeer) return;
   const c = dutyPeer.connect(id, { metadata: { role: 'call' } });
@@ -937,7 +1105,7 @@ const manualZones = [];      // {nx,ny,nw,nh}
 let pttKey = (() => { try { return localStorage.getItem('skrin_ptt_key') || ''; } catch (e) { return ''; } })();
 let W = 0, H = 0, running = false;
 
-const win = { nx: 0.52, ny: 0.08, nw: 0.42, nh: 0.42 }; // нормированный прямоугольник окна
+const win = { nx: 0.52, ny: 0.08, nw: 0.42, nh: 0.42, rot: 0 }; // прямоугольник окна + поворот
 const camHolder = document.createElement('div'); // дом для видео-элементов камер в СТУДИИ
 /* НЕ display:none — iOS заморозил бы декодер на первом кадре и убил звук в шине.
    Уводим со сцены физически: крошечный, прозрачный, вне клика, но живой и рендерящийся. */
@@ -1073,6 +1241,11 @@ function frame(){
   if (winOn){
     const r = winRectPx(), rad = Math.min(r.w, r.h) * 0.06;
     ctx.save();
+    if (win.rot){                     // окно вращается вокруг своего центра
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      ctx.translate(cx, cy); ctx.rotate(win.rot); ctx.translate(-cx, -cy);
+    }
+    ctx.save();
     rr(ctx, r.x, r.y, r.w, r.h, rad); ctx.clip();
     if (screenMode && dispVideo && dispVideo.videoWidth){
       drawCoverRect(ctx, dispVideo, r.x, r.y, r.w, r.h, false);
@@ -1089,12 +1262,18 @@ function frame(){
     ctx.shadowBlur = W * 0.012;
     ctx.stroke();
     ctx.shadowBlur = 0;
+    ctx.restore();                    // конец поворота эхо-окна
   }
 
   for (const rm of remotes){
     const live = !rm.lost && rm.video && rm.video.videoWidth;
     if (!live && !rm.lost) continue;               // картинка ещё не пошла
     const rp = rectPx(rm), rad2 = Math.min(rp.w, rp.h) * 0.06;
+    ctx.save();
+    if (rm.rot){
+      const cx = rp.x + rp.w / 2, cy = rp.y + rp.h / 2;
+      ctx.translate(cx, cy); ctx.rotate(rm.rot); ctx.translate(-cx, -cy);
+    }
     ctx.save();
     rr(ctx, rp.x, rp.y, rp.w, rp.h, rad2); ctx.clip();
     if (live){
@@ -1130,6 +1309,7 @@ function frame(){
       ctx.fillStyle = '#FFB454';
       ctx.fillText(lbl, lx, ly);
     }
+    ctx.restore();                    // конец поворота окна друга
   }
 
   const nowT = performance.now();
@@ -1163,6 +1343,7 @@ function placeWinDom(){
   winEl.style.top = r.yCss + 'px';
   winEl.style.width = r.wCss + 'px';
   winEl.style.height = r.hCss + 'px';
+  winEl.style.transform = win.rot ? 'rotate(' + win.rot + 'rad)' : '';
   winEl.style.display = winOn ? 'block' : 'none';
   remotes.forEach(r => { if (r.place) r.place(); });
 }
@@ -1174,6 +1355,17 @@ function clampWin(o){
   o.nx = Math.min(Math.max(o.nx, 0.004), 0.996 - o.nw);
   o.ny = Math.min(Math.max(o.ny, 0.004), 0.996 - o.nh);
 }
+/* поворот кнопками: ровно 90°, с прилипанием к прямым углам */
+function rotWin(o, delta, place){
+  let r = (o.rot || 0) + delta;
+  const snap = Math.round(r / (Math.PI / 2)) * (Math.PI / 2);
+  if (Math.abs(r - snap) < 0.12) r = snap;        // почти прямой угол — доводим
+  while (r > Math.PI) r -= 2 * Math.PI;
+  while (r < -Math.PI) r += 2 * Math.PI;
+  o.rot = Math.abs(r) < 0.001 ? 0 : r;
+  if (place) place();
+  bb('поворот: ' + Math.round(o.rot * 180 / Math.PI) + '°');
+}
 function attachWinGestures(el, gripEl, o, place){
   let d = null, lastTap = 0;
   const ptrs = new Map();
@@ -1181,12 +1373,17 @@ function attachWinGestures(el, gripEl, o, place){
     const v = [...ptrs.values()];
     return Math.max(20, Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y));
   };
+  const ang = () => {               // угол между пальцами: два пальца крутят окно
+    const v = [...ptrs.values()];
+    return Math.atan2(v[1].y - v[0].y, v[1].x - v[0].x);
+  };
   el.addEventListener('pointerdown', e => {
     if (gripEl && e.target === gripEl) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     if (ptrs.size >= 2){
-      d = { m: 'pinch', d0: dist(), nw: o.nw, nh: o.nh,
+      d = { m: 'pinch', d0: dist(), a0: ang(), rot0: o.rot || 0,
+            nw: o.nw, nh: o.nh,
             cx: o.nx + o.nw / 2, cy: o.ny + o.nh / 2 };
       return;
     }
@@ -1214,6 +1411,10 @@ function attachWinGestures(el, gripEl, o, place){
       o.nw = d.nw * k; o.nh = d.nh * k;
       clampWin(o);
       o.nx = d.cx - o.nw / 2; o.ny = d.cy - o.nh / 2;
+      let da = ang() - d.a0;                       // и одновременно крутим
+      while (da > Math.PI) da -= 2 * Math.PI;
+      while (da < -Math.PI) da += 2 * Math.PI;
+      o.rot = d.rot0 + da;
     } else if (d.m === 'move'){
       o.nx = d.nx + (e.clientX - d.px) / cw;
       o.ny = d.ny + (e.clientY - d.py) / ch;
@@ -1239,6 +1440,21 @@ function attachWinGestures(el, gripEl, o, place){
     gripEl.addEventListener('pointercancel', up);
   }
 }
+/* у эхо-окна своя пара кнопок поворота */
+(function winButtons(){
+  const wb = document.createElement('div');
+  wb.className = 'wbar';
+  const mk = (txt, fn) => {
+    const b = document.createElement('div');
+    b.className = 'wbtn';
+    b.textContent = txt;
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); fn(); });
+    wb.appendChild(b);
+  };
+  mk('↺', () => rotWin(win, -Math.PI / 2, placeWinDom));
+  mk('↻', () => rotWin(win, Math.PI / 2, placeWinDom));
+  winEl.appendChild(wb);
+})();
 attachWinGestures(winEl, grip, win, placeWinDom);
 
 /* ---------- звук: постоянная шина эфира ----------
@@ -1258,10 +1474,49 @@ function ensureBus(){
   monitor.connect(audioCtx.destination);
   const an = audioCtx.createAnalyser(); an.fftSize = 512;          // VU и сторож тишины
   master.connect(an);
-  bus = { master, delay, dest, monitor, an };
+  /* talkback: голос режиссёра уходит друзьям отдельной дорожкой —
+     не вся шина, иначе друг слышал бы сам себя эхом */
+  const talk = audioCtx.createMediaStreamDestination();
+  bus = { master, delay, dest, monitor, an, talk };
   return bus;
 }
 function busTrack(){ return ensureBus().dest.stream.getAudioTracks()[0]; }
+function talkTrack(){ return ensureBus().talk.stream.getAudioTracks()[0]; }
+/* звук друга: две отдельные ручки — в эфир и мне в уши */
+function attachRemoteAudio(rm, stream){
+  const ra = stream.getAudioTracks();
+  if (!ra.length) return;
+  ensureBus();
+  try{ if (rm.aSrc) rm.aSrc.disconnect(); }catch(e){}
+  rm.aSrc = audioCtx.createMediaStreamSource(new MediaStream(ra));
+  if (!rm.gEfir){ rm.gEfir = audioCtx.createGain(); rm.gEfir.connect(bus.master); }
+  if (!rm.gEar){ rm.gEar = audioCtx.createGain(); rm.gEar.connect(bus.monitor); }
+  if (rm.onEfir === undefined) rm.onEfir = true;
+  if (rm.onEar === undefined) rm.onEar = true;
+  rm.gEfir.gain.value = rm.onEfir ? 1 : 0;
+  rm.gEar.gain.value = rm.onEar ? 1 : 0;
+  rm.aSrc.connect(rm.gEfir);
+  rm.aSrc.connect(rm.gEar);
+  if (rm.bEfir) rm.bEfir.classList.toggle('on', rm.onEfir);
+  if (rm.bEar) rm.bEar.classList.toggle('on', rm.onEar);
+}
+function setRemoteAudio(rm, which, on){
+  ensureBus();
+  const t = audioCtx.currentTime;
+  if (which === 'efir'){
+    rm.onEfir = !!on;
+    if (rm.gEfir) rm.gEfir.gain.setTargetAtTime(on ? 1 : 0, t, 0.05);
+    if (rm.bEfir) rm.bEfir.classList.toggle('on', !!on);
+  } else {
+    rm.onEar = !!on;
+    if (rm.gEar) rm.gEar.gain.setTargetAtTime(on ? 1 : 0, t, 0.05);
+    if (rm.bEar) rm.bEar.classList.toggle('on', !!on);
+  }
+  bb((rm.label || 'друг') + ': ' + (which === 'efir' ? 'эфир ' : 'уши ') + (on ? 'вкл' : 'выкл'));
+  linkFlash((rm.label || 'Друг') + (which === 'efir'
+    ? (on ? ' снова в эфире' : ' вырезан из эфира')
+    : (on ? ' слышен тебе' : ' не слышен тебе')));
+}
 function connectToBus(streamOrTrack){
   ensureBus();
   const ms = (streamOrTrack instanceof MediaStream) ? streamOrTrack
@@ -1284,7 +1539,9 @@ function ensureMicChain(){
   micSrcNode = audioCtx.createMediaStreamSource(micStream);
   micGate = audioCtx.createGain();
   micGate.gain.value = (micMuted || pttHeld) ? 0 : 1;
-  micSrcNode.connect(micGate); micGate.connect(bus.master);
+  micSrcNode.connect(micGate);
+  micGate.connect(bus.master);
+  micGate.connect(bus.talk);   // друзья слышат режиссёра ровно тогда, когда его слышит эфир
 }
 function dropMicChain(){
   try{ if (micSrcNode) micSrcNode.disconnect(); }catch(e){}
@@ -2044,6 +2301,7 @@ const CMDS = {
   journal: () => bb.list.slice(-60),
   clip: () => takeClip(),
   clipRing: on => setClipRing(!!on),
+  entry: on => setEntryLock(!on),   // entry true = вход открыт
   frame: () => sendFrame('req'),
   eye: sec => setEye(sec),
   winSet: o => {
@@ -2053,6 +2311,7 @@ const CMDS = {
     if (o.ny !== undefined) t.ny = o.ny;
     if (o.nw !== undefined) t.nw = o.nw;
     if (o.nh !== undefined) t.nh = o.nh;
+    if (o.rot !== undefined) t.rot = o.rot;        // радианы; 90° = 1.5708
     if (t.nh === undefined) t.nh = t.nw;
     clampWin(t);
     placeWinDom();
@@ -2085,6 +2344,7 @@ const CMDS = {
     mode, micOn, micMuted, camMuted, twitchOn,
     ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
     pocket: lockOn,
+    entryOpen: !entryLocked,
     monitor: monitorOn,
     tempo: FPS_LEVELS[perf.level],
     clipRing: clipOn,
@@ -2231,20 +2491,81 @@ function makeWinDom(rm){
     const r = rectPx(rm);
     el.style.left = r.xCss + 'px'; el.style.top = r.yCss + 'px';
     el.style.width = r.wCss + 'px'; el.style.height = r.hCss + 'px';
+    el.style.transform = rm.rot ? 'rotate(' + rm.rot + 'rad)' : '';
   };
+  /* три кнопки: убрать окно, звук в эфир, звук мне в уши */
+  const wbar = document.createElement('div');
+  wbar.className = 'wbar';
+  const mkBtn = (txt, cls, fn) => {
+    const b = document.createElement('div');
+    b.className = 'wbtn ' + cls;
+    b.textContent = txt;
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); fn(); });
+    wbar.appendChild(b);
+    return b;
+  };
+  mkBtn('↺', '', () => rotWin(rm, -Math.PI / 2, rm.place));
+  mkBtn('↻', '', () => rotWin(rm, Math.PI / 2, rm.place));
+  rm.bEfir = mkBtn('🔊', 'on', () => setRemoteAudio(rm, 'efir', !rm.onEfir));
+  rm.bEar = mkBtn('🎧', 'on', () => setRemoteAudio(rm, 'ear', !rm.onEar));
+  /* если гостя нет в круге — одно касание, и он свой */
+  if (rm.label){
+    let known = false;
+    try{ known = friendsLoad().some(f => (f.nick || '').toLowerCase() === rm.label.toLowerCase()); }catch(e){}
+    if (!known){
+      const bAdd = mkBtn('+', '', () => {
+        try{
+          const list = friendsLoad();
+          if (!list.some(f => (f.nick || '').toLowerCase() === rm.label.toLowerCase())){
+            list.push({ nick: rm.label });
+            friendsSave(list);
+          }
+        }catch(e){}
+        bAdd.remove();
+        showMsg(rm.label + ' теперь в твоём круге — впредь войдёт без стука', 5000);
+        bb('в круг: ' + rm.label);
+      });
+    }
+  }
+  mkBtn('✕', 'x', () => {
+    try{ if (rm.call) rm.call.close(); }catch(e){}
+    removeRemote(rm.call);
+    showMsg((rm.label || 'Камера') + ': окно убрано');
+  });
+  el.appendChild(wbar);
+
   attachWinGestures(el, g, rm, rm.place);
   rm.place();
 }
 function onIncomingCall(call){
   const name = ((call.metadata && call.metadata.name) || '').slice(0, 16);
-  const lostRm = remotes.find(r => r.lost && r.label === name);
-  if (lostRm){ adoptRemote(lostRm, call); return; }   // старый друг вернулся — в своё окно
+  /* Тот же друг вернулся — неважно, помечен потерянным или ещё числится живым.
+     Свёрнутый браузер и перезагрузка страницы не рвут связь явно: старое окно
+     остаётся «живым», и без этой проверки каждый заход плодил бы новое. */
+  const same = name && remotes.find(r => r.label === name);
+  if (same){
+    if (same.call && same.call !== call){ try{ same.call.close(); }catch(e){} }
+    adoptRemote(same, call);
+    return;
+  }
   if (remotes.filter(r => !r.lost).length >= 4){
     try{ call.close(); }catch(e){}
     showMsg('Уже четыре камеры — потолок телефона-режиссёра');
     return;
   }
-  call.answer();
+  if (entryLocked){
+    try{ call.close(); }catch(e){}
+    bb('вход закрыт — отвергнут: ' + (name || '—'));
+    showMsg('Кто-то стучался камерой, но вход закрыт', 4000);
+    return;
+  }
+  if (!isTrusted(name)){ askEntry(call, name); return; }   // незнакомый — только с твоего согласия
+  admitCall(call);
+}
+/* впустить: отвечаем своим голосом и заводим окно */
+function admitCall(call){
+  try{ call.answer(new MediaStream([talkTrack()])); }
+  catch(e){ call.answer(); }
   call.on('stream', s => addRemote(call, s));
   call.on('close', () => markLost(call));
   call.on('error', () => markLost(call));
@@ -2262,8 +2583,8 @@ function markLost(call){
     f.getContext('2d').drawImage(rm.video, 0, 0);
     rm.freeze = f;
   }catch(e){ rm.freeze = null; }
-  try{ if (rm.busNode) rm.busNode.disconnect(); }catch(e){}
-  rm.busNode = null;
+  try{ if (rm.aSrc) rm.aSrc.disconnect(); }catch(e){}
+  rm.aSrc = null;
   bb('камера пропала: ' + (rm.label || '—'));
   showMsg((rm.label || 'Камера') + ' пропала — держу окно 2 минуты');
   const n = remotes.filter(r => !r.lost).length;
@@ -2271,14 +2592,13 @@ function markLost(call){
   linkStatus(n ? 'КАМЕР: ' + n : (linkRole === 'director' ? 'ЖДУ КАМЕРЫ' : null));
 }
 function adoptRemote(rm, call){
-  call.answer();
+  try{ call.answer(new MediaStream([talkTrack()])); }
+  catch(e){ call.answer(); }
   call.on('stream', s => {
-    try{ if (rm.busNode) rm.busNode.disconnect(); }catch(e){}
     rm.call = call; rm.stream = s; rm.lost = 0; rm.freeze = null;
     rm.video.srcObject = s;
     rm.video.play().catch(() => {});
-    const ra = s.getAudioTracks();
-    if (ra.length){ try{ rm.busNode = connectToBus(new MediaStream(ra)); }catch(e){} }
+    try{ attachRemoteAudio(rm, s); }catch(e){}
     bb('камера вернулась: ' + (rm.label || '—'));
     showMsg((rm.label || 'Камера') + ' снова в эфире');
     const n = remotes.filter(r => !r.lost).length;
@@ -2309,12 +2629,11 @@ function addRemote(call, s){
   const rm = {
     call, stream: s, video: v,
     label: label0,
-    nx: slot.nx, ny: slot.ny, nw: slot.nw, nh: slot.nh || slot.nw,
+    nx: slot.nx, ny: slot.ny, nw: slot.nw, nh: slot.nh || slot.nw, rot: slot.rot || 0,
     lost: 0, freeze: null
   };
-  const ra = s.getAudioTracks();
-  if (ra.length){ try{ rm.busNode = connectToBus(new MediaStream(ra)); }catch(e){} }
   makeWinDom(rm);
+  try{ attachRemoteAudio(rm, s); }catch(e){}
   remotes.push(rm);
   bb('камера вошла: ' + (rm.label || '—') + ' · видео ' +
      (s.getVideoTracks().length ? 'есть' : 'НЕТ') + ', звук ' +
@@ -2334,7 +2653,9 @@ function removeRemote(call){
   const i = remotes.findIndex(r => r.call === call);
   if (i < 0) return;
   const rm = remotes[i];
-  try{ if (rm.busNode) rm.busNode.disconnect(); }catch(e){}
+  try{ if (rm.aSrc) rm.aSrc.disconnect(); }catch(e){}
+  try{ if (rm.gEfir) rm.gEfir.disconnect(); }catch(e){}
+  try{ if (rm.gEar) rm.gEar.disconnect(); }catch(e){}
   try{ rm.video.srcObject = null; rm.video.remove(); }catch(e){}
   try{ rm.dom.remove(); }catch(e){}
   remotes.splice(i, 1);
@@ -2347,6 +2668,7 @@ function removeRemote(call){
 }
 function linkStop(silent){
   linkStopping = true;   // разрыв руками — камера НЕ перезванивает
+  if (linkRole === 'camera') roomSave({ live: false });   // ушёл сам — возвращать не будем
   remotes.slice().forEach(r => { try{ r.call.close(); }catch(e){} removeRemote(r.call); });
   if (mediaCall){ try{ mediaCall.close(); }catch(e){} mediaCall = null; }
   if (peer){ try{ peer.destroy(); }catch(e){} peer = null; }
@@ -2394,10 +2716,8 @@ function startDirector(keep){
     if (r && r.win){ Object.assign(win, r.win); clampWin(win); placeWinDom(); }
     bb('комната возвращена: ' + linkCode);
   }
-  const rmem = roomLoad();
-  $('linkCode').textContent = (linkCode[0] === 'r' && linkCode.length > 6)
-    ? '🔒 ' + ((rmem && rmem.room) || 'комната')
-    : linkCode;
+  codeShown = false;
+  renderCode();
   $('linkWait').textContent = 'жду телефоны…';
   $('linkChoose').style.display = 'none';
   $('linkDirector').style.display = 'block';
@@ -2423,6 +2743,8 @@ function startDirector(keep){
   linkStatus('ЖДУ КАМЕРЫ · ' + linkCode);
   $('btnLink').classList.add('on');
 }
+let entryLocked = false, codeShown = false;
+const entryQueue = [];      // гости, ждущие впуска
 let camTarget = '';   // адрес режиссёра: код или хеш комнаты
 async function startCameraRole(reuse){
   let code = '', rn = '';
@@ -2440,7 +2762,7 @@ async function startCameraRole(reuse){
   }
   if (!code || code.length < 4){ showMsg('Введи код — или имя комнаты и пароль'); return; }
   camTarget = code;
-  roomSave({ role: 'camera', code, name: ($('lnkName').value || '').trim(), room: rn });
+  roomSave({ role: 'camera', code, name: ($('lnkName').value || '').trim(), room: rn, live: true });
   try{
     if (!camStream) await openCam(facing);
     if (!micStream){
@@ -2461,6 +2783,20 @@ async function startCameraRole(reuse){
       camRetry = 0;
       const nm = ($('lnkName').value || '').trim();
       mediaCall = peer.call('skrin-' + code, feed, { metadata: { name: nm } });
+      /* голос режиссёра: слышим команды съёмочной группы */
+      mediaCall.on('stream', s => {
+        let a = document.getElementById('dirAudio');
+        if (!a){
+          a = document.createElement('audio');
+          a.id = 'dirAudio';
+          a.autoplay = true; a.playsInline = true;
+          a.setAttribute('playsinline', '');
+          document.body.appendChild(a);
+        }
+        a.srcObject = s;
+        a.play().catch(() => {});
+        linkFlash('слышу режиссёра — говори с ним голосом');
+      });
       mediaCall.on('close', () => {
         if (linkStopping || linkRole !== 'camera'){ linkStatus(null); return; }
         showMsg('Связь с режиссёром оборвалась — перезваниваю…');
@@ -2478,8 +2814,11 @@ async function startCameraRole(reuse){
       }catch(e){}
       $('linkSheet').style.display = 'none';
       $('btnLink').classList.add('on');
-      linkStatus('ОТДАЮ КАМЕРУ → ' + code);
-      showMsg('Камера ушла режиссёру. Экран не гаси.');
+      linkStatus('СТУЧУСЬ…');
+      showMsg('Стучусь к режиссёру — он должен впустить. Экран не гаси.', 6000);
+      setTimeout(() => {                    // впустили — статус сменится сам
+        if (linkRole === 'camera' && !linkStopping) linkStatus('ОТДАЮ КАМЕРУ → ' + (rn || code.slice(0, 6)));
+      }, 3000);
     });
     peer.on('error', e => {
       if (linkRole === 'camera' && !linkStopping &&
@@ -2596,6 +2935,11 @@ $('ringYes').onclick = () => {
   $('linkCameraUi').style.display = 'block';
   startCameraRole(true);
 };
+$('linkCode').onclick = toggleCode;
+$('lnkLock').onclick = () => setEntryLock(!entryLocked);
+$('entryYes').onclick = () => entryDecide(true, false);
+$('entryAdd').onclick = () => entryDecide(true, true);
+$('entryNo').onclick = () => entryDecide(false, false);
 $('lnkRoomGo').onclick = async () => {
   const n = ($('lnkRoomD').value || '').trim(), p = $('lnkPassD').value || '';
   if (n.length < 2 || p.length < 3){ showMsg('Имя комнаты и пароль (от 3 знаков)'); return; }
@@ -2836,10 +3180,37 @@ zoneLayer.addEventListener('pointerup', e => {
 $('btnMon').onclick = () => setMonitor(!monitorOn);
 $('btnRing').onclick = () => setClipRing(!clipOn);
 $('btnClip').onclick = () => takeClip();
-$('progPip').onclick = () => {
-  const im = $('progImg');
-  im.style.display = (im.style.display === 'none') ? 'block' : 'none';
+/* ПРОГРАММА у друга: теперь её можно двигать, тянуть и вращать —
+   как любое окно. Кнопки: повернуть влево/вправо и спрятать. */
+const progWin = { nx: 0.62, ny: 0.58, nw: 0.34, nh: 0.26, rot: 0 };
+progWin.place = () => {
+  const el = $('progPip');
+  const cw = window.innerWidth, ch = window.innerHeight;
+  el.style.left = (progWin.nx * cw) + 'px';
+  el.style.top = (progWin.ny * ch) + 'px';
+  el.style.width = (progWin.nw * cw) + 'px';
+  el.style.height = (progWin.nh * ch) + 'px';
+  el.style.right = 'auto'; el.style.bottom = 'auto';
+  el.style.transform = progWin.rot ? 'rotate(' + progWin.rot + 'rad)' : '';
 };
+(function progButtons(){
+  const el = $('progPip');
+  const wb = document.createElement('div');
+  wb.className = 'wbar';
+  const mk = (txt, cls, fn) => {
+    const b = document.createElement('div');
+    b.className = 'wbtn ' + cls;
+    b.textContent = txt;
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); fn(); });
+    wb.appendChild(b);
+  };
+  mk('↺', '', () => rotWin(progWin, -Math.PI / 2, progWin.place));
+  mk('↻', '', () => rotWin(progWin, Math.PI / 2, progWin.place));
+  mk('✕', 'x', () => { el.style.display = 'none'; });
+  el.appendChild(wb);
+  attachWinGestures(el, null, progWin, progWin.place);
+  progWin.place();
+})();
 $('lnkNet').onclick = () => {
   NET = loadNet();
   $('netHost').value = NET.host || '';
@@ -3219,6 +3590,21 @@ document.addEventListener('visibilitychange', () => {
   wakeAllVideos();   // фон гасит воспроизведение — на возврате оживляем окна друзей
   if (!wakeLock && (lockOn || linkRole || twitchOn || (recorder && recorder.state === 'recording')))
     keepAwake();
+  /* Свёрнутый браузер морозит вкладку: связь могла умереть тихо.
+     Вернулись — проверяем и, если оборвалось, звоним сами. */
+  if (linkRole === 'camera' && !linkStopping){
+    setTimeout(() => {
+      if (linkRole !== 'camera' || linkStopping) return;
+      const dead = !mediaCall || mediaCall.open === false ||
+                   !peer || peer.disconnected || peer.destroyed;
+      if (dead){
+        bb('возврат из фона: связь оборвалась — перезваниваю');
+        linkFlash('возвращаюсь в эфир…');
+        camRetry = 0;
+        cameraRedial();
+      }
+    }, 700);   // даём браузеру мгновение ожить
+  }
 });
 
 /* ссылка-приглашение: #krug=секрет&me=ник — принять круг одним тапом */
@@ -3361,6 +3747,36 @@ setTimeout(() => {
   }catch(e){}
   setTimeout(offerInstall, 18000);
 }, 2000);
+
+/* ---------- ВОЗВРАТ: страницу выгрузили, но эфир ещё идёт ----------
+   Свёрнутый браузер телефон может выгрузить целиком — тогда страница
+   открывается заново и всё как будто с нуля. Память комнаты знает, что
+   минуту назад мы были камерой: предлагаем вернуться одним касанием.
+   Автоматически не входим — браузеру нужен жест, да и воля твоя. */
+(function offerComeback(){
+  let m = null;
+  try{ m = roomLoad(); }catch(e){}
+  if (!m || m.role !== 'camera' || !m.live || !m.code) return;
+  if (Date.now() - (m.t || 0) > 15 * 60 * 1000) return;   // час назад — уже не эфир
+  $('cbName').textContent = m.name || 'камера';
+  $('comeback').style.display = 'flex';
+  $('cbNo').onclick = () => {
+    $('comeback').style.display = 'none';
+    roomSave({ live: false });
+  };
+  $('cbGo').onclick = async () => {
+    $('comeback').style.display = 'none';
+    camTarget = m.code;
+    if (m.name) $('lnkName').value = m.name;
+    if (!running){ try{ await $('btnStart').onclick(); }catch(e){} }
+    $('linkSheet').style.display = 'none';
+    $('linkChoose').style.display = 'none';
+    $('linkCameraUi').style.display = 'block';
+    linkRole = null;
+    startCameraRole(true);
+    bb('возврат в эфир после перезагрузки');
+  };
+})();
 
 dutyUp();
 rescueScan();
