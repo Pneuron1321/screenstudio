@@ -229,6 +229,44 @@
   /* ---- панель окна друга: закрыть, звук в эфир, звук мне ---- */
   /* ступени радара: три кнопки под ним, крупнее пультовых — попадать
      пальцем на воде, не глядя */
+  /* ---- ПУЛЬТ: студия на ноуте, руки на телефоне ---- */
+  #pult{position:absolute;inset:0;z-index:34;display:none;background:#05070c;
+    flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:calc(env(safe-area-inset-top,0px) + 8px) 8px 8px}
+  #pultView{width:100%;max-width:640px;border-radius:10px;background:#0B0F14;
+    border:1px solid rgba(255,180,84,.35);touch-action:none;display:block}
+  #pultHead{display:flex;gap:8px;align-items:center;width:100%;max-width:640px;
+    margin-bottom:6px;font-size:12px;color:var(--dim);
+    font-family:ui-monospace,Menlo,monospace}
+  #pultHead b{color:#7ED8A0}
+  #pultHead .bad{color:#FF5D45}
+  #pultKeys{display:flex;flex-wrap:wrap;gap:6px;width:100%;max-width:640px;margin-top:8px}
+  #pultKeys button{flex:1 1 30%;height:48px;border-radius:11px;border:1px solid #333;
+    background:rgba(18,26,34,.9);color:var(--ink);font-size:12px;font-weight:700}
+  #pultKeys button.on{border-color:var(--amber);color:var(--amber)}
+  #pultKeys button.red{border-color:rgba(255,93,69,.6);color:#FF5D45}
+  #pultKeys button.go{background:var(--amber);color:#221500;border:none}
+  #pultExit{position:absolute;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);
+    width:40px;height:40px;border-radius:50%;background:rgba(18,26,34,.9);
+    border:1px solid #333;color:var(--ink);font-size:18px;z-index:2}
+
+  /* ---- ПРОЕКЦИЯ МОНТАЖА: макет кадра поверх студии ---- */
+  #proj{
+    position:absolute;left:50%;transform:translateX(-50%);z-index:30;display:none;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+    background:rgba(11,15,20,.94);border:1px solid rgba(255,180,84,.5);
+    border-radius:16px;padding:10px;box-shadow:0 8px 34px rgba(0,0,0,.6);
+    backdrop-filter:blur(8px);max-width:96vw;
+  }
+  #projCv{display:block;border-radius:9px;background:#05070c;touch-action:none;
+    border:1px solid rgba(232,227,216,.14)}
+  #projBar{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+  #projBar button{height:34px;padding:0 12px;border-radius:9px;border:1px solid #333;
+    background:#0B0F14;color:var(--ink);font-size:12px;font-weight:700}
+  #projBar button.go{background:var(--amber);color:#221500;border:none}
+  #projBar button.on{border-color:#7ED8A0;color:#7ED8A0}
+  #projHint{color:var(--dim);font-size:11px;flex:1;min-width:120px;line-height:1.35}
+
   /* шторка радара: язычок справа от прибора — убрать его из кадра одним
      касанием, не выключая датчики. Вернуть так же. */
   #radarTab{
@@ -238,9 +276,10 @@
     color:rgba(224,205,160,.8);font-size:14px;user-select:none;-webkit-user-select:none;
   }
   #radarTab:active{background:rgba(224,205,160,.9);color:#0B0F14}
+  /* столбиком слева от радара: показатели живут под ним и справа */
   #zoombar{
-    position:absolute;left:50%;transform:translateX(-50%);bottom:-46px;
-    display:flex;gap:7px;z-index:3;
+    position:absolute;left:-44px;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:6px;z-index:3;
   }
   #zoombar .zbtn{
     width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
@@ -252,6 +291,9 @@
     color:#0B0F14;background:rgba(0,255,80,.85);border-color:rgba(0,255,80,.9);font-weight:800;
   }
   .rwin .wbar, #win .wbar{position:absolute;left:5px;top:5px;display:flex;gap:4px;z-index:2;flex-wrap:wrap;max-width:calc(100% - 10px)}
+  /* свёрнутая панель: видна только точка «⋯» */
+  .rwin .wbar > *:not(:first-child), #win .wbar > *:not(:first-child){display:none}
+  .rwin .wbar.open > *, #win .wbar.open > *{display:flex}
   .rwin .wbtn, #win .wbtn{
     width:27px;height:27px;border-radius:8px;display:flex;align-items:center;
     justify-content:center;font-size:13px;background:rgba(11,15,20,.75);
@@ -424,6 +466,7 @@
   <button class="btn" id="btnAspect" data-g="эфир">⬛ 16:9</button>
   <button class="btn" id="btnMontage" data-g="эфир">⧉ МОНТАЖ</button>
   <button class="btn" id="btnFeed" data-g="эфир">📢 ЛЕНТА</button>
+  <button class="btn" id="btnCohost" data-g="ещё">◆ СОВЕДУЩИЙ</button>
   <button class="btn" id="btnMode" data-g="эфир">ЭФИР</button>
   <button class="btn" id="btnRing" data-g="эфир">КОЛЬЦО</button>
   <button class="btn" id="btnClip" data-g="эфир">КЛИП</button>
@@ -484,6 +527,33 @@
 </div>
 
 <div class="rwin" id="mapWin" style="display:none"><div class="grip"></div></div>
+<div id="pult">
+  <button id="pultExit">✕</button>
+  <div id="pultHead"><span id="pultState">соединяюсь…</span></div>
+  <canvas id="pultView"></canvas>
+  <div id="pultKeys">
+    <button class="go" id="pkTwitch">▶ ЭФИР</button>
+    <button class="red" id="pkRec">● ЗАПИСЬ</button>
+    <button class="red" id="pkPanic">ПАНИКА</button>
+    <button id="pkBlur">БЛЮР</button>
+    <button id="pkClip">✂ КЛИП</button>
+    <button id="pkRing">КОЛЬЦО</button>
+    <button id="pkMic">⊘ МИК</button>
+    <button id="pkDash">◎ ПРИБОРЫ</button>
+    <button id="pkLock">🔒 РАСКЛАДКА</button>
+  </div>
+</div>
+
+<div id="proj">
+  <canvas id="projCv"></canvas>
+  <div id="projBar">
+    <button class="go" id="projFix">🔒 ЗАФИКСИРОВАТЬ</button>
+    <button id="projFit">↻ ПО МЕСТАМ</button>
+    <button id="projClose">▾ СВЕРНУТЬ</button>
+    <div id="projHint">Тащи элементы по макету — так их увидят зрители.</div>
+  </div>
+</div>
+
 <div id="radarTab">◂</div>
 <div class="rwin" id="radarWin" style="display:none">
   <div class="grip"></div>
@@ -546,6 +616,9 @@
       </div>
       <div class="row"><button class="quiet" id="lnkRoomGo">🔒 ПОДНЯТЬ КОМНАТУ</button></div>
       <div class="row"><button class="quiet" id="lnkKrug">👥 МОЙ КРУГ — кто в сети</button></div>
+      <div class="row"><button class="quiet" id="lnkPult">📱 Я — ПУЛЬТ (студия на другом устройстве)</button></div>
+      <input id="lnkPultKey" autocomplete="off" maxlength="12" autocapitalize="characters"
+             placeholder="ключ рубки — если входишь не по комнате с паролем">
       <div class="row" id="roomBack" style="display:none">
         <button class="quiet" id="lnkForget" style="flex:0 0 34%">✕ забыть</button>
         <button class="go" id="lnkResume">↩ ВЕРНУТЬСЯ</button>
@@ -869,7 +942,10 @@ function roomSaveLayout(){
   remotes.forEach(r => {
     if (r.label) slots[r.label] = { nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh, rot: r.rot || 0 };
   });
-  roomSave({ win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh, rot: win.rot || 0 }, slots });
+  roomSave({ win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh, rot: win.rot || 0 },
+             radar: { nx: radar.nx, ny: radar.ny, nw: radar.nw, mode: radar.mode },
+             mapWin: { nx: mapWin.nx, ny: mapWin.ny, nw: mapWin.nw, nh: mapWin.nh },
+             lock: projLock, slots });
 }
 setInterval(roomSaveLayout, 5000);   // раскладка догоняет память сама
 
@@ -1317,6 +1393,75 @@ function showMsg(t, ms = 4000){
 }
 
 /* ---------- размеры ---------- */
+/* ---------- СОВЕДУЩИЙ ----------
+   До сих пор Клод говорил только в ухо стримеру. Здесь он получает право
+   голоса в эфире — и вместе с ним рамки. Право включает человек: пока
+   тумблер выключен, ни одна фраза Клода зрителям не прозвучит, что бы он
+   ни прислал. Каждая его реплика подписана в кадре, чтобы зритель всегда
+   знал, кто говорит: человек или машина. */
+let cohostOn = false, cohostSaid = null, cohostT = 0;
+function setCohost(v){
+  cohostOn = !!v;
+  $('btnCohost').classList.toggle('on', cohostOn);
+  if (cohostOn) layers.set('соведущий', (c, w, h) => drawCohost(c, w, h));
+  else { layers.delete('соведущий'); cohostSaid = null; }
+  bb('соведущий ' + (cohostOn ? 'вкл' : 'выкл'));
+  linkFlash(cohostOn
+    ? 'СОВЕДУЩИЙ включён: Клод может говорить зрителям — каждая реплика подписана'
+    : 'соведущий выключен: Клод говорит только тебе в ухо');
+  engSend({ op: 'note', data: 'cohost:' + (cohostOn ? 'on' : 'off') });
+  return cohostOn ? 'вкл' : 'выкл';
+}
+/* реплика соведущего: подпись в кадре, пока звучит голос */
+function cohostSay(text, ms){
+  if (!cohostOn) return 'соведущий выключен — в эфир не пущу';
+  const t = String(text || '').trim().slice(0, 220);
+  if (!t) return 'пусто';
+  cohostSaid = { text: t, t0: performance.now(), ms: Math.max(3000, Math.min(20000, +ms || (2500 + t.length * 70))) };
+  bb('соведущий: «' + t.slice(0, 60) + '»');
+  if (feedOn) feedPush({ kind: 'note', text: 'Клод: ' + t.slice(0, 70), ms: 5000 });
+  return 'сказано';
+}
+function drawCohost(c, w, h){
+  if (!cohostSaid) return;
+  const age = performance.now() - cohostSaid.t0;
+  if (age > cohostSaid.ms){ cohostSaid = null; return; }
+  const a = Math.min(1, Math.min(age / 220, (cohostSaid.ms - age) / 300));
+  const fs = Math.max(13, w * 0.022);
+  const pad = fs * 0.6;
+  c.save();
+  c.globalAlpha = a;
+  c.font = '600 ' + Math.round(fs) + 'px system-ui,-apple-system,Segoe UI,sans-serif';
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  /* переносим по словам: реплика бывает длинной */
+  const maxw = w * 0.52;
+  const words = cohostSaid.text.split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach(word => {
+    const t2 = line ? line + ' ' + word : word;
+    if (c.measureText(t2).width > maxw && line){ lines.push(line); line = word; }
+    else line = t2;
+  });
+  if (line) lines.push(line);
+  while (lines.length > 3) lines.shift();
+  const bw = Math.min(maxw, Math.max(...lines.map(l => c.measureText(l).width))) + pad * 2;
+  const bh = fs * (1.5 + lines.length * 1.25);
+  const bx = w * 0.035, by = h - bh - h * (subsOn ? 0.20 : 0.075);
+  c.fillStyle = 'rgba(11,15,20,0.82)';
+  rr(c, bx, by, bw, bh, fs * 0.45); c.fill();
+  c.lineWidth = Math.max(1.5, w * 0.0016);
+  c.strokeStyle = 'rgba(126,216,160,.7)';
+  rr(c, bx, by, bw, bh, fs * 0.45); c.stroke();
+  c.fillStyle = 'rgba(126,216,160,.95)';
+  c.font = '800 ' + Math.round(fs * 0.72) + 'px ui-monospace,Menlo,monospace';
+  c.fillText('◆ КЛОД', bx + pad, by + fs * 0.95);
+  c.fillStyle = '#E8E3D8';
+  c.font = '600 ' + Math.round(fs) + 'px system-ui,-apple-system,sans-serif';
+  lines.forEach((l, i) => c.fillText(l, bx + pad, by + fs * (1.9 + i * 1.25), maxw));
+  c.restore();
+}
+
 /* ---------- КАРТОЧКА ОПРОСА ----------
    Считает рубка (она видит чат), студия только показывает. Карточка живёт,
    пока идёт голосование, и ещё несколько секунд после итога — чтобы зритель
@@ -1482,6 +1627,173 @@ function setFeed(v){
   bb('лента ' + (feedOn ? 'вкл' : 'выкл'));
   linkFlash(feedOn ? 'ЛЕНТА: события идут строкой вверху кадра' : 'лента убрана');
   return feedOn ? 'вкл' : 'выкл';
+}
+
+/* ---------- ПРОЕКЦИЯ МОНТАЖА ----------
+   Дома, у экрана, удобно расставить кадр заранее — а в море уже не до того.
+   Проекция показывает ЖИВОЙ эфирный кадр целиком, уменьшенным, и позволяет
+   таскать элементы прямо по макету. Вертикальное видео здесь помещается
+   без обрезки, бока дорисованы — видно ровно то, что увидит зритель.
+   Расстановка хранится в долях кадра, потому держится где угодно.
+   «Зафиксировать» запирает раскладку: случайный палец её не сдвинет. */
+let projOn = false, projLock = false, projDrag = null, projSel = null;
+const projCv = () => $('projCv');
+function projItems(){
+  const list = [];
+  if (winOn) list.push({ id: 'эхо', o: win, place: placeWinDom, color: '#FFB454' });
+  if (dashOn && !radarHidden){
+    const b = radarBox(1, 1);                 // доли кадра
+    list.push({ id: 'радар', o: radar, place: () => { placeRadarWin(); },
+                color: '#E0CDA0', fixed: radar.mode === 'gta',
+                box: { nx: b.x, ny: b.y, nw: b.w, nh: b.w * (W / H) } });
+  }
+  if (mapMode === 'mini') list.push({ id: 'карта', o: mapWin, place: placeMapWin, color: '#7ED8A0' });
+  remotes.filter(r => !r.lost && r.label !== heroName).forEach(r =>
+    list.push({ id: r.label || 'камера', o: r, place: r.place, color: '#FF5D45' }));
+  return list;
+}
+function projSize(){
+  const maxW = Math.min(window.innerWidth * 0.92 - 20, 520);
+  const maxH = window.innerHeight * 0.46;
+  const s = Math.min(maxW / W, maxH / H);
+  return { w: Math.round(W * s), h: Math.round(H * s), s };
+}
+function projDraw(){
+  if (!projOn) return;
+  const c = projCv().getContext('2d');
+  const { w, h } = projSize();
+  if (projCv().width !== w){ projCv().width = w; projCv().height = h; }
+  c.clearRect(0, 0, w, h);
+  try{ c.drawImage(out, 0, 0, w, h); }        // живой кадр как есть
+  catch(e){ c.fillStyle = '#05070c'; c.fillRect(0, 0, w, h); }
+  c.fillStyle = 'rgba(11,15,20,.35)'; c.fillRect(0, 0, w, h);
+  projItems().forEach(it => {
+    const b = it.box || it.o;
+    const x = b.nx * w, y = b.ny * h;
+    const bw = (b.nw || 0.2) * w, bh = (b.nh || b.nw || 0.2) * h;
+    const sel = projSel === it.id;
+    c.lineWidth = sel ? 2.5 : 1.5;
+    c.strokeStyle = it.fixed ? 'rgba(232,227,216,.35)' : it.color;
+    c.setLineDash(it.fixed ? [4, 4] : []);
+    c.strokeRect(x, y, bw, bh);
+    c.setLineDash([]);
+    c.fillStyle = sel ? it.color + '33' : 'rgba(11,15,20,.25)';
+    c.fillRect(x, y, bw, bh);
+    c.font = '700 11px ui-monospace,Menlo,monospace';
+    c.fillStyle = it.color;
+    c.fillText(it.id + (it.fixed ? ' (в углу)' : ''), x + 5, y + 14, bw - 8);
+    if (!it.fixed && !projLock){             // уголок для размера
+      c.fillStyle = it.color;
+      c.fillRect(x + bw - 11, y + bh - 11, 9, 9);
+    }
+  });
+  /* рамка кадра и подпись формата */
+  c.lineWidth = 2; c.strokeStyle = 'rgba(255,180,84,.7)';
+  c.strokeRect(1, 1, w - 2, h - 2);
+  c.font = '700 10px ui-monospace,Menlo,monospace';
+  c.fillStyle = 'rgba(232,227,216,.6)';
+  c.fillText((aspect === 'экран' ? 'по экрану' : aspect) + '  ' + W + '×' + H, 6, h - 7);
+  if (projLock){
+    c.fillStyle = 'rgba(126,216,160,.9)';
+    c.fillText('🔒 закреплено', w - 82, h - 7);
+  }
+}
+function projHit(px, py){
+  const { w, h } = projSize();
+  const list = projItems().filter(i => !i.fixed);
+  for (let i = list.length - 1; i >= 0; i--){    // сверху вниз
+    const it = list[i], b = it.o;
+    const x = b.nx * w, y = b.ny * h, bw = b.nw * w, bh = (b.nh || b.nw) * h;
+    if (px >= x - 4 && px <= x + bw + 4 && py >= y - 4 && py <= y + bh + 4){
+      const corner = (px > x + bw - 16 && py > y + bh - 16);
+      return { it, corner, dx: px - x, dy: py - y };
+    }
+  }
+  return null;
+}
+function projSetup(){
+  const cv2 = projCv();
+  cv2.addEventListener('pointerdown', e => {
+    if (projLock){ linkFlash('раскладка закреплена — отпусти замок'); return; }
+    const r = cv2.getBoundingClientRect();
+    const hit = projHit(e.clientX - r.left, e.clientY - r.top);
+    if (!hit){ projSel = null; projDraw(); return; }
+    projSel = hit.it.id;
+    projDrag = hit;
+    try{ cv2.setPointerCapture(e.pointerId); }catch(err){}
+    projDraw();
+  });
+  cv2.addEventListener('pointermove', e => {
+    if (!projDrag || projLock) return;
+    const r = cv2.getBoundingClientRect();
+    const { w, h } = projSize();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    const o = projDrag.it.o;
+    if (projDrag.corner){
+      o.nw = Math.max(0.08, (px - o.nx * w) / w);
+      o.nh = Math.max(0.08, (py - o.ny * h) / h);
+    } else {
+      o.nx = (px - projDrag.dx) / w;
+      o.ny = (py - projDrag.dy) / h;
+    }
+    clampWin(o);
+    if (projDrag.it.place) projDrag.it.place();
+    projDraw();
+  });
+  const up = () => { projDrag = null; };
+  cv2.addEventListener('pointerup', up);
+  cv2.addEventListener('pointercancel', up);
+}
+function setProj(v){
+  projOn = !!v;
+  $('proj').style.display = projOn ? 'block' : 'none';
+  $('btnMontage').classList.toggle('on', projOn);
+  if (projOn){
+    const { w, h } = projSize();
+    projCv().width = w; projCv().height = h;
+    if (!setProj.ready){ projSetup(); setProj.ready = true; }
+    clearInterval(setProj.t);
+    setProj.t = setInterval(projDraw, 220);    // живой макет, без нагрузки
+    projDraw();
+    bb('проекция: открыта');
+  } else {
+    clearInterval(setProj.t);
+    bb('проекция: свёрнута');
+  }
+  return projOn ? 'открыта' : 'свёрнута';
+}
+function setProjLock(v){
+  projLock = !!v;
+  $('projFix').textContent = projLock ? '🔓 ОТПУСТИТЬ' : '🔒 ЗАФИКСИРОВАТЬ';
+  $('projFix').classList.toggle('on', projLock);
+  /* закреплённую раскладку не сдвинуть и пальцем по самому кадру */
+  remotes.forEach(r => { if (r.dom) r.dom.style.pointerEvents = projLock ? 'none' : ''; });
+  winEl.style.pointerEvents = projLock ? 'none' : '';
+  $('radarWin').style.pointerEvents = projLock ? 'none' : '';
+  $('mapWin').style.pointerEvents = projLock ? 'none' : '';
+  bb('раскладка ' + (projLock ? 'закреплена' : 'отпущена'));
+  linkFlash(projLock ? '🔒 раскладка закреплена — случайный палец её не сдвинет'
+                     : 'раскладка отпущена');
+  roomSaveLayout();
+  return projLock ? 'закреплено' : 'отпущено';
+}
+/* «по местам»: разложить всё аккуратно и без наложений */
+function projTidy(){
+  const items = projItems().filter(i => !i.fixed && i.id !== 'радар');
+  const cols = items.length > 2 ? 2 : 1;
+  items.forEach((it, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    it.o.nw = cols === 1 ? 0.30 : 0.28;
+    it.o.nh = it.o.nw * (W / H) * 0.75;
+    it.o.nx = 0.035 + col * 0.5;
+    it.o.ny = 0.06 + row * 0.30;
+    clampWin(it.o);
+    if (it.place) it.place();
+  });
+  tidyLayout();
+  projDraw();
+  linkFlash('разложено по местам');
+  return items.length;
 }
 
 /* ---------- МОНТАЖ: расставить всё в альбомном кадре ----------
@@ -1757,7 +2069,9 @@ function frame(){
   ctx.fillRect(0, 0, W, H);
   const hero = heroVideo();
   if (hero) drawHero(ctx, hero.vid, hero.rot, hero.mirror);
-  else if (camVideo) drawCoverRect(ctx, camVideo, 0, 0, W, H, facing === 'user');
+  else if (camVideo) drawHero(ctx, camVideo, 0, facing === 'user');
+  /* своя камера тоже проходит через зеркальные бока: при формате 16:9 на
+     вертикальном телефоне картинка не режется, а дополняется по краям */
 
   if (winOn){
     const r = winRectPx(), rad = Math.min(r.w, r.h) * 0.06;
@@ -2107,6 +2421,47 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener){
     }
   });
 }
+/* ---------- СИГНАЛЫ КОМАНД ----------
+   На воде смотреть на экран некогда, а голосовое подтверждение приходит
+   с задержкой синтеза. Короткий тон отвечает мгновенно: восходящий —
+   включилось, нисходящий — выключилось, глухой — не вышло.
+   Звучит ТОЛЬКО в ухо: узел идёт прямо в динамик, минуя эфирную шину. */
+let beepOn = true;
+function beep(kind){
+  if (!beepOn) return;
+  try{
+    ensureBus();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    const t = audioCtx.currentTime;
+    const g = audioCtx.createGain();
+    g.connect(audioCtx.destination);              // мимо шины: в эфир не попадёт
+    const o = audioCtx.createOscillator();
+    o.type = 'sine';
+    o.connect(g);
+    if (kind === 'off'){                          // выключилось: вниз
+      o.frequency.setValueAtTime(760, t);
+      o.frequency.exponentialRampToValueAtTime(430, t + 0.13);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+      o.start(t); o.stop(t + 0.19);
+    } else if (kind === 'fail'){                  // не вышло: глухо и низко
+      o.type = 'square';
+      o.frequency.setValueAtTime(180, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.10, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.start(t); o.stop(t + 0.24);
+    } else {                                      // включилось: вверх
+      o.frequency.setValueAtTime(520, t);
+      o.frequency.exponentialRampToValueAtTime(880, t + 0.11);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.start(t); o.stop(t + 0.18);
+    }
+  }catch(e){}
+}
 /* голос в ухо: системный TTS телефона — в эфирный микс НЕ входит */
 function speakEar(text){
   try{
@@ -2119,6 +2474,11 @@ function speakEar(text){
 /* аудио-буфер от инженера: aloud=true — в эфир (и в монитор), иначе — только в ухо */
 async function playEngineerAudio(m){
   try{
+    if (m.aloud && !cohostOn){        // право голоса в эфире даёт человек
+      engSend({ op: 'result', of: 'audio',
+                error: 'соведущий выключен — в эфир не пущу, скажу в ухо' });
+      m = Object.assign({}, m, { aloud: false });
+    }
     ensureBus();
     const bin = atob(m.b64 || '');
     const buf = new Uint8Array(bin.length);
@@ -2277,6 +2637,7 @@ function privacyPass(now){
 }
 function setAutoBlur(v){
   autoBlur = !!v;
+  setTimeout(applyDomBlur, 0);
   bb('блюр ' + (autoBlur ? 'вкл (+' + BLUR_DELAY + 'с)' : 'выкл'));
   $('btnBlur').classList.toggle('on', autoBlur);
   if (autoBlur){
@@ -2290,10 +2651,22 @@ function setAutoBlur(v){
     linkFlash('блюр выключен · задержка снята, эфир живой');
   }
 }
+/* В режиме ЭФИР полотно спрятано, а камера показана DOM-элементом поверх
+   сайта — блюр и паника, нарисованные на холсте, туда не доходили. Потому
+   на этом пути закрываем картинку CSS-размытием: путь другой, защита та же. */
+function applyDomBlur(){
+  if (!camVideo) return;
+  const strong = panic ? 'blur(28px) saturate(.5)' : (autoBlur ? 'blur(9px)' : '');
+  camVideo.style.filter = (mode === 'efir') ? strong : '';
+  remotes.forEach(r => {
+    if (r.video) r.video.style.filter = (mode === 'efir') ? strong : '';
+  });
+}
 function setPanic(v){
   bb('паника ' + (!!v ? 'ВКЛ' : 'выкл'));
   panic = !!v;
   $('btnPanic').classList.toggle('on', panic);
+  applyDomBlur();
   linkFlash(panic ? '⚠ ПАНИКА — весь кадр замазан' : 'паника снята');
 }
 
@@ -2654,19 +3027,21 @@ function drawDash(c, w, h){
   c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.clip();
   c.fillStyle = 'rgba(4,7,16,0.97)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
   radarTiles(c, cx, cy, R, angle, P);
-  c.fillStyle = 'rgba(4,7,16,0.30)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
+  /* тайлы тёмной схемы сами по себе густые — вместо затемнения ОСВЕТЛЯЕМ,
+     иначе внутри радара ничего не разобрать */
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  c.globalAlpha = 0.45;
+  radarTiles(c, cx, cy, R, angle, P);      // второй проход поверх себя же
+  c.restore();
 
-  /* кольца дальности */
+  /* внутренние кольца убраны: они дробили карту и мешали читать.
+     Остаётся короткий крест у центра — держит ориентир, не режет картинку. */
   const lw = Math.max(1, w * 0.0012);
-  [0.33, 0.66, 1].forEach((s, i) => {
-    twice(() => { c.beginPath(); c.arc(cx, cy, R * s, 0, Math.PI * 2); c.stroke(); },
-          lw * 2.4, lw * 1.3, 0.62 + i * 0.12);
-  });
-  /* крест */
   twice(() => {
-    c.beginPath(); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
-    c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.stroke();
-  }, lw * 2.4, lw * 1.2, 0.45);
+    c.beginPath(); c.moveTo(cx, cy - R * 0.16); c.lineTo(cx, cy + R * 0.16); c.stroke();
+    c.beginPath(); c.moveTo(cx - R * 0.16, cy); c.lineTo(cx + R * 0.16, cy); c.stroke();
+  }, lw * 2.4, lw * 1.2, 0.5);
 
   /* компасное кольцо: деления через 5°, крупные на сторонах света */
   c.save(); c.translate(cx, cy); c.rotate(-angle * Math.PI / 180);
@@ -2920,6 +3295,8 @@ const EAR_TABLE = [
   [['на весь экран', 'главный экран'], { op: 'cmd', name: 'hero', args: ['я'] }],
   [['обычный фон', 'верни фон'], { op: 'cmd', name: 'hero', args: [''] }],
   [['итоги опроса', 'закрой опрос'], { op: 'poll-end' }],
+  [['войс он', 'войс ин', 'соведущий', 'клод говори'], { op: 'cmd', name: 'cohost', args: [true] }],
+  [['войс оф', 'войс аут', 'клод молчи', 'без соведущего'], { op: 'cmd', name: 'cohost', args: [false] }],
   [['лента', 'события'], { op: 'cmd', name: 'feedOn', args: [true] }],
   [['без ленты', 'убери ленту'], { op: 'cmd', name: 'feedOn', args: [false] }],
   [['радар в угол', 'радар в углу'], { op: 'cmd', name: 'radarMode', args: ['gta'] }],
@@ -3034,6 +3411,8 @@ function earRoute(t, from){
       return;
     }
     const okDone = earDo(cmd.name, cmd.args);
+    /* тон раньше слов: ухо получает ответ мгновенно */
+    beep(!okDone ? 'fail' : (cmd.args && cmd.args[0] === false ? 'off' : 'on'));
     const f = EAR_ECHO[cmd.name];
     earSay(okDone ? (f ? f(cmd.args && cmd.args[0]) : 'есть') : 'не вышло');
     bb('ухо ⚡ «' + t + '» → ' + cmd.name);
@@ -3044,6 +3423,7 @@ function earRoute(t, from){
   const guess = earLoose(t);
   if (guess){
     const okDone = earDo(guess.name, guess.args);
+    beep(!okDone ? 'fail' : (guess.args[0] === false ? 'off' : 'on'));
     const f = EAR_ECHO[guess.name];
     earSay(okDone ? (f ? f(guess.args[0]) : 'есть') : 'не вышло');
     bb('ухо ≈ «' + t + '» → ' + guess.name + ' ' + JSON.stringify(guess.args));
@@ -3052,6 +3432,7 @@ function earRoute(t, from){
   }
   /* не команда — Клоду, если мост поднят */
   const sent = engSend({ op: 'voice', text: t, via: 'ear' });
+  beep(engConns.length ? 'on' : 'fail');
   bb('ухо 🎙 «' + t + '»');
   linkFlash('🎙 ' + t + (engConns.length ? '' : ' (рубки нет — не услышит)'));
   if (!engConns.length) earSay('рубка не на связи');
@@ -3109,7 +3490,7 @@ function drawSubs(c, w, h){
 async function setSubs(v, lang){
   const want = (v === 'en' || lang === 'en') ? 'en' : (v ? '' : null);
   if (v === false || v === 'off' || v === null){
-    subsOn = false; subsLang = ''; subsTr = null;
+    subsOn = false; subsLang = ''; subsTr = null; subsStage = 0;
     layers.delete('субтитры');
     subsLines.length = 0;
     $('btnSubs').classList.remove('on');
@@ -3146,6 +3527,7 @@ function earCapture(src){
     earWasGate = micMuted;
     if (!micMuted) CMDS.micGate(true);
   }
+  beep('on');                        // услышал: можно говорить
   linkFlash('слушаю…');
   clearTimeout(earHard);
   earHard = setTimeout(earFinish, 9000);
@@ -3753,6 +4135,7 @@ function setMode(m){
   screenAvail = !!(!efir && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
   setGroup(curGroup);
   winEl.classList.toggle('solid', efir);
+  setTimeout(applyDomBlur, 0);        // смена режима: защита едет следом
   /* в режиме ЭФИР окно — это и есть твоя камера поверх сайта: поднимаем его,
      даже если в студии оно было опущено */
   if (efir && !winOn){
@@ -3769,6 +4152,72 @@ function setMode(m){
 $('btnMode').onclick = () => setMode(mode === 'studio' ? 'efir' : 'studio');
 
 /* ---------- Twitch · WHIP ---------- */
+let twCanvasStream = null, twStatTimer = null;
+/* Сторож эфира: следит за настоящим состоянием соединения и за тем, что
+   байты реально уходят. Молчаливый обрыв больше не выдаёт себя за эфир. */
+function twWatch(srcKind){
+  let started = false, sawBytes = 0, silent = 0;
+  const fail = why => {
+    clearInterval(twStatTimer); twStatTimer = null;
+    bb('twitch: не вышло — ' + why);
+    showMsg('Эфир не пошёл: ' + why, 9000);
+    engSend({ op: 'result', of: 'twitch', error: why });
+    twitchStop();
+  };
+  pc.addEventListener('connectionstatechange', () => {
+    const s = pc.connectionState;
+    bb('twitch: соединение ' + s);
+    if (s === 'connected' && !started){
+      started = true;
+      twitchOn = true;
+      $('hud').classList.add('live');
+      recT0 = Date.now(); startTimer();
+      bb('twitch: В ЭФИРЕ (' + srcKind + ')');
+      showMsg('Эфир пошёл. Смотри свой канал — задержка секунд 5–10.');
+      if (H > W * 1.05)
+        showMsg('Кадр вертикальный — на Twitch будут чёрные поля по бокам. '
+              + 'Кнопка ⬛ переключит эфир в 16:9.', 9000);
+      twCodecCheck();
+    }
+    if (s === 'failed') fail('соединение не установилось (сеть или NAT)');
+    if (s === 'disconnected' && started) showMsg('Twitch: связь дрожит…', 4000);
+  });
+  setTimeout(() => { if (!started && !twitchOn) fail('сервер не ответил за 15 секунд'); }, 15000);
+  /* байты: если ничего не уходит — кодировать нечем или кодек не тот */
+  clearInterval(twStatTimer);
+  twStatTimer = setInterval(async () => {
+    if (!pc) return;
+    try{
+      const st = await pc.getStats();
+      let bytes = 0;
+      st.forEach(r => { if (r.type === 'outbound-rtp' && r.kind === 'video') bytes = r.bytesSent || 0; });
+      if (started){
+        if (bytes > sawBytes){ sawBytes = bytes; silent = 0; }
+        else if (++silent >= 4) fail('кадры не уходят — устройство не тянет кодирование');
+      }
+    }catch(e){}
+  }, 2500);
+}
+/* какой кодек выбрался на самом деле: Twitch принимает только H264 */
+async function twCodecCheck(){
+  try{
+    const st = await pc.getStats();
+    let codec = '';
+    const codecs = new Map();
+    st.forEach(r => { if (r.type === 'codec') codecs.set(r.id, r.mimeType || ''); });
+    st.forEach(r => {
+      if (r.type === 'outbound-rtp' && r.kind === 'video' && r.codecId)
+        codec = codecs.get(r.codecId) || '';
+    });
+    if (codec){
+      bb('twitch: кодек ' + codec);
+      if (!/h264/i.test(codec))
+        showMsg('⚠ Устройство отдаёт ' + codec.replace('video/', '') +
+                ', а Twitch принимает только H264. Картинки у зрителей не будет.', 12000);
+    }
+  }catch(e){}
+}
+
 async function twitchStart(){
   const endpoint = $('twEndpoint').value.trim();
   const key = $('twKey').value.trim();
@@ -3780,7 +4229,8 @@ async function twitchStart(){
   try{
     if (srcKind === 'screen'){
       if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia))
-        throw new Error('на этом устройстве браузер не отдаёт экран');
+        throw new Error('захват экрана на телефоне браузеру запрещён — это не наша ошибка. '
+                      + 'Выбери «полотно студии»: там весь композит, окна и приборы');
       const gdm = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true });
       vTrack = gdm.getVideoTracks()[0];
       const twA = gdm.getAudioTracks();
@@ -3788,7 +4238,14 @@ async function twitchStart(){
       twScreenStream = gdm;
       gdm.getVideoTracks()[0].addEventListener('ended', () => { if (twitchOn) twitchStop(); });
     } else if (srcKind === 'canvas'){
-      vTrack = out.captureStream(30).getVideoTracks()[0];   // застрахованный кадр
+      /* На слабом телефоне 30 к/с с большого полотна кодировать нечем.
+         Берём темп, который студия и так держит — лучше ровные 20, чем
+         рваные 30 с потерями. */
+      const fps = FPS_LEVELS[perf.level] || 24;
+      const cs = out.captureStream(fps);
+      vTrack = cs.getVideoTracks()[0];
+      twCanvasStream = cs;
+      bb('twitch: полотно ' + W + '×' + H + ' @' + fps);
     } else {
       if (!camStream) await openCam(facing);
       vTrack = camStream.getVideoTracks()[0];
@@ -3844,16 +4301,13 @@ async function twitchStart(){
       }
     }catch(e){}
 
-    twitchOn = true;
-    bb('twitch: в эфире (' + srcKind + ')');
-    if (H > W * 1.05)                      // вертикальный кадр на альбомной площадке
-      showMsg('Кадр вертикальный — на Twitch будут чёрные поля по бокам. '
-            + 'Кнопка ⬛ переключит эфир в 16:9.', 9000);
+    /* Раньше эфир объявлялся сразу после ответа сервера — и счётчик шёл,
+       даже когда соединение так и не встало. Теперь ждём факта: пока
+       не connected, эфира нет, и мы честно об этом говорим. */
     $('btnTwitch').classList.add('on');
-    $('hud').classList.add('live');
-    recT0 = Date.now(); startTimer();
     $('twitchSheet').style.display = 'none';
-    showMsg('Эфир пошёл. Смотри свой канал — задержка секунд 5–10.');
+    showMsg('Соединяюсь с Twitch…', 4000);
+    twWatch(srcKind);
   }catch(e){
     twitchStop(true);
     const cors = (e && e.name === 'TypeError');
@@ -3868,6 +4322,11 @@ function twitchStop(silent){
   if (twScreenStream){ twScreenStream.getTracks().forEach(t => t.stop()); twScreenStream = null; }
   if (twTabNode){ try{ twTabNode.disconnect(); }catch(e){} twTabNode = null; }
   twitchSrcKind = '';
+  clearInterval(twStatTimer); twStatTimer = null;
+  if (twCanvasStream){
+    try{ twCanvasStream.getTracks().forEach(t => t.stop()); }catch(e){}
+    twCanvasStream = null;
+  }
   bb('twitch: стоп');
   twitchOn = false;
   $('btnTwitch').classList.remove('on');
@@ -3907,6 +4366,7 @@ const CMDS = {
   clip: () => takeClip(),
   clipRing: on => setClipRing(!!on),
   entry: on => setEntryLock(!on),   // entry true = вход открыт
+  twitch: () => { $('btnTwitch').onclick(); return twitchOn ? 'останавливаю' : 'запускаю'; },
   dash: on => setDash(!!on),
   probe: name => setProbe(name),
   hero: name => setHero(name),
@@ -3925,7 +4385,33 @@ const CMDS = {
   },
   subs: (v, lang) => setSubs(v, lang),
   aspect: a => setAspect(a),
-  montage: v => setMontage(!!v),
+  montage: v => setProj(!!v),
+  layoutLock: v => setProjLock(!!v),
+  layoutTidy: () => projTidy(),
+  /* удалённая расстановка: пульт двигает элемент по имени */
+  layoutSet: o => {
+    if (!o || !o.id) return 'нужно имя';
+    if (projLock) return 'раскладка закреплена';
+    const set = t => {
+      if (o.nx != null) t.nx = o.nx;
+      if (o.ny != null) t.ny = o.ny;
+      if (o.nw != null) t.nw = o.nw;
+      if (o.nh != null) t.nh = o.nh;
+      clampWin(t);
+    };
+    if (o.id === 'эхо'){ set(win); placeWinDom(); return 'эхо'; }
+    if (o.id === 'радар'){
+      if (radar.mode === 'gta') return 'радар в углу — сначала отпусти';
+      set(radar); placeRadarWin(); return 'радар';
+    }
+    if (o.id === 'карта'){ set(mapWin); placeMapWin(); return 'карта'; }
+    const rm = remotes.find(r => r.label === o.id);
+    if (!rm) return 'нет элемента «' + o.id + '»';
+    set(rm); rm.place(); return rm.label;
+  },
+  cohost: v => setCohost(!!v),
+  beep: v => { beepOn = !!v; bb('сигналы ' + (beepOn ? 'вкл' : 'выкл')); return beepOn; },
+  cohostSay: (t, ms) => cohostSay(t, ms),
   pollShow: d => setPollShow(d),
   poll: o => {                     // просьба уходит рубке: считает она
     const sent = engSend(Object.assign({ op: 'poll' }, o || {}));
@@ -4038,8 +4524,10 @@ const CMDS = {
     dash: dashOn,
     camRadar: camRadarOn,
     aspect: aspect,
-    montage: montage,
+    montage: projOn,
+    layoutLock: projLock,
     feed: feedOn ? feed.q.length : false,
+    cohost: cohostOn,
     poll: pollCard ? (pollCard.done ? 'итог' : pollCard.total) : false,
     radarMode: radar.mode,
     radarHidden: radarHidden,
@@ -4095,15 +4583,47 @@ function handleEngMsg(raw){
    Программа — тот же уровень доверия, что и отдача камеры: достаточно кода эфира. */
 function onDataConn(conn){
   const md = conn.metadata || {};
+  if (md.role === 'pult'){
+    /* Пульт может всё, поэтому пускаем только своих: либо знает ключ рубки,
+       либо пришёл по комнате с паролем (её адрес без пароля не вычислить). */
+    const byRoom = linkCode && linkCode[0] === 'r' && linkCode.length > 6;
+    if (!byRoom && md.key !== engKey){ try{ conn.close(); }catch(e){} return; }
+    pultConns.push(conn);
+    conn.on('data', d => handleEngMsg(d));      // те же команды, что у рубки
+    conn.on('close', () => {
+      pultConns = pultConns.filter(c => c !== conn);
+      linkFlash('пульт отключился');
+    });
+    conn.on('open', () => pultSend(conn));
+    startPultFeed();
+    bb('пульт на связи: ' + (md.name || '—'));
+    linkFlash('ПУЛЬТ НА СВЯЗИ — управляешь отсюда');
+    return;
+  }
   if (md.role === 'knock'){          // «поднята ли комната?» — да, и до свидания
     setTimeout(() => { try{ conn.close(); }catch(e){} }, 400);
     return;
   }
   if (md.role === 'program'){
     programConns.push(conn);
+    /* Полевая камера может быть и пультом: она в море, студия дома.
+       Право команд даём тем же правилом, что и вход без стука — вошёл по
+       комнате с паролем или уже в круге. Чужой друг командовать не может. */
+    const byRoom = linkCode && linkCode[0] === 'r' && linkCode.length > 6;
+    const trusted = byRoom || isTrusted((md.name || '').slice(0, 16));
+    if (trusted){
+      pultConns.push(conn);
+      conn.on('close', () => { pultConns = pultConns.filter(c => c !== conn); });
+      startPultFeed();
+      bb('полевой пульт: ' + (md.name || '—'));
+    }
     conn.on('data', d => {
       if (!d) return;
       const who0 = (md.name || '').slice(0, 16);
+      if (trusted && (d.op === 'cmd' || d.op === 'ptt' || d.op === 'voice')){
+        handleEngMsg(d);                 // те же команды, что у рубки и пульта
+        return;
+      }
       if (d.op === 'geo'){
         const r0 = remotes.find(r => r.label === who0);
         if (!r0) return;
@@ -4129,6 +4649,42 @@ function onDataConn(conn){
     return;
   }
   acceptEngineer(conn);
+}
+let pultConns = [], pultTimer = null;
+const pultTmp = document.createElement('canvas');
+/* Пульту нужен не только кадр, но и раскладка: он двигает элементы удалённо.
+   Потому шлём картинку, состояние и список прямоугольников в долях кадра. */
+function pultLayout(){
+  const list = [];
+  if (winOn) list.push({ id: 'эхо', nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh, c: '#FFB454' });
+  if (dashOn && !radarHidden){
+    const b = radarBox(1, 1);
+    list.push({ id: 'радар', nx: b.x, ny: b.y, nw: b.w, nh: b.w * (W / H),
+                c: '#E0CDA0', fixed: radar.mode === 'gta' });
+  }
+  if (mapMode === 'mini') list.push({ id: 'карта', nx: mapWin.nx, ny: mapWin.ny,
+                                      nw: mapWin.nw, nh: mapWin.nh, c: '#7ED8A0' });
+  remotes.filter(r => !r.lost && r.label !== heroName).forEach(r =>
+    list.push({ id: r.label || 'камера', nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh, c: '#FF5D45' }));
+  return list;
+}
+function pultSend(one){
+  const targets = one ? [one] : pultConns;
+  if (!targets.length) return;
+  const pw = 420, ph = Math.max(2, Math.round(420 * H / W));
+  pultTmp.width = pw; pultTmp.height = ph;
+  try{ pultTmp.getContext('2d').drawImage(out, 0, 0, pw, ph); }catch(e){ return; }
+  let jpg;
+  try{ jpg = pultTmp.toDataURL('image/jpeg', 0.55); }catch(e){ return; }
+  const msg = { op: 'pult-view', jpg, w: W, h: H, layout: pultLayout(),
+                st: { twitch: twitchOn, rec: !!(recorder && recorder.state === 'recording'),
+                      panic: panic, blur: autoBlur, ring: clipOn, mic: micMuted,
+                      dash: dashOn, lock: projLock, cams: remotes.filter(r => !r.lost).length } };
+  targets.forEach(c => { try{ if (c.open) c.send(msg); }catch(e){} });
+}
+function startPultFeed(){
+  if (pultTimer) return;
+  pultTimer = setInterval(() => { if (pultConns.length) pultSend(); }, 900);
 }
 const progTmp = document.createElement('canvas');
 function startProgFeed(){
@@ -4222,6 +4778,19 @@ function makeWinDom(rm){
   /* три кнопки: убрать окно, звук в эфир, звук мне в уши */
   const wbar = document.createElement('div');
   wbar.className = 'wbar';
+  /* панель мешала кадру — теперь сворачивается в одну точку.
+     Тап по «⋯» разворачивает обратно. */
+  let wOpen = false;
+  const wDots = document.createElement('div');
+  wDots.className = 'wbtn';
+  wDots.textContent = '⋯';
+  wDots.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    wOpen = !wOpen;
+    wbar.classList.toggle('open', wOpen);
+    wDots.textContent = wOpen ? '×' : '⋯';
+  });
+  wbar.appendChild(wDots);
   const mkBtn = (txt, cls, fn) => {
     const b = document.createElement('div');
     b.className = 'wbtn ' + cls;
@@ -4405,6 +4974,9 @@ function linkStop(silent){
   progConn = null;
   $('progPip').style.display = 'none';
   if (progTimer){ clearInterval(progTimer); progTimer = null; }
+  if (pultTimer){ clearInterval(pultTimer); pultTimer = null; }
+  pultConns.forEach(c => { try{ c.close(); }catch(e){} });
+  pultConns = [];
   programConns = [];
   $('btnLink').classList.remove('on');
   linkStatus(null);
@@ -4536,9 +5108,11 @@ async function startCameraRole(reuse){
       /* Показания доски: скорость, курс и место уходят режиссёру тем же
          лёгким каналом, что и ориентация. Шлём только когда у нас включены
          приборы — иначе нечего отдавать, да и незачем. */
+      /* Компас нужен режиссёру, даже если у камеры приборы выключены:
+         иначе его радар не поворачивается. Поднимаем датчики сразу. */
+      geoStart(); tiltStart();
       const sendGeo = () => {
-        if (!dashOn && !camRadarOn) return;
-        if (geo.lat == null) return;
+        if (geo.lat == null && tilt.head == null) return;
         try{
           if (progConn && progConn.open) progConn.send({
             op: 'geo',
@@ -4617,6 +5191,7 @@ $('linkSheet').addEventListener('click', e => {
   if (e.target === $('linkSheet')) $('linkSheet').style.display = 'none';
 });
 $('lnkDirector').onclick = () => startDirector();   // новая комната — новый код
+$('lnkPult').onclick = () => pultStart();
 $('lnkKrug').onclick = () => {
   const me = meLoad() || {};
   $('meNick').value = me.nick || '';
@@ -4730,6 +5305,156 @@ $('lnkKnock').onclick = async () => {
   showMsg(up ? '✓ комната в эфире — отдавай камеру'
              : '· тишина: комната не поднята (или имя/пароль другие)', 5000);
 };
+/* ---------- ТЕЛЕФОН КАК ПУЛЬТ ----------
+   Студия работает дома на ноуте, а руки — здесь. Пульт показывает живой
+   кадр, кнопки эфира и ту же раскладку: элементы двигаются пальцем прямо
+   по макету, и на ноуте они переезжают следом. */
+let pultOn = false, pultPeer = null, pultConn = null, pultData = null;
+let pultDrag = null, pultRetry = 0;
+function pultStop(){
+  pultOn = false;
+  try{ if (pultPeer) pultPeer.destroy(); }catch(e){}
+  pultPeer = null; pultConn = null; pultData = null;
+  $('pult').style.display = 'none';
+}
+async function pultStart(){
+  let code = '', rn = ($('lnkRoom').value || '').trim(), rp = $('lnkPass').value || '';
+  if (rn && rp){
+    code = await roomIdFrom(rn, rp);
+    if (!code){ showMsg('Комната с паролем требует https', 5000); return; }
+  } else code = $('lnkCodeIn').value.trim().toUpperCase();
+  if (!code || code.length < 4){ showMsg('Введи код студии — или имя комнаты и пароль'); return; }
+  const key = ($('lnkPultKey').value || '').trim().toUpperCase();
+  roomSave({ role: 'pult', code, room: rn, name: ($('lnkName').value || '').trim() });
+  pultOn = true;
+  $('linkSheet').style.display = 'none';
+  $('pult').style.display = 'flex';
+  $('pultState').textContent = 'соединяюсь…';
+  try{ if (pultPeer) pultPeer.destroy(); }catch(e){}
+  pultPeer = new Peer(peerOpts());
+  pultPeer.on('open', () => {
+    pultConn = pultPeer.connect(code, { metadata: { role: 'pult', key,
+                                                    name: ($('lnkName').value || '').trim() } });
+    pultConn.on('open', () => {
+      pultRetry = 0;
+      $('pultState').innerHTML = '<b>студия на связи</b>';
+      keepAwake();
+    });
+    pultConn.on('data', d => {
+      if (!d || d.op !== 'pult-view') return;
+      pultData = d;
+      pultDraw();
+      pultKeysUpdate(d.st || {});
+    });
+    pultConn.on('close', () => {
+      if (!pultOn) return;
+      $('pultState').innerHTML = '<span class="bad">связь пропала — перезваниваю…</span>';
+      setTimeout(() => { if (pultOn && pultRetry++ < 20) pultStart(); }, 2500);
+    });
+  });
+  pultPeer.on('error', e => {
+    if (!pultOn) return;
+    $('pultState').innerHTML = '<span class="bad">' +
+      (e.type === 'peer-unavailable' ? 'студия не отвечает — она запущена?' : e.type) + '</span>';
+    if (e.type === 'peer-unavailable' && pultRetry++ < 20) setTimeout(pultStart, 4000);
+  });
+}
+function pultCmd(name, args){
+  if (!pultConn || !pultConn.open){ showMsg('пульт не на связи'); return; }
+  try{ pultConn.send({ op: 'cmd', name, args: args || [] }); }catch(e){}
+  bb('пульт → ' + name);
+}
+function pultKeysUpdate(st){
+  const set = (id, on) => $(id).classList.toggle('on', !!on);
+  set('pkTwitch', st.twitch); set('pkRec', st.rec); set('pkPanic', st.panic);
+  set('pkBlur', st.blur); set('pkRing', st.ring); set('pkMic', st.mic);
+  set('pkDash', st.dash); set('pkLock', st.lock);
+  $('pultState').innerHTML = '<b>студия</b> · камер ' + (st.cams || 0) +
+    (st.twitch ? ' · <b>В ЭФИРЕ</b>' : '') + (st.rec ? ' · ЗАПИСЬ' : '');
+}
+function pultBox(){
+  const cv2 = $('pultView');
+  const maxW = Math.min(window.innerWidth - 16, 640);
+  const ratio = pultData ? (pultData.h / pultData.w) : 9 / 16;
+  const w = maxW, h = Math.round(maxW * ratio);
+  if (cv2.width !== w){ cv2.width = w; cv2.height = h; }
+  return { w, h };
+}
+function pultDraw(){
+  if (!pultData) return;
+  const cv2 = $('pultView'), c = cv2.getContext('2d');
+  const { w, h } = pultBox();
+  const img = new Image();
+  img.onload = () => {
+    c.clearRect(0, 0, w, h);
+    c.drawImage(img, 0, 0, w, h);
+    c.fillStyle = 'rgba(11,15,20,.28)'; c.fillRect(0, 0, w, h);
+    (pultData.layout || []).forEach(it => {
+      const x = it.nx * w, y = it.ny * h, bw = it.nw * w, bh = (it.nh || it.nw) * h;
+      c.lineWidth = 1.8; c.strokeStyle = it.c || '#FFB454';
+      c.setLineDash(it.fixed ? [4, 4] : []);
+      c.strokeRect(x, y, bw, bh);
+      c.setLineDash([]);
+      c.font = '700 11px ui-monospace,Menlo,monospace';
+      c.fillStyle = it.c || '#FFB454';
+      c.fillText(it.id, x + 4, y + 13, bw - 6);
+      if (!it.fixed){ c.fillRect(x + bw - 10, y + bh - 10, 8, 8); }
+    });
+  };
+  img.src = pultData.jpg;
+}
+(function pultGestures(){
+  const cv2 = $('pultView');
+  cv2.addEventListener('pointerdown', e => {
+    if (!pultData) return;
+    const r = cv2.getBoundingClientRect(), { w, h } = pultBox();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    const list = (pultData.layout || []).filter(i => !i.fixed);
+    for (let i = list.length - 1; i >= 0; i--){
+      const it = list[i];
+      const x = it.nx * w, y = it.ny * h, bw = it.nw * w, bh = (it.nh || it.nw) * h;
+      if (px >= x - 5 && px <= x + bw + 5 && py >= y - 5 && py <= y + bh + 5){
+        pultDrag = { it, corner: (px > x + bw - 15 && py > y + bh - 15),
+                     dx: px - x, dy: py - y };
+        try{ cv2.setPointerCapture(e.pointerId); }catch(err){}
+        return;
+      }
+    }
+  });
+  cv2.addEventListener('pointermove', e => {
+    if (!pultDrag) return;
+    const r = cv2.getBoundingClientRect(), { w, h } = pultBox();
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    const it = pultDrag.it;
+    if (pultDrag.corner){
+      it.nw = Math.max(0.08, (px - it.nx * w) / w);
+      it.nh = Math.max(0.08, (py - it.ny * h) / h);
+    } else {
+      it.nx = Math.max(0, Math.min(0.99 - it.nw, (px - pultDrag.dx) / w));
+      it.ny = Math.max(0, Math.min(0.99 - (it.nh || it.nw), (py - pultDrag.dy) / h));
+    }
+    pultDraw();
+  });
+  const up = () => {
+    if (!pultDrag) return;
+    const it = pultDrag.it;
+    pultCmd('layoutSet', [{ id: it.id, nx: it.nx, ny: it.ny, nw: it.nw, nh: it.nh }]);
+    pultDrag = null;
+  };
+  cv2.addEventListener('pointerup', up);
+  cv2.addEventListener('pointercancel', up);
+})();
+$('pultExit').onclick = () => { pultStop(); $('linkSheet').style.display = 'flex'; };
+$('pkTwitch').onclick = () => pultCmd('twitch');
+$('pkRec').onclick = () => pultCmd('rec', [!($('pkRec').classList.contains('on'))]);
+$('pkPanic').onclick = () => pultCmd('panic', [!($('pkPanic').classList.contains('on'))]);
+$('pkBlur').onclick = () => pultCmd('blur', [!($('pkBlur').classList.contains('on'))]);
+$('pkClip').onclick = () => pultCmd('clip');
+$('pkRing').onclick = () => pultCmd('clipRing', [!($('pkRing').classList.contains('on'))]);
+$('pkMic').onclick = () => pultCmd('micGate', [!($('pkMic').classList.contains('on'))]);
+$('pkDash').onclick = () => pultCmd('dash', [!($('pkDash').classList.contains('on'))]);
+$('pkLock').onclick = () => pultCmd('layoutLock', [!($('pkLock').classList.contains('on'))]);
+
 $('lnkResume').onclick = () => {
   const mem = roomLoad();
   if (!mem || !mem.code){ $('roomBack').style.display = 'none'; return; }
@@ -4943,7 +5668,11 @@ zoneLayer.addEventListener('pointerup', e => {
 $('btnMon').onclick = () => setMonitor(!monitorOn);
 $('btnEar').onclick = () => setEar(!earOn);
 /* по кругу: выкл → русские → английские → выкл */
-$('btnSubs').onclick = () => setSubs(!subsOn ? true : (subsLang === 'en' ? false : 'en'));
+let subsStage = 0;                       // 0 выкл · 1 русские · 2 английские
+$('btnSubs').onclick = () => {
+  subsStage = (subsStage + 1) % 3;
+  setSubs(subsStage === 0 ? false : (subsStage === 2 ? 'en' : true));
+};
 $('btnDuty').onclick = () => CMDS.duty(!dutyWanted);
 /* по кругу: экран → 16:9 → 9:16 → 1:1 → экран */
 $('btnAspect').onclick = () => {
@@ -4954,7 +5683,11 @@ $('btnAspect').onclick = () => {
   $('btnAspect').classList.toggle('on', next !== 'экран');
 };
 $('btnFeed').onclick = () => setFeed(!feedOn);
-$('btnMontage').onclick = () => setMontage(!montage);
+$('btnCohost').onclick = () => setCohost(!cohostOn);
+$('btnMontage').onclick = () => setProj(!projOn);
+$('projClose').onclick = () => setProj(false);
+$('projFix').onclick = () => setProjLock(!projLock);
+$('projFit').onclick = () => projTidy();
 document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && montage) setMontage(false);
 });
@@ -5361,6 +6094,21 @@ $('checkRun').onclick = async () => {
     /* 9 · TURN */
     ckLine(NET.turnUri ? '✓ TURN задан: ' + NET.turnUri
                        : '· TURN не задан — чужие NAT как повезёт', NET.turnUri ? 'ok' : 'warn');
+
+    /* 9б · H264: без него Twitch не примет картинку */
+    try{
+      const caps = (window.RTCRtpSender && RTCRtpSender.getCapabilities)
+        ? RTCRtpSender.getCapabilities('video') : null;
+      const h264 = caps && caps.codecs.some(c => /h264/i.test(c.mimeType));
+      ckLine(h264 ? '✓ H264 есть — Twitch примет картинку'
+                  : '✗ H264 нет: Twitch не примет видео с этого устройства',
+             h264 ? 'ok' : 'fail');
+    }catch(e){ ckLine('· H264: спросить не вышло', 'warn'); }
+    /* 9в · захват экрана */
+    ckLine((navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)
+      ? '✓ захват экрана доступен'
+      : '· захват экрана браузером не даётся (телефон) — стримь полотно студии',
+      (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) ? 'ok' : 'warn');
 
     /* 10 · сундук: где живут настройки и надолго ли */
     try{
