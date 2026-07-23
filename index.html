@@ -271,25 +271,29 @@
      касанием, не выключая датчики. Вернуть так же. */
   #radarTab{
     position:absolute;z-index:22;display:none;align-items:center;justify-content:center;
-    width:26px;height:52px;border-radius:0 13px 13px 0;cursor:pointer;touch-action:none;
+    border-radius:0 10px 10px 0;cursor:pointer;touch-action:none;
     background:rgba(4,7,16,.8);border:1px solid rgba(224,205,160,.35);border-left:none;
-    color:rgba(224,205,160,.8);font-size:14px;user-select:none;-webkit-user-select:none;
+    color:rgba(224,205,160,.8);user-select:none;-webkit-user-select:none;
+    transition:opacity .25s ease;
   }
   #radarTab:active{background:rgba(224,205,160,.9);color:#0B0F14}
   /* столбиком слева от радара: показатели живут под ним и справа */
+  /* Кнопки радара живут тише: размер идёт от самого прибора, а сами они
+     тают через две секунды. Тап по радару возвращает их. */
   #zoombar{
-    position:absolute;left:-44px;top:50%;transform:translateY(-50%);
-    display:flex;flex-direction:column;gap:6px;z-index:3;
+    position:absolute;top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:4px;z-index:3;
+    transition:opacity .25s ease;
   }
   #zoombar .zbtn{
-    width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
-    justify-content:center;font-size:17px;line-height:1;cursor:pointer;
-    background:rgba(4,7,16,.82);border:1px solid rgba(0,255,80,.28);
-    color:rgba(0,255,80,.62);touch-action:none;user-select:none;-webkit-user-select:none;
+    display:flex;align-items:center;justify-content:center;line-height:1;cursor:pointer;
+    background:rgba(4,7,16,.8);border:1px solid rgba(224,205,160,.35);
+    color:rgba(224,205,160,.72);touch-action:none;user-select:none;-webkit-user-select:none;
   }
   #zoombar .zbtn.on{
-    color:#0B0F14;background:rgba(0,255,80,.85);border-color:rgba(0,255,80,.9);font-weight:800;
+    color:#0B0F14;background:rgba(224,205,160,.9);border-color:rgba(224,205,160,.95);font-weight:800;
   }
+  .radarKeys.away{opacity:0;pointer-events:none}
   .rwin .wbar, #win .wbar{position:absolute;left:5px;top:5px;display:flex;gap:4px;z-index:2;flex-wrap:wrap;max-width:calc(100% - 10px)}
   /* свёрнутая панель: видна только точка «⋯» */
   .rwin .wbar > *:not(:first-child), #win .wbar > *:not(:first-child){display:none}
@@ -470,6 +474,7 @@
   <button class="btn" id="btnMode" data-g="эфир">ЭФИР</button>
   <button class="btn" id="btnRing" data-g="эфир">КОЛЬЦО</button>
   <button class="btn" id="btnClip" data-g="эфир">КЛИП</button>
+  <button class="btn" id="btnMark" data-g="ещё">★ МЕТКА</button>
   <button class="btn" id="btnTwitch" data-g="эфир">TWITCH</button>
   <button class="btn" id="btnMic" data-g="звук">МИК·выкл</button>
   <button class="btn" id="btnGateMic" data-g="звук">⊘МИК</button>
@@ -493,6 +498,7 @@
   <button class="btn" id="btnRoster" data-g="круг">🎽 ИГРОКИ</button>
   <button class="btn" id="btnPocket" data-g="ещё">КАРМАН</button>
   <button class="btn" id="btnCheck" data-g="ещё">ПРОГОН</button>
+  <button class="btn" id="btnLang" data-g="ещё">EN</button>
   <button class="btn" id="btnInfo" data-g="ещё">ⓘ</button>
 </div>
 
@@ -554,10 +560,10 @@
   </div>
 </div>
 
-<div id="radarTab">◂</div>
+<div id="radarTab" class="radarKeys">◂</div>
 <div class="rwin" id="radarWin" style="display:none">
   <div class="grip"></div>
-  <div id="zoombar">
+  <div id="zoombar" class="radarKeys">
     <div class="zbtn on" data-z="0">◉</div>
     <div class="zbtn" data-z="1">◎</div>
     <div class="zbtn" data-z="2">○</div>
@@ -831,7 +837,7 @@ function median3(a){
   const s = a.slice(-3).sort((x, y) => x - y);
   return s[Math.floor(s.length / 2)];
 }
-const tilt = { head: null, beta: 0, gamma: 0 };
+const tilt = { head: null, raw: null, beta: 0, gamma: 0, abs: false, off: 0 };
 const meteo = { wind: null, dir: null, temp: null, t: 0 };
 let dashOn = false, geoWatch = null;
 
@@ -874,13 +880,24 @@ function geoStop(){
   if (geoWatch !== null){ navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
 }
 /* компас и наклон */
+/* Курс с датчиков. Долго не работал на Android: мы требовали
+   e.absolute !== false, а обычное событие приходит именно таким —
+   и угол отбрасывался. В Pneuraden берётся безусловно, и там всё
+   вертится. Берём так же.
+   iOS отдаёт webkitCompassHeading (магнитный север, по часовой);
+   Android отдаёт alpha (поворот против часовой) — переводим.
+   Сырой угол дрожит на градусы, поэтому круговое сглаживание. */
+function wrap180(d){ return ((d + 540) % 360) - 180; }
 function tiltHandler(e){
-  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)){
-    tilt.head = e.webkitCompassHeading;            // iOS даёт истинный курс
-  } else if (e.alpha != null && !isNaN(e.alpha)){
-    tilt.head = e.absolute === false ? tilt.head : (360 - e.alpha) % 360;
+  let h = null;
+  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;
+  else if (e.alpha != null && !isNaN(e.alpha)) h = (360 - e.alpha) % 360;
+  if (h != null){
+    tilt.raw = (tilt.raw == null) ? h : (tilt.raw + wrap180(h - tilt.raw) * 0.25 + 360) % 360;
+    tilt.head = (tilt.raw + (tilt.off || 0) + 360) % 360;
+    tilt.abs = (e.absolute !== false) || e.webkitCompassHeading != null;
   }
-  if (e.beta != null) tilt.beta = e.beta;
+  if (e.beta != null) tilt.beta = tilt.beta + (e.beta - tilt.beta) * 0.3;
   if (e.gamma != null) tilt.gamma = e.gamma;
 }
 async function tiltStart(){
@@ -893,6 +910,16 @@ async function tiltStart(){
     window.addEventListener('deviceorientationabsolute', tiltHandler, true);
     window.addEventListener('deviceorientation', tiltHandler, true);
     bb('приборы: компас слушает');
+    /* через три секунды честно скажем, есть ли датчик вообще:
+       на дешёвых телефонах магнитометра может не быть */
+    setTimeout(() => {
+      if (tilt.head == null){
+        bb('компас: датчик молчит — курс пойдёт из GPS при движении');
+        linkFlash('компаса нет — курс появится, когда поедешь');
+      } else if (!tilt.abs){
+        bb('компас: относительный (без магнитометра) — север приблизителен');
+      }
+    }, 3000);
   }catch(e){}
 }
 /* ветер: раз в 10 минут, по текущим координатам */
@@ -1393,6 +1420,281 @@ function showMsg(t, ms = 4000){
 }
 
 /* ---------- размеры ---------- */
+/* ---------- ЯЗЫК ИНТЕРФЕЙСА ----------
+   Студия думает по-русски, но открыть её может кто угодно. Английский —
+   не перевод всего подряд, а словарь того, на что человек смотрит и
+   нажимает: кнопки, заголовки листов, подписи полей. Голосовые команды
+   остаются русскими: ухо обучено им, и менять язык распознавания — уже
+   другая работа.
+   Честно: сообщения в кадре и подсказки остаются на языке оригинала —
+   их сотни, и перевод ради перевода сделал бы файл вдвое толще. */
+const LANG = {
+  btnStart: ['СТАРТ', 'START'],
+  btnMode: ['ЭФИР', 'AIR'],
+  btnAspect: ['⬛ 16:9', '⬛ 16:9'],
+  btnMontage: ['⧉ МОНТАЖ', '⧉ LAYOUT'],
+  btnFeed: ['📢 ЛЕНТА', '📢 FEED'],
+  btnRing: ['КОЛЬЦО', 'RING'],
+  btnClip: ['КЛИП', 'CLIP'],
+  btnTwitch: ['TWITCH', 'TWITCH'],
+  btnMic: ['МИК·выкл', 'MIC·off'],
+  btnGateMic: ['⊘МИК', '⊘MIC'],
+  btnMon: ['🎧 НАУШНИКИ', '🎧 HEADPHONES'],
+  btnPtt: ['◉ РАЦИЯ', '◉ TALK'],
+  btnPrompt: ['СУФЛЁР·ухо', 'PROMPT·ear'],
+  btnEar: ['👂 УХО', '👂 EAR'],
+  btnSubs: ['💬 СУБТИТРЫ', '💬 SUBTITLES'],
+  btnDash: ['◎ ПРИБОРЫ', '◎ GAUGES'],
+  btnMap: ['🗺 КАРТА', '🗺 MAP'],
+  btnMe: ['👋 ПОКАЗАТЬСЯ', '👋 SHOW ME'],
+  btnFlip: ['⟲', '⟲'],
+  btnWin: ['ОКНО', 'PIP'],
+  btnScreen: ['ЭКРАН', 'SCREEN'],
+  btnGateCam: ['⊘КАМ', '⊘CAM'],
+  btnBlur: ['БЛЮР', 'BLUR'],
+  btnZone: ['ЗОНА', 'ZONE'],
+  btnLink: ['СВЯЗЬ', 'LINK'],
+  btnKrug: ['👥 КРУГ', '👥 CIRCLE'],
+  btnRoster: ['🎽 ИГРОКИ', '🎽 PLAYERS'],
+  btnPocket: ['КАРМАН', 'POCKET'],
+  btnCheck: ['ПРОГОН', 'CHECK'],
+  btnCohost: ['◆ СОВЕДУЩИЙ', '◆ CO-HOST'],
+  btnMark: ['★ МЕТКА', '★ MARK'],
+  btnDuty: ['🤖 ДЕЖУРНЫЙ', '🤖 DUTY'],
+  btnRec: ['● REC', '● REC'],
+  btnPanic: ['ПАНИКА', 'PANIC'],
+  btnInfo: ['ⓘ', 'ⓘ'],
+  lnkDirector: ['Я СОБИРАЮ', 'I DIRECT'],
+  lnkCamera: ['Я — КАМЕРА', 'I AM A CAMERA'],
+  lnkPult: ['📱 Я — ПУЛЬТ (студия на другом устройстве)',
+            '📱 I AM A REMOTE (studio on another device)'],
+  lnkKrug: ['👥 МОЙ КРУГ — кто в сети', '👥 MY CIRCLE — who is online'],
+  lnkStop1: ['Разорвать всё', 'Disconnect all'],
+  lnkLock: ['🔓 ВХОД ОТКРЫТ', '🔓 ENTRY OPEN'],
+  projFix: ['🔒 ЗАФИКСИРОВАТЬ', '🔒 LOCK LAYOUT'],
+  projFit: ['↻ ПО МЕСТАМ', '↻ ARRANGE'],
+  projClose: ['▾ СВЕРНУТЬ', '▾ HIDE'],
+  rosterMe: ['◎ карту на себя', '◎ map on me'],
+  rosterClose: ['Закрыть', 'Close'],
+  krugClose: ['Закрыть', 'Close'],
+  krugInvite: ['📋 ссылка-приглашение', '📋 invite link'],
+  meSave: ['СОХРАНИТЬ ЛИЧНОСТЬ', 'SAVE IDENTITY'],
+  frAdd: ['+ ДРУГ', '+ FRIEND'],
+  dataInstall: ['📲 на экран', '📲 install'],
+  dataKeep: ['💾 хранить вечно', '💾 keep forever'],
+  dataOut: ['📤 в файл', '📤 export'],
+  dataInBtn: ['📥 из файла', '📥 import'],
+  checkRun: ['ЗАПУСК', 'RUN'],
+  checkClose: ['Закрыть', 'Close'],
+  wcGo: ['ГОТОВО', 'DONE'],
+  wcSkip: ['просто пользоваться', 'just use it'],
+  wcInstall: ['📲 значок на экран', '📲 add to home screen'],
+  eGo: ['ВОЙТИ В ЭФИР', 'JOIN THE AIR'],
+  entryYes: ['ВПУСТИТЬ', 'LET IN'],
+  entryNo: ['отказать', 'refuse'],
+  ringYes: ['ВОЙТИ КАМЕРОЙ', 'JOIN AS CAMERA'],
+  ringNo: ['потом', 'later'],
+  cbGo: ['↩ ВЕРНУТЬСЯ В ЭФИР', '↩ BACK TO AIR'],
+  cbNo: ['не сейчас', 'not now'],
+  lnkResume: ['↩ ВЕРНУТЬСЯ', '↩ RESUME'],
+  lnkForget: ['✕ забыть', '✕ forget'],
+  pkTwitch: ['▶ ЭФИР', '▶ GO LIVE'],
+  pkRec: ['● ЗАПИСЬ', '● RECORD'],
+  pkPanic: ['ПАНИКА', 'PANIC'],
+  pkBlur: ['БЛЮР', 'BLUR'],
+  pkClip: ['✂ КЛИП', '✂ CLIP'],
+  pkRing: ['КОЛЬЦО', 'RING'],
+  pkMic: ['⊘ МИК', '⊘ MIC'],
+  pkDash: ['◎ ПРИБОРЫ', '◎ GAUGES'],
+  pkLock: ['🔒 РАСКЛАДКА', '🔒 LAYOUT']
+};
+const TABS_LANG = {
+  'эфир': ['🎬 ЭФИР', '🎬 AIR'], 'звук': ['🔊 ЗВУК', '🔊 SOUND'],
+  'мир': ['🌍 МИР', '🌍 WORLD'], 'кадр': ['👁 КАДР', '👁 FRAME'],
+  'круг': ['🔗 КРУГ', '🔗 CIRCLE'], 'ещё': ['⚙ ЕЩЁ', '⚙ MORE']
+};
+let lang = 0;                                   // 0 русский, 1 английский
+function setLang(v){
+  const want = (v === 'en' || v === 1) ? 1 : 0;
+  lang = want;
+  Object.keys(LANG).forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    /* не трогаем кнопки, чей текст живёт своей жизнью (состояние) */
+    if (id === 'btnMic' && micOn) return;
+    if (id === 'lnkLock' && entryLocked) return;
+    if (id === 'projFix' && projLock) return;
+    el.textContent = LANG[id][lang];
+  });
+  document.querySelectorAll('#tabs .tab').forEach(t => {
+    const p = TABS_LANG[t.dataset.g];
+    if (p) t.textContent = p[lang];
+  });
+  document.documentElement.lang = lang ? 'en' : 'ru';
+  try{ localStorage.setItem('skrin-lang', lang ? 'en' : 'ru'); }catch(e){}
+  bb('язык: ' + (lang ? 'english' : 'русский'));
+  linkFlash(lang ? 'Interface switched to English. Voice commands stay in Russian.'
+                 : 'Интерфейс по-русски');
+  return lang ? 'en' : 'ru';
+}
+
+/* ---------- МЕТКИ МОМЕНТОВ ----------
+   Час эфира — это час материала, в котором потом не найти нужных десяти
+   секунд. Метка ставится в тот момент, когда что-то случилось, и хранит
+   три времени: от начала записи (искать в файле), от начала эфира (искать
+   в записи канала) и настоящее (сверить с чем угодно). Плюс кадр — чтобы
+   узнать место глазами, а не перематывать вслепую.
+   Метки переживают перезагрузку и выгружаются файлом для монтажа. */
+const MARKS_KEY = 'skrin-marks';
+function marksLoad(){
+  try{ return JSON.parse(localStorage.getItem(MARKS_KEY) || '[]'); }catch(e){ return []; }
+}
+function marksSave(a){
+  try{ localStorage.setItem(MARKS_KEY, JSON.stringify(a.slice(-300))); }catch(e){}
+}
+function hhmmss(ms){
+  if (ms == null) return null;
+  const s = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), q = s % 60;
+  return (h ? String(h).padStart(2, '0') + ':' : '') +
+         String(m).padStart(2, '0') + ':' + String(q).padStart(2, '0');
+}
+function markMoment(text, opts){
+  const now = Date.now();
+  const rec = (recorder && recorder.state === 'recording' && recT0) ? (now - recT0) : null;
+  const air = (twitchOn && twT0) ? (now - twT0) : null;
+  const m = {
+    t: now,
+    text: String(text || '').slice(0, 90),
+    rec: rec, air: air,
+    recStr: hhmmss(rec), airStr: hhmmss(air),
+    clock: new Date(now).toTimeString().slice(0, 8),
+    who: (probeData().who || 'я'),
+    spd: trustSpeed(probeData()) ? +(probeData().spd * 3.6).toFixed(1) : null,
+    lat: geo.lat, lon: geo.lon
+  };
+  const list = marksLoad();
+  list.push(m);
+  marksSave(list);
+  bb('метка ' + (m.recStr || m.clock) + (m.text ? ': ' + m.text : ''));
+  engSend({ op: 'mark', mark: m });                 // Клоду в журнал
+  if (feedOn) feedPush({ kind: 'note', ms: 4000,
+    text: '★ метка' + (m.text ? ': ' + m.text : ''),
+    sub: m.recStr ? ('запись ' + m.recStr) : (m.airStr ? ('эфир ' + m.airStr) : m.clock) });
+  linkFlash('★ метка ' + (m.recStr || m.airStr || m.clock) + (m.text ? ' · ' + m.text : ''));
+  if (!(opts && opts.noFrame)) sendFrame('mark');   // кадр, чтобы узнать место
+  return m;
+}
+function marksText(){
+  const list = marksLoad();
+  if (!list.length) return 'меток нет';
+  return list.map(m =>
+    [m.clock, m.recStr ? 'запись ' + m.recStr : '', m.airStr ? 'эфир ' + m.airStr : '',
+     m.spd != null ? m.spd + ' км/ч' : '', m.text]
+      .filter(Boolean).join(' · ')).join('\n');
+}
+function marksDownload(){
+  const body = 'МЕТКИ ЭФИРА · ' + new Date().toLocaleString() + '\n\n' + marksText() + '\n';
+  const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'метки-' + new Date().toISOString().slice(0, 10) + '.txt';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  bb('метки выгружены: ' + marksLoad().length);
+}
+
+/* ---------- ЩИТ ЭФИРА ----------
+   Связь на воде рвётся, камера-герой уходит, телефон уплывает из сети —
+   и зритель видит чёрный прямоугольник. Он не знает, что случилось, и
+   уходит. Щит закрывает эти секунды: последний живой кадр размытым фоном,
+   крупная надпись и часы отсутствия. Эфир при этом не прерывается — на
+   Twitch продолжают идти кадры, а значит канал остаётся живым.
+   Щит поднимается сам, когда картинки нет дольше трёх секунд. */
+let shieldOn = false, shieldSince = 0, shieldText = 'СЕЙЧАС ВЕРНЁМСЯ';
+const shieldFreeze = document.createElement('canvas');
+let shieldHas = false;
+function shieldGrab(){                     // запоминаем последний живой кадр
+  try{
+    if (!W || !H) return;
+    shieldFreeze.width = Math.max(2, Math.round(W / 3));
+    shieldFreeze.height = Math.max(2, Math.round(H / 3));
+    shieldFreeze.getContext('2d').drawImage(out, 0, 0, shieldFreeze.width, shieldFreeze.height);
+    shieldHas = true;
+  }catch(e){}
+}
+function havePicture(){
+  if (heroName){
+    const hv = heroVideo();
+    if (hv && hv.vid && hv.vid.videoWidth) return true;
+  }
+  if (camVideo && camVideo.videoWidth && !camMuted) return true;
+  return remotes.some(r => !r.lost && r.video && r.video.videoWidth);
+}
+function drawShield(c, w, h){
+  if (!shieldOn) return;
+  if (shieldHas){                          // размытый последний кадр как фон
+    c.save();
+    c.globalAlpha = 0.5;
+    c.drawImage(shieldFreeze, -w * 0.06, -h * 0.06, w * 1.12, h * 1.12);
+    c.restore();
+  }
+  c.save();
+  c.fillStyle = 'rgba(11,15,20,0.72)';
+  c.fillRect(0, 0, w, h);
+  const fs = Math.max(20, w * 0.045);
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '800 ' + Math.round(fs) + 'px system-ui,-apple-system,Segoe UI,sans-serif';
+  c.lineWidth = Math.max(3, fs * 0.14);
+  c.strokeStyle = 'rgba(11,15,20,.85)';
+  c.strokeText(shieldText, w / 2, h / 2 - fs * 0.3, w * 0.9);
+  c.fillStyle = '#FFB454';
+  c.fillText(shieldText, w / 2, h / 2 - fs * 0.3, w * 0.9);
+  const s = Math.round((Date.now() - shieldSince) / 1000);
+  c.font = '600 ' + Math.round(fs * 0.5) + 'px ui-monospace,Menlo,monospace';
+  c.fillStyle = 'rgba(232,227,216,.75)';
+  c.fillText(s < 60 ? (s + ' с') : (Math.floor(s / 60) + ' мин ' + (s % 60) + ' с'),
+             w / 2, h / 2 + fs * 0.65);
+  /* живая точка: видно, что эфир идёт, а не завис */
+  const a = 0.35 + 0.35 * Math.sin(Date.now() / 400);
+  c.beginPath();
+  c.arc(w / 2, h / 2 + fs * 1.5, Math.max(3, fs * 0.09), 0, Math.PI * 2);
+  c.fillStyle = 'rgba(255,93,69,' + a.toFixed(2) + ')';
+  c.fill();
+  c.restore();
+}
+function setShield(v, text){
+  const want = !!v;
+  if (text) shieldText = String(text).slice(0, 60);
+  if (want === shieldOn) return shieldOn ? 'поднят' : 'опущен';
+  shieldOn = want;
+  if (shieldOn){
+    shieldSince = Date.now();
+    layers.set('щит', (c, w, h) => drawShield(c, w, h));
+    bb('щит эфира: поднят');
+    linkFlash('ЩИТ: зрители видят заставку — картинки нет');
+    engSend({ op: 'note', data: 'shield:up' });
+    if (feedOn) feedPush({ kind: 'note', text: 'связь потеряна — держу заставку', ms: 6000 });
+  } else {
+    layers.delete('щит');
+    bb('щит эфира: опущен (' + Math.round((Date.now() - shieldSince) / 1000) + ' с)');
+    linkFlash('картинка вернулась');
+    engSend({ op: 'note', data: 'shield:down' });
+  }
+  return shieldOn ? 'поднят' : 'опущен';
+}
+let shieldAuto = true, shieldBlank = 0;
+setInterval(() => {
+  if (!running || mode !== 'studio') return;
+  if (havePicture()){
+    shieldBlank = 0;
+    shieldGrab();
+    if (shieldOn && shieldAuto) setShield(false);
+  } else if (shieldAuto){
+    if (++shieldBlank >= 3 && !shieldOn) setShield(true);
+  }
+}, 1000);
+
 /* ---------- СОВЕДУЩИЙ ----------
    До сих пор Клод говорил только в ухо стримеру. Здесь он получает право
    голоса в эфире — и вместе с ним рамки. Право включает человек: пока
@@ -2885,6 +3187,7 @@ function takeClip(){
       (type.indexOf('mp4') >= 0 ? '.mp4' : '.webm');
     $('saveWrap').style.display = 'flex';
     bb('клип: ' + depth.toFixed(0) + ' с · ' + (blob.size / 1048576).toFixed(1) + ' МБ');
+    markMoment('клип ' + depth.toFixed(0) + ' с', { noFrame: true });
     if (feedOn) feedPush({ kind: 'clip', text: 'момент сохранён',
                            sub: depth.toFixed(0) + ' с', ms: 4000 });
     linkFlash('КЛИП вырезан: ' + depth.toFixed(0) + ' с — забери файл');
@@ -2995,6 +3298,8 @@ function radarTiles(c, cx, cy, R, angle, P){
   c.save();
   c.translate(cx, cy);
   c.rotate(-angle * Math.PI / 180);
+  const hadF2 = c.filter;
+  try{ c.filter = MAP_FILTER; }catch(e){}
   const x0 = px - S / 2, y0 = py - S / 2;
   const tx0 = Math.floor(x0 / T), ty0 = Math.floor(y0 / T);
   const tx1 = Math.floor((x0 + S) / T), ty1 = Math.floor((y0 + S) / T);
@@ -3004,6 +3309,7 @@ function radarTiles(c, cx, cy, R, angle, P){
       if (im) c.drawImage(im, tx * T - x0 - S / 2, ty * T - y0 - S / 2, T, T);
     }
   }
+  try{ c.filter = hadF2 || 'none'; }catch(e){}
   c.restore();
 }
 function drawDash(c, w, h){
@@ -3027,13 +3333,7 @@ function drawDash(c, w, h){
   c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.clip();
   c.fillStyle = 'rgba(4,7,16,0.97)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
   radarTiles(c, cx, cy, R, angle, P);
-  /* тайлы тёмной схемы сами по себе густые — вместо затемнения ОСВЕТЛЯЕМ,
-     иначе внутри радара ничего не разобрать */
-  c.save();
-  c.globalCompositeOperation = 'lighter';
-  c.globalAlpha = 0.45;
-  radarTiles(c, cx, cy, R, angle, P);      // второй проход поверх себя же
-  c.restore();
+  /* второй проход больше не нужен: карта осветляется фильтром при отрисовке */
 
   /* внутренние кольца убраны: они дробили карту и мешали читать.
      Остаётся короткий крест у центра — держит ориентир, не режет картинку. */
@@ -3246,6 +3546,7 @@ async function setDash(v){
     radarHidden = false;
     if (radar.mode === 'free'){ $('radarWin').style.display = 'block'; placeRadarWin(); }
     placeRadarTab();
+    radarKeysShow();
     setTimeout(tidyLayout, 200);
     layers.set('приборы', (c, w, h) => { if (dashOn) drawDash(c, w, h); });
     linkFlash('ПРИБОРЫ в эфире: скорость, курс, путь, ветер');
@@ -3295,8 +3596,13 @@ const EAR_TABLE = [
   [['на весь экран', 'главный экран'], { op: 'cmd', name: 'hero', args: ['я'] }],
   [['обычный фон', 'верни фон'], { op: 'cmd', name: 'hero', args: [''] }],
   [['итоги опроса', 'закрой опрос'], { op: 'poll-end' }],
-  [['войс он', 'войс ин', 'соведущий', 'клод говори'], { op: 'cmd', name: 'cohost', args: [true] }],
-  [['войс оф', 'войс аут', 'клод молчи', 'без соведущего'], { op: 'cmd', name: 'cohost', args: [false] }],
+  [['войс ин', 'войс инн', 'соведущий', 'клод говори'], { op: 'cmd', name: 'cohost', args: [true] }],
+  [['войс он ми', 'войс онми', 'войс он мне', 'войс мне', 'войс оф', 'клод молчи', 'без соведущего'],
+   { op: 'cmd', name: 'cohost', args: [false] }],
+  [['метка', 'запомни', 'отметь'], { op: 'cmd', name: 'mark', args: [''] }],
+  [['метки', 'покажи метки'], { op: 'cmd', name: 'marks', args: [] }],
+  [['щит', 'заставка'], { op: 'cmd', name: 'shield', args: [true] }],
+  [['убери щит', 'сними заставку'], { op: 'cmd', name: 'shield', args: ['auto'] }],
   [['лента', 'события'], { op: 'cmd', name: 'feedOn', args: [true] }],
   [['без ленты', 'убери ленту'], { op: 'cmd', name: 'feedOn', args: [false] }],
   [['радар в угол', 'радар в углу'], { op: 'cmd', name: 'radarMode', args: ['gta'] }],
@@ -3389,6 +3695,12 @@ function earLoose(t){
 }
 
 function earRoute(t, from){
+  if (t.indexOf('метка ') === 0){
+    markMoment(t.slice(6));
+    beep('on');
+    earSay('отметил');
+    return;
+  }
   if (t.indexOf('опрос ') === 0){
     const r = CMDS.poll({ q: t.slice(6), ms: 60000 });
     earSay(String(r).indexOf('не на связи') >= 0 ? 'рубка не на связи' : 'опрос пошёл');
@@ -3803,6 +4115,11 @@ function presenceHide(){
    ВАЖНО: crossOrigin='anonymous' обязателен. Без него полотно «портится»
    и captureStream перестаёт отдавать кадры — эфир умрёт молча. Картинка
    без CORS просто не загрузится: это безопасный отказ. */
+/* Яркость карт. Тёмные тайлы CARTO почти чёрные — в Pneuraden они
+   осветляются фильтром brightness(4.5) contrast(1.15), и только тогда
+   на них что-то видно. Берём ту же меру. Если браузер фильтр не умеет
+   (старые Safari), карта останется тёмной, но работать будет. */
+let MAP_FILTER = 'brightness(4.5) contrast(1.15)';
 const TILE_SRC = [
   z => 'https://a.basemaps.cartocdn.com/dark_all/' + z + '/{x}/{y}.png',
   z => 'https://tile.openstreetmap.org/' + z + '/{x}/{y}.png'
@@ -3861,6 +4178,9 @@ function drawMap(c, x, y, w, h, z){
   c.save();
   c.beginPath(); c.rect(x, y, w, h); c.clip();
   c.fillStyle = '#0B0F14'; c.fillRect(x, y, w, h);
+  /* тёмная схема сама по себе почти чёрная — осветляем, как в Pneuraden */
+  const hadF = c.filter;
+  try{ c.filter = MAP_FILTER; }catch(e){}
   for (let ty = ty0; ty <= ty1; ty++){
     for (let tx = tx0; tx <= tx1; tx++){
       const im = getTile(z, tx, ty);
@@ -3869,6 +4189,7 @@ function drawMap(c, x, y, w, h, z){
       else { c.fillStyle = 'rgba(18,26,34,0.8)'; c.fillRect(dx, dy, T, T); }
     }
   }
+  try{ c.filter = hadF || 'none'; }catch(e){}
   /* точки друзей и меток (заполняет маяк) */
   (radar.dots || []).forEach(d => {
     if (d.lat == null) return;
@@ -4152,7 +4473,7 @@ function setMode(m){
 $('btnMode').onclick = () => setMode(mode === 'studio' ? 'efir' : 'studio');
 
 /* ---------- Twitch · WHIP ---------- */
-let twCanvasStream = null, twStatTimer = null;
+let twCanvasStream = null, twStatTimer = null, twRetry = 0, twT0 = 0;
 /* Сторож эфира: следит за настоящим состоянием соединения и за тем, что
    байты реально уходят. Молчаливый обрыв больше не выдаёт себя за эфир. */
 function twWatch(srcKind){
@@ -4170,6 +4491,9 @@ function twWatch(srcKind){
     if (s === 'connected' && !started){
       started = true;
       twitchOn = true;
+      twT0 = Date.now();                 // от него считаем время в записи канала
+      twRetry = 0;
+      if (shieldOn && shieldText === 'СВЯЗЬ ВОССТАНАВЛИВАЕТСЯ') setShield(false);
       $('hud').classList.add('live');
       recT0 = Date.now(); startTimer();
       bb('twitch: В ЭФИРЕ (' + srcKind + ')');
@@ -4179,7 +4503,17 @@ function twWatch(srcKind){
               + 'Кнопка ⬛ переключит эфир в 16:9.', 9000);
       twCodecCheck();
     }
-    if (s === 'failed') fail('соединение не установилось (сеть или NAT)');
+    if (s === 'failed'){
+      if (started && twRetry < 5){        // эфир шёл — не сдаёмся молча
+        twRetry++;
+        showMsg('Twitch: связь оборвалась — переподключаюсь (' + twRetry + ')…', 6000);
+        bb('twitch: переподключение ' + twRetry);
+        setShield(true, 'СВЯЗЬ ВОССТАНАВЛИВАЕТСЯ');
+        const k = twitchSrcKind;
+        twitchStop();
+        setTimeout(() => { if (!twitchOn) { $('twSource').value = k; twitchStart(); } }, 3000);
+      } else fail('соединение не установилось (сеть или NAT)');
+    }
     if (s === 'disconnected' && started) showMsg('Twitch: связь дрожит…', 4000);
   });
   setTimeout(() => { if (!started && !twitchOn) fail('сервер не ответил за 15 секунд'); }, 15000);
@@ -4411,6 +4745,16 @@ const CMDS = {
   },
   cohost: v => setCohost(!!v),
   beep: v => { beepOn = !!v; bb('сигналы ' + (beepOn ? 'вкл' : 'выкл')); return beepOn; },
+  mark: t => markMoment(t),
+  lang: v => setLang(v),
+  marks: () => marksLoad().slice(-40),
+  marksSave: () => { marksDownload(); return marksLoad().length; },
+  marksClear: () => { marksSave([]); bb('метки стёрты'); return 'стёрто'; },
+  shield: (v, text) => {
+    if (v === 'auto'){ shieldAuto = true; return 'щит сам'; }
+    shieldAuto = false;                    // ручной режим: сам не опустится
+    return setShield(v, text);
+  },
   cohostSay: (t, ms) => cohostSay(t, ms),
   pollShow: d => setPollShow(d),
   poll: o => {                     // просьба уходит рубке: считает она
@@ -4432,6 +4776,14 @@ const CMDS = {
   },
   radarMode: m => setRadarMode(m),
   radarShade: v => setRadarShade(v),
+  mapBright: k => {
+    const v = Math.max(1, Math.min(9, +k || 4.5));
+    MAP_FILTER = 'brightness(' + v + ') contrast(1.15)';
+    tiles.clear();
+    bb('яркость карты: ' + v);
+    linkFlash('яркость карты ×' + v);
+    return v;
+  },
   radarZoom: i => {
     radar.zoom = Math.max(0, Math.min(2, +i || 0));
     document.querySelectorAll('#zoombar .zbtn').forEach(x =>
@@ -4528,6 +4880,8 @@ const CMDS = {
     layoutLock: projLock,
     feed: feedOn ? feed.q.length : false,
     cohost: cohostOn,
+    shield: shieldOn,
+    marks: marksLoad().length,
     poll: pollCard ? (pollCard.done ? 'итог' : pollCard.total) : false,
     radarMode: radar.mode,
     radarHidden: radarHidden,
@@ -5714,19 +6068,50 @@ function placeRadarWin(){
   placeRadarTab();
 }
 /* язычок встаёт вплотную справа от прибора, где бы тот ни стоял */
+/* Размеры кнопок считаются от прибора: маленький радар — маленькие кнопки. */
 function placeRadarTab(){
   const tab = $('radarTab');
   if (!dashOn){ tab.style.display = 'none'; return; }
   const f = screenFrame();
   const b = radarBox(f.w, f.h);
+  const tw = Math.max(14, Math.min(24, b.w * 0.075));      // ширина язычка
+  const th = tw * 2.1;
   tab.style.display = 'flex';
+  tab.style.width = tw + 'px';
+  tab.style.height = th + 'px';
+  tab.style.fontSize = Math.max(9, tw * 0.62) + 'px';
   tab.style.left = (f.x + b.x + b.w) + 'px';
-  tab.style.top = (f.y + b.y + b.w / 2 - 26) + 'px';
+  tab.style.top = (f.y + b.y + b.w / 2 - th / 2) + 'px';
+  /* кнопки ступеней — столбиком слева, того же роста */
+  const zb = $('zoombar');
+  const zs = Math.max(18, Math.min(34, b.w * 0.105));
+  zb.style.left = (-zs - 6) + 'px';
+  zb.querySelectorAll('.zbtn').forEach(x => {
+    x.style.width = zs + 'px';
+    x.style.height = zs + 'px';
+    x.style.borderRadius = Math.round(zs * 0.3) + 'px';
+    x.style.fontSize = Math.round(zs * 0.46) + 'px';
+  });
+}
+/* Кнопки тают через две секунды бездействия; тап по радару возвращает. */
+let radarKeysT = null;
+function radarKeysShow(){
+  $('radarTab').classList.remove('away');
+  $('zoombar').classList.remove('away');
+  clearTimeout(radarKeysT);
+  radarKeysT = setTimeout(() => {
+    $('radarTab').classList.add('away');
+    $('zoombar').classList.add('away');
+  }, 2000);
 }
 (function zoomButtons(){
+  /* тап по самому радару будит кнопки */
+  $('radarWin').addEventListener('pointerdown', () => radarKeysShow());
+  $('radarTab').addEventListener('pointerdown', () => radarKeysShow());
   document.querySelectorAll('#zoombar .zbtn').forEach(b => {
     b.addEventListener('pointerdown', e => {
       e.stopPropagation();
+      radarKeysShow();
       CMDS.radarZoom(+b.dataset.z);
       document.querySelectorAll('#zoombar .zbtn').forEach(x => x.classList.remove('on'));
       b.classList.add('on');
@@ -5743,6 +6128,11 @@ function placeRadarTab(){
 })();
 $('btnRing').onclick = () => setClipRing(!clipOn);
 $('btnClip').onclick = () => takeClip();
+$('btnMark').onclick = () => markMoment('');
+$('btnLang').onclick = () => {
+  setLang(lang ? 'ru' : 'en');
+  $('btnLang').textContent = lang ? 'РУ' : 'EN';
+};
 /* ПРОГРАММА у друга: теперь её можно двигать, тянуть и вращать —
    как любое окно. Кнопки: повернуть влево/вправо и спрятать. */
 const progWin = { nx: 0.62, ny: 0.58, nw: 0.34, nh: 0.26, rot: 0 };
@@ -6400,6 +6790,12 @@ setTimeout(() => {
   };
 })();
 
+try{
+  if (localStorage.getItem('skrin-lang') === 'en'){
+    setLang('en');
+    $('btnLang').textContent = 'РУ';
+  }
+}catch(e){}
 dutyUp();
 rescueScan();
 fit();
