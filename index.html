@@ -104,10 +104,13 @@
 
   /* ---- окно ---- */
   #win{position:absolute;z-index:10;touch-action:none;cursor:grab}
+  #win.calm .grip, .rwin.calm .grip{opacity:0;pointer-events:none}
   .rwin{position:absolute;z-index:10;touch-action:none;cursor:grab}
+  /* Уголок правки тише и тает вместе с окном: он мешал кадру и висел,
+     даже когда самой картинки уже не было. */
   #win .grip, .rwin .grip{
-    position:absolute;right:-6px;bottom:-6px;width:26px;height:26px;border-radius:50%;
-    background:var(--amber);box-shadow:0 0 12px rgba(255,180,84,.6);
+    position:absolute;right:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;
+    background:rgba(255,180,84,.8);transition:opacity .25s ease;
     touch-action:none;cursor:nwse-resize;z-index:2;
   }
   #win.solid{
@@ -136,6 +139,49 @@
     display:flex;justify-content:flex-start;gap:4px;margin:0 0 2px;flex-wrap:wrap;
     max-width:min(62vw,320px);
   }
+  /* ---- МАЯК: кружок, открывающий PNEURADEN ---- */
+  @keyframes mayakRing{ to{ transform:rotate(360deg); } }
+  #mayakDot{
+    position:absolute;left:calc(env(safe-area-inset-left,0px) + 10px);
+    top:calc(env(safe-area-inset-top,0px) + 10px);z-index:20;display:none;
+    width:44px;height:44px;border-radius:50%;cursor:pointer;
+    background:rgba(11,15,20,.9);
+    transition:transform .22s ease, opacity .18s ease;
+  }
+  #mayakDot::before{
+    content:'';position:absolute;inset:-2px;border-radius:50%;
+    background:conic-gradient(from 0deg,#FFB454,#7ED8A0,#4aa3ff,#c07cff,#FFB454);
+    animation:mayakRing 6s linear infinite;
+  }
+  #mayakDot::after{
+    content:'🜨';position:absolute;inset:3px;border-radius:50%;
+    background:#0B0F14;display:flex;align-items:center;justify-content:center;
+    font-size:18px;color:#E0CDA0;
+  }
+  #mayakDot.tuck{transform:translateX(-140%);opacity:0;pointer-events:none}
+  #mayakWrap{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:33;
+    display:none;width:75%;height:75%;border-radius:16px;overflow:hidden;
+    background:#05070c;border:1px solid rgba(255,180,84,.5);
+    box-shadow:0 10px 40px rgba(0,0,0,.7);
+  }
+  #mayakWrap.mini{width:34%;height:30%;left:auto;right:12px;top:auto;bottom:96px;transform:none}
+  #mayakWrap iframe{width:100%;height:100%;border:0;display:block;background:#05070c}
+  #mayakBar{position:absolute;right:6px;top:6px;z-index:2;display:flex;gap:6px}
+  #mayakBar div{
+    width:34px;height:34px;border-radius:9px;display:flex;align-items:center;
+    justify-content:center;background:rgba(11,15,20,.85);color:var(--ink);
+    border:1px solid rgba(232,227,216,.2);font-size:15px;cursor:pointer;
+  }
+
+  /* язык — в правом верхнем углу, но живёт со шторкой: уехал пульт — уехал и он */
+  #langBox{
+    position:absolute;right:calc(env(safe-area-inset-right,0px) + 10px);
+    top:calc(env(safe-area-inset-top,0px) + 10px);z-index:20;display:none;
+    transition:transform .22s ease, opacity .18s ease;
+  }
+  #langBox.tuck{transform:translateX(140%);opacity:0;pointer-events:none}
+  #langBox .btn{min-width:44px;height:36px;padding:0 10px;font-size:11px}
   #tabs .tab{
     padding:7px 9px;border-radius:999px;font-size:11px;letter-spacing:.03em;
     background:rgba(18,26,34,.7);border:1px solid rgba(232,227,216,.14);
@@ -455,6 +501,13 @@
 
 <div id="tab">◂</div>
 
+<div id="mayakDot" title="PNEURADEN"></div>
+<div id="mayakWrap">
+  <div id="mayakBar"><div id="mayakSmall">▭</div><div id="mayakClose">✕</div></div>
+</div>
+
+<div id="langBox"><button class="btn" id="btnLang">EN</button></div>
+
 <div id="bar">
   <div id="tabs">
     <div class="tab" data-g="эфир">🎬 ЭФИР</div>
@@ -469,6 +522,9 @@
   <button class="btn" id="btnPanic">ПАНИКА</button>
   <button class="btn" id="btnAspect" data-g="эфир">⬛ 16:9</button>
   <button class="btn" id="btnMontage" data-g="эфир">⧉ МОНТАЖ</button>
+  <button class="btn" id="btnScene1" data-g="ещё">□ 1</button>
+  <button class="btn" id="btnScene2" data-g="ещё">□ 2</button>
+  <button class="btn" id="btnScene3" data-g="ещё">□ 3</button>
   <button class="btn" id="btnFeed" data-g="эфир">📢 ЛЕНТА</button>
   <button class="btn" id="btnCohost" data-g="ещё">◆ СОВЕДУЩИЙ</button>
   <button class="btn" id="btnMode" data-g="эфир">ЭФИР</button>
@@ -482,6 +538,7 @@
   <button class="btn" id="btnEar" data-g="звук">👂 УХО</button>
   <button class="btn" id="btnSubs" data-g="звук">💬 СУБТИТРЫ</button>
   <button class="btn" id="btnDuty" data-g="ещё">🤖 ДЕЖУРНЫЙ</button>
+  <button class="btn" id="btnWarm" data-g="мир">🔥 РАЗОГРЕВ</button>
   <button class="btn" id="btnPtt" data-g="звук">◉ РАЦИЯ</button>
   <button class="btn" id="btnPrompt" data-g="звук">СУФЛЁР·ухо</button>
   <button class="btn" id="btnDash" data-g="мир">◎ ПРИБОРЫ</button>
@@ -497,9 +554,8 @@
   <button class="btn" id="btnKrug" data-g="круг">👥 КРУГ</button>
   <button class="btn" id="btnRoster" data-g="круг">🎽 ИГРОКИ</button>
   <button class="btn" id="btnPocket" data-g="ещё">КАРМАН</button>
-  <button class="btn" id="btnCheck" data-g="ещё">ПРОГОН</button>
-  <button class="btn" id="btnLang" data-g="ещё">EN</button>
-  <button class="btn" id="btnInfo" data-g="ещё">ⓘ</button>
+  <button class="btn" id="btnCheck" data-g="мир">ПРОГОН</button>
+  <button class="btn" id="btnInfo" data-g="мир">ⓘ</button>
 </div>
 
 <div id="lock">
@@ -1024,11 +1080,24 @@ function setEntryLock(v){
     ? 'ВХОД ЗАКРЫТ: свои в эфире остаются, новые камеры не примутся'
     : 'вход открыт');
 }
+/* Впущенные помнятся: «запомнить как своего» больше не забывается при
+   переподключении. Иначе стример в море ждал бы подтверждения от
+   ноутбука, до которого не дотянуться. */
+const LET_KEY = 'skrin-let';
+function letLoad(){ try{ return JSON.parse(localStorage.getItem(LET_KEY) || '[]'); }catch(e){ return []; } }
+function letAdd(name){
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return;
+  const l = letLoad();
+  if (!l.includes(n)){ l.push(n); try{ localStorage.setItem(LET_KEY, JSON.stringify(l.slice(-30))); }catch(e){} }
+}
 function isTrusted(name){
   if (linkCode && linkCode[0] === 'r' && linkCode.length > 6) return true;   // знал пароль
   if (!name) return false;
+  const n = name.toLowerCase();
+  if (letLoad().includes(n)) return true;          // уже впускали — не спрашиваем снова
   try{
-    return friendsLoad().some(f => (f.nick || '').toLowerCase() === name.toLowerCase());
+    return friendsLoad().some(f => (f.nick || '').toLowerCase() === n);
   }catch(e){ return false; }
 }
 function askEntry(call, name){
@@ -1065,6 +1134,7 @@ function entryDecide(allow, remember){
     bb('отказано: ' + (q.name || '—'));
     return;
   }
+  if (q.name) letAdd(q.name);                      // впустил — запомнили навсегда
   if (remember && q.name){
     try{
       const list = friendsLoad();
@@ -1420,6 +1490,41 @@ function showMsg(t, ms = 4000){
 }
 
 /* ---------- размеры ---------- */
+/* ---------- МАЯК: окно в PNEURADEN ----------
+   Кружок с переливающимся ободком открывает карту мира на три четверти
+   экрана. Главное — цена: рамка создаётся ТОЛЬКО при открытии и сносится
+   при закрытии. Пока кружок не тронут, Pneuraden не считает ни кадра и
+   эфиру не мешает. Свёрнутый режим — четверть экрана в углу.
+   Честно: открытая карта считает свою графику параллельно со студией;
+   на слабом устройстве это заметно, потому закрывай, когда не нужна. */
+const MAYAK_URL = 'https://pneuron1321.github.io/pneuraden/';
+let mayakOpen = false;
+function setMayak(v, small){
+  const want = !!v;
+  const wrap = $('mayakWrap');
+  if (want && !mayakOpen){
+    const fr = document.createElement('iframe');
+    fr.id = 'mayakFrame';
+    fr.setAttribute('allow', 'geolocation; accelerometer; magnetometer; gyroscope');
+    fr.setAttribute('referrerpolicy', 'no-referrer');
+    fr.src = MAYAK_URL;
+    wrap.appendChild(fr);
+    wrap.style.display = 'block';
+    mayakOpen = true;
+    bb('маяк: открыт');
+    linkFlash('PNEURADEN открыт — закрой, когда не нужен: он считает свою графику');
+  } else if (!want && mayakOpen){
+    const fr = $('mayakFrame');
+    if (fr) fr.remove();                    // сносим: иначе считает вхолостую
+    wrap.style.display = 'none';
+    wrap.classList.remove('mini');
+    mayakOpen = false;
+    bb('маяк: закрыт');
+  }
+  if (mayakOpen && small !== undefined) wrap.classList.toggle('mini', !!small);
+  return mayakOpen ? (wrap.classList.contains('mini') ? 'малый' : 'открыт') : 'закрыт';
+}
+
 /* ---------- ЯЗЫК ИНТЕРФЕЙСА ----------
    Студия думает по-русски, но открыть её может кто угодно. Английский —
    не перевод всего подряд, а словарь того, на что человек смотрит и
@@ -1461,6 +1566,7 @@ const LANG = {
   btnCohost: ['◆ СОВЕДУЩИЙ', '◆ CO-HOST'],
   btnMark: ['★ МЕТКА', '★ MARK'],
   btnDuty: ['🤖 ДЕЖУРНЫЙ', '🤖 DUTY'],
+  btnWarm: ['🔥 РАЗОГРЕВ', '🔥 WARM UP'],
   btnRec: ['● REC', '● REC'],
   btnPanic: ['ПАНИКА', 'PANIC'],
   btnInfo: ['ⓘ', 'ⓘ'],
@@ -1536,6 +1642,77 @@ function setLang(v){
   linkFlash(lang ? 'Interface switched to English. Voice commands stay in Russian.'
                  : 'Интерфейс по-русски');
   return lang ? 'en' : 'ru';
+}
+
+/* ---------- СЦЕНЫ ----------
+   Раскладка, собранная в монтаже, сохраняется в один из трёх слотов и
+   возвращается одним касанием или голосом. Хранится всё, что можно
+   двигать: эхо-окно, радар, карта, окна камер по подписи, формат кадра.
+   Камеры, которых сейчас нет в эфире, просто пропускаются. */
+const SCENE_KEY = 'skrin-scenes';
+function scenesLoad(){ try{ return JSON.parse(localStorage.getItem(SCENE_KEY) || '{}'); }catch(e){ return {}; } }
+function sceneSave(n){
+  const s = scenesLoad();
+  const cams = {};
+  remotes.forEach(r => { if (r.label) cams[r.label] = { nx: r.nx, ny: r.ny, nw: r.nw, nh: r.nh, rot: r.rot || 0 }; });
+  s['s' + n] = {
+    t: Date.now(), aspect,
+    win: { nx: win.nx, ny: win.ny, nw: win.nw, nh: win.nh, on: winOn },
+    radar: { nx: radar.nx, ny: radar.ny, nw: radar.nw, mode: radar.mode, zoom: radar.zoom, on: dashOn },
+    map: { nx: mapWin.nx, ny: mapWin.ny, nw: mapWin.nw, nh: mapWin.nh, mode: mapMode },
+    hero: heroName, cams
+  };
+  try{ localStorage.setItem(SCENE_KEY, JSON.stringify(s)); }catch(e){}
+  bb('сцена ' + n + ': сохранена');
+  linkFlash('СЦЕНА ' + n + ' сохранена — вернуть одним касанием');
+  sceneButtons();
+  return 'сохранена';
+}
+function sceneApply(n){
+  const s = scenesLoad()['s' + n];
+  if (!s) return 'сцена ' + n + ' пуста';
+  if (s.aspect && s.aspect !== aspect) setAspect(s.aspect);
+  if (s.win){
+    Object.assign(win, { nx: s.win.nx, ny: s.win.ny, nw: s.win.nw, nh: s.win.nh });
+    clampWin(win);
+    if (s.win.on !== winOn) $('btnWin').onclick();
+    placeWinDom();
+  }
+  if (s.radar){
+    Object.assign(radar, { nx: s.radar.nx, ny: s.radar.ny, nw: s.radar.nw });
+    if (s.radar.mode) setRadarMode(s.radar.mode);
+    if (s.radar.zoom != null) CMDS.radarZoom(s.radar.zoom);
+    if (s.radar.on && !dashOn) setDash(true);
+    else if (!s.radar.on && dashOn) setDash(false);
+    placeRadarWin();
+  }
+  if (s.map){
+    Object.assign(mapWin, { nx: s.map.nx, ny: s.map.ny, nw: s.map.nw, nh: s.map.nh });
+    if (s.map.mode !== mapMode) setMap(s.map.mode);
+    placeMapWin();
+  }
+  Object.keys(s.cams || {}).forEach(label => {
+    const rm = remotes.find(r => r.label === label);
+    if (!rm) return;                        // этой камеры сейчас нет — пропускаем
+    Object.assign(rm, s.cams[label]);
+    clampWin(rm);
+    rm.place();
+  });
+  if (s.hero !== undefined && s.hero !== heroName) setHero(s.hero || '');
+  bb('сцена ' + n + ': применена');
+  linkFlash('СЦЕНА ' + n);
+  beep('on');
+  return 'сцена ' + n;
+}
+function sceneButtons(){
+  const s = scenesLoad();
+  [1, 2, 3].forEach(n => {
+    const b = $('btnScene' + n);
+    if (!b) return;
+    const has = !!s['s' + n];
+    b.classList.toggle('on', has);
+    b.textContent = has ? ('▣ ' + n) : ('□ ' + n);
+  });
 }
 
 /* ---------- МЕТКИ МОМЕНТОВ ----------
@@ -1844,7 +2021,7 @@ function drawPoll(c, w, h){
    реплику. Ничто не копится вечно: очередь ограничена. */
 let feedOn = false;
 const feed = { q: [], cur: null, t0: 0, pin: null };
-const FEED_W = { raid: 5, gift: 4, cheer: 4, sub: 3, poll: 3, note: 2, chat: 1 };
+const FEED_W = { raid: 5, tip: 5, gift: 4, goal: 4, cheer: 4, sub: 3, poll: 3, note: 2, chat: 1 };
 function feedPush(ev){
   if (!ev) return 0;
   const e = {
@@ -1864,9 +2041,9 @@ function feedPush(ev){
   bb('лента: ' + e.kind + ' — ' + e.text.slice(0, 40));
   return feed.q.length;
 }
-const FEED_ICON = { raid: '🚩', gift: '🎁', cheer: '💎', sub: '★', poll: '📊',
+const FEED_ICON = { raid: '🚩', gift: '🎁', cheer: '💎', sub: '★', poll: '📊', goal: '🎯', tip: '💛',
                     note: '•', chat: '💬', clip: '✂', people: '👋' };
-const FEED_COLOR = { raid: '#FF5D45', gift: '#FFB454', cheer: '#7ED8A0',
+const FEED_COLOR = { raid: '#FF5D45', gift: '#FFB454', cheer: '#7ED8A0', goal: '#E0CDA0', tip: '#FFD166',
                      sub: '#FFB454', poll: '#7ED8A0', chat: '#E8E3D8' };
 function drawFeed(c, w, h){
   const now = performance.now();
@@ -2429,12 +2606,14 @@ function frame(){
     }
     ctx.restore();
     rr(ctx, rp.x, rp.y, rp.w, rp.h, rad2);
-    ctx.lineWidth = Math.max(2, W * 0.004);
-    ctx.strokeStyle = rm.lost ? 'rgba(255,180,84,0.45)' : 'rgba(255,180,84,0.9)';
-    ctx.shadowColor = 'rgba(255,180,84,0.55)';
-    ctx.shadowBlur = rm.lost ? 0 : W * 0.012;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    /* Ободок больше не рисуется вокруг живой камеры: он загораживал кадр
+       и в эфире не нужен. Остаётся только у пропавшей — чтобы место было
+       видно, пока друг возвращается. */
+    if (rm.lost){
+      ctx.lineWidth = Math.max(1.5, W * 0.002);
+      ctx.strokeStyle = 'rgba(255,180,84,0.4)';
+      ctx.stroke();
+    }
     const lbl = rm.lost ? ((rm.label || 'камера') + ' · переподключается…') : rm.label;
     if (lbl){
       const fs = Math.max(12, W * 0.018);
@@ -3561,6 +3740,443 @@ async function setDash(v){
   bb('приборы ' + (dashOn ? 'вкл' : 'выкл'));
 }
 
+/* ---------- РАЗОГРЕВ ----------
+   Кнопка и голос «разогрев»: студия только просит — думает Клод на ноуте.
+   Он сам соберёт факты (тумблеры, конфиги, записанные удары, чем кончился
+   прошлый эфир) и поведёт РАЗГОВОР в ухо: три-четыре шага, вопрос о том,
+   что сегодня, предложение цели. Без рубки просьбе некуда идти — скажем
+   честно, а не сделаем вид. */
+function warmAsk(){
+  if (!engConns.length){
+    earSay('рубка не на связи — разогрев живёт на ноуте');
+    return 'рубки нет';
+  }
+  engSend({ op: 'warm' });
+  beep('on');
+  earSay('собираю разогрев');
+  bb('разогрев 🔥 запрошен');
+  return 'разогрев запрошен';
+}
+
+/* ---------- ЭФИРНАЯ ПАМЯТЬ ----------
+   Стенограмма того, что ЗВУЧАЛО В ЭФИРЕ. Отсюда растут три вещи: поиск
+   («что я говорил про ветер»), настоящая память Напарника (он видит весь
+   эфир, а не десять строк хроники) и след для будущих Пророков.
+   ПРИВАТНОСТЬ — конструкцией, а не обещанием: пишется ТОЛЬКО то, что
+   слышали зрители. Мут, рация, паника, карман — молчание не записывается.
+   Выключена по умолчанию: скрытый слой включает человек. Команды Клоду в
+   память не идут — они служебные и уже лежат в журнале как voice. */
+let pamyatMode = 'off';                     // off · efir · vse
+function pamyatLive(){
+  return !micMuted && !pttHeld && !panicOn && !pocketOn;
+}
+function pamyatSay(text){
+  if (pamyatMode === 'off') return false;
+  const live = pamyatLive();
+  if (pamyatMode === 'efir' && !live) return false;   // частная речь мимо памяти
+  const t = String(text || '').trim().slice(0, 300);
+  if (!t) return false;
+  /* efir:false — фраза звучала НЕ в эфир; рубка пометит её знаком ⊘, и
+     Клод знает, что вслух её пересказывать нельзя */
+  engSend({ op: 'said', text: t, efir: live });
+  return true;
+}
+function setPamyat(v){
+  const s = String(v == null ? '' : v).toLowerCase();
+  if (v === false || /^(стоп|нет|выкл|off)/.test(s)) pamyatMode = 'off';
+  else if (/^(вс[ёе]|полн|all|vse)/.test(s)) pamyatMode = 'vse';
+  else pamyatMode = 'efir';
+  const say = { off: 'память эфира спит',
+                efir: 'память пишет эфир',
+                vse: 'память пишет ВСЁ, включая закрытый микрофон' }[pamyatMode];
+  bb(say);
+  linkFlash(pamyatMode === 'vse'
+    ? 'ПАМЯТЬ ПОЛНАЯ: пишу и то, что зрители НЕ слышат — мут, рацию, карман. Файл на ноуте, помеченный ⊘'
+    : (pamyatMode === 'efir'
+       ? 'ПАМЯТЬ ЭФИРА: пишу только то, что слышат зрители'
+       : 'память эфира выключена'));
+  return pamyatMode;
+}
+/* ---------- КОНЕЦ ПАМЯТИ ---------- */
+
+/* ---------- СУПЕРУДАРЫ: награда, которую слышно ----------
+   Звуки записывает Александр — своей рукой, своим слухом. Студия их только
+   принимает: манифест udary.json + файлы в udary/. Путь звука — bus.master
+   и монитор: ровно как голос Ирины, значит слышат ЗРИТЕЛИ (и запись), а не
+   только наушники. Служебные пикалки так не умеют — они идут мимо шины.
+   Пока файла нет — играет честная заглушка (короткий слайд), и студия
+   один раз честно скажет об этом в ухо: механика проверяема до записи.
+   Связка по донату считается в рубке (она знает деньги), студия получает
+   готовое число. */
+let UDARY = null, udarOn = true, udarWarned = false;
+const udarBuf = new Map();
+let udarGain = 0.55, udarStep = 340;
+async function udarLoad(){
+  if (UDARY) return UDARY;
+  try{
+    const r = await fetch('udary.json', { cache: 'no-store' });
+    const j = await r.json();
+    UDARY = Array.isArray(j.udary) ? j.udary : [];
+    if (j.gain > 0) udarGain = Math.min(1, j.gain);
+    if (j.step > 0) udarStep = Math.max(80, Math.min(1200, j.step));
+  }catch(e){ UDARY = []; }
+  ensureBus();
+  await Promise.all(UDARY.map(async u => {
+    if (!u.file) return;
+    try{
+      const res = await fetch(u.file, { cache: 'force-cache' });
+      if (!res.ok) throw new Error('нет файла');
+      udarBuf.set(u.n, await audioCtx.decodeAudioData(await res.arrayBuffer()));
+    }catch(e){ /* заглушка сыграет вместо него */ }
+  }));
+  return UDARY;
+}
+function udarStub(n, t0){
+  /* заглушка, а НЕ подражание чему-либо: слайд вниз с щелчком, высота от
+     номера — чтобы связка была различима на слух до записи настоящих */
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(320 + n * 90, t0);
+  o.frequency.exponentialRampToValueAtTime(90, t0 + 0.16);
+  g.gain.setValueAtTime(udarGain * 0.5, t0);
+  g.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.2);
+  o.connect(g); g.connect(bus.master); g.connect(bus.monitor);
+  o.start(t0); o.stop(t0 + 0.22);
+}
+function udarPick(count){
+  /* без повторов внутри связки: одинаковый удар дважды звучит как сбой */
+  const pool = (UDARY || []).filter(u => !u.final).map(u => u.n);
+  if (!pool.length) return Array.from({ length: count }, (_, i) => (i % 12) + 1);
+  const out = [];
+  while (out.length < count && pool.length){
+    out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  while (out.length < count) out.push(out[out.length % Math.max(1, out.length)] || 1);
+  return out;
+}
+async function udarFire(arg){
+  if (!udarOn) return 'удары выключены';
+  await udarLoad();
+  ensureBus();
+  if (audioCtx.state === 'suspended') try{ await audioCtx.resume(); }catch(e){}
+  let list = [], final = false;
+  if (typeof arg === 'number') list = udarPick(Math.max(1, Math.min(8, Math.round(arg))));
+  else if (arg && typeof arg === 'object'){
+    list = udarPick(Math.max(1, Math.min(8, Math.round(arg.n || 1))));
+    final = !!arg.final;
+  } else if (typeof arg === 'string'){
+    const hit = (UDARY || []).find(u => u.name && u.name.toLowerCase() === arg.toLowerCase());
+    if (!hit) return 'такого удара нет: ' + arg;
+    list = [hit.n];
+  } else list = udarPick(1);
+  if (final){
+    const f = (UDARY || []).find(u => u.final);
+    if (f) list.push(f.n);
+  }
+  const missing = list.filter(n => !udarBuf.has(n)).length;
+  if (missing && !udarWarned){
+    udarWarned = true;
+    earSay('удары ещё не записаны — играю заглушки');
+  }
+  const t0 = audioCtx.currentTime + 0.02;
+  list.forEach((n, i) => {
+    const at = t0 + i * (udarStep / 1000);
+    const ab = udarBuf.get(n);
+    if (!ab){ udarStub(n, at); return; }
+    const s = audioCtx.createBufferSource(), g = audioCtx.createGain();
+    s.buffer = ab;
+    g.gain.value = udarGain;
+    s.connect(g); g.connect(bus.master); g.connect(bus.monitor);
+    s.start(at);
+  });
+  const names = list.map(n => {
+    const u = (UDARY || []).find(x => x.n === n);
+    return u && u.name ? u.name : ('#' + n);
+  });
+  bb('удар ⚡ ' + names.join(' · '));
+  return 'связка: ' + names.join(' · ') + (missing ? ' (заглушки: ' + missing + ')' : '');
+}
+function setUdar(arg){
+  if (arg === true){ udarOn = true; udarLoad(); return 'удары включены'; }
+  if (arg === false){ udarOn = false; return 'удары выключены'; }
+  return udarFire(arg);
+}
+/* ---------- КОНЕЦ УДАРОВ ---------- */
+
+/* ---------- QR: дверь доната ----------
+   Свой генератор: byte-режим, версии 1-4, один блок ECC — до 80 знаков,
+   любой ссылке хватит. Без библиотек и без сети: студия остаётся одним
+   файлом и работает офлайн. Уровень M (15% коррекции) для v1-3, для
+   длинных ссылок v4-L: с v4 уровень M становится двублочным, а лишняя
+   сложность здесь не окупается. */
+const QR_CAP = [
+  { v: 1, ecl: 'M', dc: 16, ec: 10 },
+  { v: 2, ecl: 'M', dc: 28, ec: 16 },
+  { v: 3, ecl: 'M', dc: 44, ec: 26 },
+  { v: 4, ecl: 'L', dc: 80, ec: 20 }
+];
+const QR_EXP = new Uint8Array(512), QR_LOG = new Uint8Array(256);
+(function(){
+  let x = 1;
+  for (let i = 0; i < 255; i++){ QR_EXP[i] = x; QR_LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+  for (let i = 255; i < 512; i++) QR_EXP[i] = QR_EXP[i - 255];
+})();
+function qrMul(a, b){ return (a && b) ? QR_EXP[QR_LOG[a] + QR_LOG[b]] : 0; }
+function qrGen(n){
+  let g = [1];
+  for (let i = 0; i < n; i++){
+    const ng = new Array(g.length + 1).fill(0);
+    for (let j = 0; j < g.length; j++){ ng[j] ^= qrMul(g[j], QR_EXP[i]); ng[j + 1] ^= g[j]; }
+    g = ng;
+  }
+  return g;
+}
+function qrEcc(data, n){
+  const g = qrGen(n), res = data.concat(new Array(n).fill(0));
+  for (let i = 0; i < data.length; i++){
+    const f = res[i];
+    if (!f) continue;
+    for (let j = 0; j < g.length; j++) res[i + j] ^= qrMul(g[j], f);
+  }
+  return res.slice(data.length);
+}
+const QR_MASKS = [
+  (r, c) => (r + c) % 2 === 0,
+  (r, c) => r % 2 === 0,
+  (r, c) => c % 3 === 0,
+  (r, c) => (r + c) % 3 === 0,
+  (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+  (r, c) => (r * c) % 2 + (r * c) % 3 === 0,
+  (r, c) => ((r * c) % 2 + (r * c) % 3) % 2 === 0,
+  (r, c) => ((r + c) % 2 + (r * c) % 3) % 2 === 0
+];
+function qrPenalty(m){
+  const n = m.length;
+  let p = 0, dark = 0;
+  const run = line => {
+    let same = 1, out = 0;
+    for (let i = 1; i < n; i++){
+      if (line[i] === line[i - 1]) same++;
+      else { if (same >= 5) out += 3 + (same - 5); same = 1; }
+    }
+    if (same >= 5) out += 3 + (same - 5);
+    return out;
+  };
+  for (let r = 0; r < n; r++){
+    p += run(m[r]);
+    p += run(m.map(row => row[r]));
+    for (let c = 0; c < n; c++) if (m[r][c]) dark++;
+  }
+  for (let r = 0; r < n - 1; r++)
+    for (let c = 0; c < n - 1; c++){
+      const s = m[r][c] + m[r][c + 1] + m[r + 1][c] + m[r + 1][c + 1];
+      if (s === 0 || s === 4) p += 3;
+    }
+  const pat = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+  const hit = line => {
+    let out = 0;
+    for (let i = 0; i + 11 <= n; i++){
+      let a = true, b = true;
+      for (let k = 0; k < 11; k++){
+        if (line[i + k] !== pat[k]) a = false;
+        if (line[i + k] !== pat[10 - k]) b = false;
+      }
+      if (a || b) out += 40;
+    }
+    return out;
+  };
+  for (let r = 0; r < n; r++){ p += hit(m[r]); p += hit(m.map(row => row[r])); }
+  p += Math.floor(Math.abs(dark * 100 / (n * n) - 50) / 5) * 10;
+  return p;
+}
+function qrFormat(ecl, mask){
+  const data = ((ecl === 'L' ? 1 : 0) << 3) | mask;
+  let v = data << 10;
+  for (let i = 4; i >= 0; i--) if (v & (1 << (i + 10))) v ^= 0x537 << i;
+  return ((data << 10) | v) ^ 0x5412;
+}
+function qrMake(text){
+  const bytes = Array.from(new TextEncoder().encode(String(text)));
+  const cap = QR_CAP.find(c => bytes.length <= c.dc - 2);
+  if (!cap) return null;                       // длиннее 78 знаков — не наш случай
+  const bits = [];
+  const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+  put(4, 4); put(bytes.length, 8);
+  for (const b of bytes) put(b, 8);
+  for (let i = 0; i < 4 && bits.length < cap.dc * 8; i++) bits.push(0);
+  while (bits.length % 8) bits.push(0);
+  const words = [];
+  for (let i = 0; i < bits.length; i += 8){
+    let v = 0;
+    for (let j = 0; j < 8; j++) v = (v << 1) | bits[i + j];
+    words.push(v);
+  }
+  const PAD = [0xEC, 0x11];
+  for (let i = 0; words.length < cap.dc; i++) words.push(PAD[i % 2]);
+  const all = words.concat(qrEcc(words, cap.ec));
+  const size = 17 + cap.v * 4;
+  const m = Array.from({ length: size }, () => new Array(size).fill(0));
+  const fx = Array.from({ length: size }, () => new Array(size).fill(0));
+  const finder = (r0, c0) => {
+    for (let r = -1; r <= 7; r++)
+      for (let c = -1; c <= 7; c++){
+        const rr = r0 + r, cc = c0 + c;
+        if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+        const on = (r >= 0 && r <= 6 && (c === 0 || c === 6)) ||
+                   (c >= 0 && c <= 6 && (r === 0 || r === 6)) ||
+                   (r >= 2 && r <= 4 && c >= 2 && c <= 4);
+        m[rr][cc] = on ? 1 : 0; fx[rr][cc] = 1;
+      }
+  };
+  finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+  for (let i = 8; i < size - 8; i++){
+    const v = i % 2 === 0 ? 1 : 0;
+    m[6][i] = v; fx[6][i] = 1; m[i][6] = v; fx[i][6] = 1;
+  }
+  if (cap.v > 1){
+    const ax = size - 7;
+    for (let r = -2; r <= 2; r++)
+      for (let c = -2; c <= 2; c++){
+        m[ax + r][ax + c] = Math.max(Math.abs(r), Math.abs(c)) !== 1 ? 1 : 0;
+        fx[ax + r][ax + c] = 1;
+      }
+  }
+  m[size - 8][8] = 1; fx[size - 8][8] = 1;                  // тёмный модуль
+  for (let i = 0; i < 9; i++){
+    if (!fx[8][i]){ fx[8][i] = 1; m[8][i] = 0; }
+    if (!fx[i][8]){ fx[i][8] = 1; m[i][8] = 0; }
+  }
+  for (let i = 0; i < 8; i++){
+    fx[8][size - 1 - i] = 1; m[8][size - 1 - i] = 0;
+    fx[size - 1 - i][8] = 1; m[size - 1 - i][8] = 0;
+  }
+  let bi = 0, up = true;
+  for (let col = size - 1; col > 0; col -= 2){
+    if (col === 6) col--;                                   // тайминг-колонку перешагиваем
+    for (let i = 0; i < size; i++){
+      const row = up ? size - 1 - i : i;
+      for (let k = 0; k < 2; k++){
+        const cc = col - k;
+        if (fx[row][cc]) continue;
+        m[row][cc] = bi < all.length * 8
+          ? (all[bi >> 3] >> (7 - (bi & 7))) & 1 : 0;
+        bi++;
+      }
+    }
+    up = !up;
+  }
+  let best = null;
+  for (let mask = 0; mask < 8; mask++){
+    const t = m.map(row => row.slice());
+    for (let r = 0; r < size; r++)
+      for (let c = 0; c < size; c++)
+        if (!fx[r][c] && QR_MASKS[mask](r, c)) t[r][c] ^= 1;
+    const fmt = qrFormat(cap.ecl, mask);
+    for (let i = 0; i < 15; i++){
+      const bit = (fmt >> i) & 1;
+      if (i < 6) t[8][i] = bit;
+      else if (i < 8) t[8][i + 1] = bit;
+      else if (i === 8) t[7][8] = bit;
+      else t[14 - i][8] = bit;
+      if (i < 8) t[size - 1 - i][8] = bit;
+      else t[8][size - 15 + i] = bit;
+    }
+    t[size - 8][8] = 1;
+    const p = qrPenalty(t);
+    if (!best || p < best.p) best = { p, m: t, mask };
+  }
+  return { size, mod: best.m, mask: best.mask, ver: cap.v, ecl: cap.ecl };
+}
+/* ---------- КОНЕЦ QR ---------- */
+
+/* ДВЕРЬ ДОНАТА в кадре. Правило Александра: QR не мешает изображению —
+   отсюда вся конструкция: мелкий (13% высоты), в углу на выбор, всплывает
+   по команде и УХОДИТ САМ через 20 с, с мягким появлением. Постоянного
+   попрошайничества в кадре нет по построению. Паника и карман сильнее:
+   при них дверь не показывается вовсе. */
+let tipUrl = '', tipQR = null, tipT0 = 0, tipMs = 0, tipCorner = 'br';
+try{ tipUrl = localStorage.getItem('tipUrl') || ''; }catch(e){}
+function setTip(arg, corner){
+  if (corner && /^(br|bl|tr|tl)$/.test(corner)) tipCorner = corner;
+  if (typeof arg === 'string' && /^https?:\/\//i.test(arg.trim())){
+    tipUrl = arg.trim();
+    try{ localStorage.setItem('tipUrl', tipUrl); }catch(e){}
+    tipQR = null;
+    return 'дверь доната: ' + tipUrl;
+  }
+  if (arg === false || arg === 'стоп'){ tipMs = 0; return 'дверь закрыта'; }
+  if (!tipUrl) return 'сначала дай ссылку: tip "https://…"';
+  if (!tipQR){
+    tipQR = qrMake(tipUrl);
+    if (!tipQR) return 'ссылка длиннее 78 знаков — QR не соберётся';
+  }
+  const sec = (typeof arg === 'number' && arg > 0) ? Math.min(120, arg) : 20;
+  tipT0 = performance.now(); tipMs = sec * 1000;
+  return 'дверь доната открыта на ' + sec + ' с (' + tipCorner + ')';
+}
+function drawTip(c, w, h){
+  if (!tipMs || !tipQR) return;
+  if (panicOn || pocketOn) return;                 // приватность сильнее доната
+  const age = performance.now() - tipT0;
+  if (age > tipMs){ tipMs = 0; return; }
+  const a = Math.min(1, age / 300) * Math.min(1, Math.max(0, (tipMs - age) / 500));
+  const q = tipQR.size, quiet = 4;
+  const box = Math.round(h * 0.13);                // мелкий: не спорит с картинкой
+  const cell = Math.max(1, Math.floor(box / (q + quiet * 2)));
+  const side = cell * (q + quiet * 2);
+  const pad = Math.round(h * 0.03), lab = Math.round(side * 0.16);
+  const x = tipCorner[1] === 'l' ? pad : w - pad - side;
+  const y = tipCorner[0] === 't' ? pad : h - pad - side - lab;
+  c.save();
+  c.globalAlpha = a * 0.96;
+  c.fillStyle = '#FFFFFF';
+  rr(c, x, y, side, side + lab, Math.round(cell * 1.5)); c.fill();
+  c.fillStyle = '#0B0F14';
+  for (let r = 0; r < q; r++)
+    for (let cc = 0; cc < q; cc++)
+      if (tipQR.mod[r][cc])
+        c.fillRect(x + (cc + quiet) * cell, y + (r + quiet) * cell, cell, cell);
+  c.font = '800 ' + Math.round(lab * 0.62) + 'px system-ui,-apple-system,sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('ПОДДЕРЖАТЬ', x + side / 2, y + side + lab * 0.42);
+  c.restore();
+}
+layers.set('дверь доната', (c, w, h) => drawTip(c, w, h));
+
+/* ---------- ЛОВЕЦ МОМЕНТОВ ----------
+   Скрытый слой: громкость шины против собственного медленного фона; чат
+   вспыхнул — рубка пришлёт {op:'moment'}. Пик → метка (времена, место,
+   кадр глазом), тихий шёпот в ухо; markMoment сам положит строку в ленту.
+   НИКАКОГО видео: кольцо не включает, клип не режет — лишь подскажет
+   «скажи клип», если кольцо уже крутится. Выключен по умолчанию:
+   скрытый слой включает человек. */
+let huntOn = false;
+const hunt = { base: 0.02, last: 0 };
+function huntJudge(rms, now, st){
+  const COOL = 25000;                       // не чаще раза в 25 с
+  st.base = st.base * 0.995 + rms * 0.005;  // медленный фон: минуты, не секунды
+  if (rms < Math.max(0.06, st.base * 3.2)) return null;
+  if (st.last && now - st.last < COOL) return null;   // 0 = моментов ещё не было
+  st.last = now;
+  return 'fire';
+}
+function momentCatch(kind, note){
+  if (!huntOn) return;
+  const txt = 'ловец: ' + kind + (note ? ' · ' + note : '');
+  markMoment(txt);                          // метка + кадр глазом; видео нет
+  beep('on');
+  earSay(clipOn ? 'момент — скажи клип' : 'момент отмечен');
+  bb('ловец ⚑ ' + txt);
+}
+function setHunt(v){
+  huntOn = !!v;
+  bb('ловец ' + (huntOn ? 'на посту' : 'спит'));
+  linkFlash(huntOn
+    ? 'ЛОВЕЦ: слежу за звуком и чатом — моменты отмечу метками сам'
+    : 'ловец выключен');
+  return huntOn;
+}
+
 /* ---------- УХО СТУДИИ: браузер слышит сам ----------
    Раньше слух жил только в рубке — значит на воде без ноутбука голос никуда
    не долетал. Теперь распознаёт сама страница: команды исполняются на месте
@@ -3596,9 +4212,16 @@ const EAR_TABLE = [
   [['на весь экран', 'главный экран'], { op: 'cmd', name: 'hero', args: ['я'] }],
   [['обычный фон', 'верни фон'], { op: 'cmd', name: 'hero', args: [''] }],
   [['итоги опроса', 'закрой опрос'], { op: 'poll-end' }],
-  [['войс ин', 'войс инн', 'соведущий', 'клод говори'], { op: 'cmd', name: 'cohost', args: [true] }],
-  [['войс он ми', 'войс онми', 'войс он мне', 'войс мне', 'войс оф', 'клод молчи', 'без соведущего'],
+  [['голос в эфир', 'говори зрителям', 'войс ин', 'войс инн', 'войсин', 'соведущий', 'клод говори'],
+   { op: 'cmd', name: 'cohost', args: [true] }],
+  [['голос мне', 'говори мне', 'только мне', 'войс он ми', 'войс онми', 'войс он мне',
+    'войс мне', 'войсонми', 'войс оф', 'клод молчи', 'без соведущего'],
    { op: 'cmd', name: 'cohost', args: [false] }],
+  [['сцена один', 'сцена первая'], { op: 'cmd', name: 'scene', args: [1] }],
+  [['сцена два', 'сцена вторая'], { op: 'cmd', name: 'scene', args: [2] }],
+  [['сцена три', 'сцена третья'], { op: 'cmd', name: 'scene', args: [3] }],
+  [['открой мир', 'пнеураден'], { op: 'cmd', name: 'mayak2', args: [true] }],
+  [['закрой мир', 'убери мир'], { op: 'cmd', name: 'mayak2', args: [false] }],
   [['метка', 'запомни', 'отметь'], { op: 'cmd', name: 'mark', args: [''] }],
   [['метки', 'покажи метки'], { op: 'cmd', name: 'marks', args: [] }],
   [['щит', 'заставка'], { op: 'cmd', name: 'shield', args: [true] }],
@@ -3615,6 +4238,16 @@ const EAR_TABLE = [
   [['без субтитров', 'убери субтитры'], { op: 'cmd', name: 'subs', args: [false] }],
   [['дежурный проснись', 'разбуди клода'], { op: 'cmd', name: 'duty', args: [true] }],
   [['дежурный спи', 'клод спи'], { op: 'cmd', name: 'duty', args: [false] }],
+  [['ловец', 'лови моменты'], { op: 'cmd', name: 'hunt', args: [true] }],
+  [['донат', 'поддержать', 'дверь доната'], { op: 'cmd', name: 'tip', args: [true] }],
+  [['удар', 'суперудар'], { op: 'cmd', name: 'udar', args: [1] }],
+  [['помни эфир', 'память включи'], { op: 'cmd', name: 'pamyat', args: [true] }],
+  [['не помни', 'память стоп'], { op: 'cmd', name: 'pamyat', args: [false] }],
+  [['помни всё', 'помни все', 'память полная'], { op: 'cmd', name: 'pamyat', args: ['всё'] }],
+  [['разогрев', 'разогреться'], { op: 'cmd', name: 'warm', args: [] }],
+  [['без ударов', 'удары стоп'], { op: 'cmd', name: 'udar', args: [false] }],
+  [['донат стоп', 'закрой донат'], { op: 'cmd', name: 'tip', args: [false] }],
+  [['без ловца', 'стоп ловец'], { op: 'cmd', name: 'hunt', args: [false] }],
   [['эхо'], { op: 'cmd', name: 'echo', args: [true] }],
   [['без эха'], { op: 'cmd', name: 'echo', args: [false] }],
   [['клип'], { op: 'cmd', name: 'clip', args: [] }],
@@ -3654,6 +4287,12 @@ const EAR_ECHO = {
   frame: () => 'скрин снят',
   map: m => m === 'off' ? 'карта убрана' : m === 'mini' ? 'мини карта' : 'карта',
   dash: on => on ? 'приборы' : 'приборы убраны',
+  hunt: on => on ? 'ловец на посту' : 'ловец спит',
+  tip: on => on ? 'дверь доната открыта' : 'дверь закрыта',
+  udar: on => on ? 'удары включены' : 'удары выключены',
+  pamyat: v => ({ off: 'память спит', efir: 'память пишет эфир',
+                  vse: 'память пишет всё' }[v] || 'память'),
+  warm: () => 'собираю разогрев',
   hero: n => n ? 'главный экран' : 'обычный фон',
   tidy: () => 'разложил',
   text: () => 'титр стоит'
@@ -3681,7 +4320,12 @@ const EAR_LOOSE = [
   { w: ['пауз', 'чёрн', 'черн'], cmd: 'camMute' },
   { w: ['разлож', 'разбер'], cmd: 'tidy', once: true },
   { w: ['субтитр', 'титры речи'], cmd: 'subs' },
-  { w: ['дежурн'], cmd: 'duty' }
+  { w: ['дежурн'], cmd: 'duty' },
+  { w: ['ловец', 'ловц'], cmd: 'hunt' },
+  { w: ['донат', 'поддерж'], cmd: 'tip' },
+  { w: ['удар', 'суперудар'], cmd: 'udar' },
+  { w: ['памят', 'помни'], cmd: 'pamyat' },
+  { w: ['разогрев', 'разогре'], cmd: 'warm' }
 ];
 function earLoose(t){
   const hits = EAR_LOOSE.filter(g => g.w.some(w => t.indexOf(w) >= 0));
@@ -3705,6 +4349,20 @@ function earRoute(t, from){
     const r = CMDS.poll({ q: t.slice(6), ms: 60000 });
     earSay(String(r).indexOf('не на связи') >= 0 ? 'рубка не на связи' : 'опрос пошёл');
     bb('ухо: опрос «' + t.slice(6) + '»');
+    return;
+  }
+  if (t.indexOf('память ') === 0){             // «память ветер» — поиск по стенограмме
+    engSend({ op: 'pam', q: t.slice(7).trim(), via: 'ear' });
+    beep(engConns.length ? 'on' : 'fail');
+    earSay(engConns.length ? 'ищу в памяти' : 'рубка не на связи — память живёт на ноуте');
+    bb('ухо 🧠 «' + t + '»');
+    return;
+  }
+  if (t.indexOf('цель') === 0){                 // «цель 500 битов на парус» · «цель стоп» · «цель»
+    engSend({ op: 'goal', text: t.slice(4).trim(), via: 'ear' });
+    beep(engConns.length ? 'on' : 'fail');
+    earSay(engConns.length ? 'передал рубке' : 'рубка не на связи — цели некому считать');
+    bb('ухо 🎯 «' + t + '»');
     return;
   }
   if (t.indexOf('титр ') === 0){
@@ -3884,6 +4542,8 @@ function setEar(v){
       const f = earNorm(fin), m = earNorm(mid);
       if (subsOn && fin.trim() && earMode !== 'capture')
         subsPush(fin.replace(EAR_WAKE, ' ').trim());   // титр без слова-триггера
+      if (fin.trim() && earMode !== 'capture')
+        pamyatSay(fin.replace(EAR_WAKE, ' ').trim());  // память живёт и без титров
       if (earMode === 'idle'){
         const hit = f.match(EAR_WAKE);
         if (hit){
@@ -4552,6 +5212,21 @@ async function twCodecCheck(){
   }catch(e){}
 }
 
+/* ключ Twitch хранится: вводится один раз дома, работает из моря */
+(function twKeyMemory(){
+  try{
+    const k = localStorage.getItem('skrin-twkey');
+    if (k) $('twKey').value = k;
+    const s = localStorage.getItem('skrin-twsrc');
+    if (s && $('twSource')) $('twSource').value = s;
+  }catch(e){}
+  $('twKey').addEventListener('change', () => {
+    try{ localStorage.setItem('skrin-twkey', $('twKey').value.trim()); }catch(e){}
+  });
+  if ($('twSource')) $('twSource').addEventListener('change', () => {
+    try{ localStorage.setItem('skrin-twsrc', $('twSource').value); }catch(e){}
+  });
+})();
 async function twitchStart(){
   const endpoint = $('twEndpoint').value.trim();
   const key = $('twKey').value.trim();
@@ -4700,7 +5375,18 @@ const CMDS = {
   clip: () => takeClip(),
   clipRing: on => setClipRing(!!on),
   entry: on => setEntryLock(!on),   // entry true = вход открыт
-  twitch: () => { $('btnTwitch').onclick(); return twitchOn ? 'останавливаю' : 'запускаю'; },
+  /* Запуск эфира издалека: ключ и источник берутся из сохранённых
+     настроек, окно с полями не открывается — иначе из моря его не нажать. */
+  twitch: (on) => {
+    const want = (on === undefined) ? !twitchOn : !!on;
+    if (!want){ if (twitchOn) twitchStop(); return 'остановлен'; }
+    if (twitchOn) return 'уже в эфире';
+    const key = ($('twKey').value || '').trim();
+    if (!key) return 'нет ключа Twitch: впиши его в студии один раз, он сохранится';
+    if (mode !== 'studio' || !running) return 'студия не запущена';
+    twitchStart();
+    return 'запускаю';
+  },
   dash: on => setDash(!!on),
   probe: name => setProbe(name),
   hero: name => setHero(name),
@@ -4717,6 +5403,11 @@ const CMDS = {
       : 'рубки нет — дежурный не услышит');
     return engConns.length ? 'передано' : 'рубка не на связи';
   },
+  hunt: v => setHunt(!!v),
+  tip: (v, corner) => setTip(v, corner),
+  udar: v => setUdar(v),
+  pamyat: v => setPamyat(v),
+  warm: () => warmAsk(),
   subs: (v, lang) => setSubs(v, lang),
   aspect: a => setAspect(a),
   montage: v => setProj(!!v),
@@ -4747,6 +5438,9 @@ const CMDS = {
   beep: v => { beepOn = !!v; bb('сигналы ' + (beepOn ? 'вкл' : 'выкл')); return beepOn; },
   mark: t => markMoment(t),
   lang: v => setLang(v),
+  mayak2: (v, small) => setMayak(v, small),
+  scene: n => sceneApply(n),
+  sceneSave: n => sceneSave(n),
   marks: () => marksLoad().slice(-40),
   marksSave: () => { marksDownload(); return marksLoad().length; },
   marksClear: () => { marksSave([]); bb('метки стёрты'); return 'стёрто'; },
@@ -4872,6 +5566,10 @@ const CMDS = {
     ear: earOn,
     subs: subsOn ? (subsLang || 'ru') : false,
     duty: dutyWanted,
+    hunt: huntOn,
+    tip: !!tipMs,
+    udar: udarOn,
+    pamyat: pamyatMode,
     hero: heroName || null,
     dash: dashOn,
     camRadar: camRadarOn,
@@ -4882,6 +5580,7 @@ const CMDS = {
     cohost: cohostOn,
     shield: shieldOn,
     marks: marksLoad().length,
+    scenes: Object.keys(scenesLoad()).length,
     poll: pollCard ? (pollCard.done ? 'итог' : pollCard.total) : false,
     radarMode: radar.mode,
     radarHidden: radarHidden,
@@ -4923,6 +5622,8 @@ function handleEngMsg(raw){
     prompterWhisper(m.text);
   } else if (m.op === 'audio'){
     playEngineerAudio(m);
+  } else if (m.op === 'moment'){
+    momentCatch(m.kind || 'чат', m.note);   // рубка увидела вспышку чата
   } else if (m.op === 'voice'){
     linkFlash('🎙 ' + (m.text || ''));   // слух услышал — режиссёр видит, что именно
   } else if (m.op === 'js'){
@@ -4976,6 +5677,18 @@ function onDataConn(conn){
       const who0 = (md.name || '').slice(0, 16);
       if (trusted && (d.op === 'cmd' || d.op === 'ptt' || d.op === 'voice')){
         handleEngMsg(d);                 // те же команды, что у рубки и пульта
+        return;
+      }
+      if (d.op === 'shape'){
+        /* камера сообщила свою форму кадра — окно принимает её же,
+           чтобы у режиссёра и в эфире картинка не расходилась */
+        const rs = remotes.find(r => r.label === who0);
+        if (rs && d.w && d.h){
+          rs.nh = rs.nw * (d.h / d.w) * (W / H);
+          clampWin(rs);
+          rs.place();
+          bb('форма камеры ' + (who0 || '—') + ': ' + d.w + '×' + d.h);
+        }
         return;
       }
       if (d.op === 'geo'){
@@ -5153,7 +5866,11 @@ function makeWinDom(rm){
     wbar.appendChild(b);
     return b;
   };
-  rm.bHero = mkBtn('★', '', () => setHero(heroName === rm.label ? '' : rm.label));
+  rm.bHero = mkBtn('★', '', () => {
+    const r = setHero(heroName === rm.label ? '' : rm.label);
+    linkFlash(String(r).indexOf('нет камеры') >= 0 ? 'не вышло: ' + r
+                                                   : ('главный экран: ' + (heroName || 'обычный фон')));
+  });
   mkBtn('↺', '', () => rotWin(rm, -Math.PI / 2, rm.place));
   mkBtn('↻', '', () => rotWin(rm, Math.PI / 2, rm.place));
   rm.bEfir = mkBtn('🔊', 'on', () => setRemoteAudio(rm, 'efir', !rm.onEfir));
@@ -5184,6 +5901,15 @@ function makeWinDom(rm){
   });
   el.appendChild(wbar);
 
+  /* окно успокаивается через 2 с: уголок и панель прячутся, кадр чист */
+  let calmT = null;
+  const wake = () => {
+    el.classList.remove('calm');
+    clearTimeout(calmT);
+    calmT = setTimeout(() => el.classList.add('calm'), 2000);
+  };
+  el.addEventListener('pointerdown', wake);
+  wake();
   attachWinGestures(el, g, rm, rm.place);
   rm.place();
 }
@@ -5192,7 +5918,10 @@ function onIncomingCall(call){
   /* Тот же друг вернулся — неважно, помечен потерянным или ещё числится живым.
      Свёрнутый браузер и перезагрузка страницы не рвут связь явно: старое окно
      остаётся «живым», и без этой проверки каждый заход плодил бы новое. */
-  const same = name && remotes.find(r => r.label === name);
+  /* Имя может прийти пустым (переподключение до готовности) — тогда
+     ищем по подписи любого «потерянного»: второе окно не нужно никому. */
+  let same = name && remotes.find(r => r.label === name);
+  if (!same && !name) same = remotes.find(r => r.lost);
   if (same){
     if (same.call && same.call !== call){ try{ same.call.close(); }catch(e){} }
     adoptRemote(same, call);
@@ -5479,6 +6208,13 @@ async function startCameraRole(reuse){
         }catch(e){}
       };
       setInterval(sendGeo, 2000);
+      /* своя форма кадра — режиссёру: окно станет той же пропорции */
+      const sendShape = () => {
+        try{
+          if (progConn && progConn.open) progConn.send({ op: 'shape', w: W, h: H });
+        }catch(e){}
+      };
+      setInterval(sendShape, 5000);
       const sendOrient = () => {
         let a = 0;
         try{
@@ -6028,6 +6764,7 @@ $('btnSubs').onclick = () => {
   setSubs(subsStage === 0 ? false : (subsStage === 2 ? 'en' : true));
 };
 $('btnDuty').onclick = () => CMDS.duty(!dutyWanted);
+$('btnWarm').onclick = () => CMDS.warm();
 /* по кругу: экран → 16:9 → 9:16 → 1:1 → экран */
 $('btnAspect').onclick = () => {
   const order = ['экран', '16:9', '9:16', '1:1'];
@@ -6039,6 +6776,28 @@ $('btnAspect').onclick = () => {
 $('btnFeed').onclick = () => setFeed(!feedOn);
 $('btnCohost').onclick = () => setCohost(!cohostOn);
 $('btnMontage').onclick = () => setProj(!projOn);
+/* короткое касание — применить сцену, долгое — сохранить нынешнюю */
+[1, 2, 3].forEach(n => {
+  const b = $('btnScene' + n);
+  let held = null, long = false;
+  b.addEventListener('pointerdown', () => {
+    long = false;
+    held = setTimeout(() => { long = true; sceneSave(n); navigator.vibrate && navigator.vibrate(40); }, 650);
+  });
+  const up = () => {
+    clearTimeout(held);
+    if (!long) sceneApply(n);
+  };
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', () => clearTimeout(held));
+});
+$('mayakDot').onclick = () => setMayak(!mayakOpen);
+$('mayakClose').onclick = () => setMayak(false);
+$('mayakSmall').onclick = () => {
+  const w = $('mayakWrap');
+  w.classList.toggle('mini');
+  $('mayakSmall').textContent = w.classList.contains('mini') ? '▢' : '▭';
+};
 $('projClose').onclick = () => setProj(false);
 $('projFix').onclick = () => setProjLock(!projLock);
 $('projFit').onclick = () => projTidy();
@@ -6205,6 +6964,8 @@ setInterval(() => {
   const vi = $('vu').firstElementChild;
   vi.style.height = Math.round(lvl * 100) + '%';
   vi.style.background = lvl > 0.86 ? '#FF5D45' : '#7ED8A0';
+  if (huntOn && running && mode === 'studio' && huntJudge(rms, Date.now(), hunt))
+    momentCatch('звук взлетел');
   const onAir = twitchOn || (recorder && recorder.state === 'recording');
   const expect = (micOn && !micMuted && !pttHeld) || remotes.some(r => !r.lost) || twTabNode || recTabNode;
   if (onAir && expect && rms < 0.006){
@@ -6235,6 +6996,8 @@ let barOn = true;
 function setBar(v){
   barOn = !!v;
   $('bar').classList.toggle('tuck', !barOn);
+  $('langBox').classList.toggle('tuck', !barOn);
+  $('mayakDot').classList.toggle('tuck', !barOn);
   $('tab').textContent = barOn ? '◂' : '▸';
   bb('шторка: кнопки ' + (barOn ? 'видны' : 'спрятаны'));
 }
@@ -6534,6 +7297,9 @@ $('btnStart').onclick = async () => {
   $('start').style.display = 'none';
   $('bar').style.display = 'flex';
   $('tab').style.display = 'flex';
+  $('langBox').style.display = 'block';
+  $('mayakDot').style.display = 'block';
+  sceneButtons();
   /* знакомство и значок предлагаются отдельно — тосты больше не нужны */
   running = true;
   setMode('studio');
