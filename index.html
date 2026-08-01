@@ -53,6 +53,14 @@
   }
 
   /* ---- стартовый экран ---- */
+  #helpVoice{position:fixed;inset:auto 12px 12px 12px;max-height:64vh;z-index:60;display:none;
+    background:rgba(8,11,16,.97);border:1px solid rgba(232,227,216,.18);border-radius:16px;
+    padding:12px 14px;overflow:auto;-webkit-overflow-scrolling:touch}
+  #helpVoiceHead{display:flex;justify-content:space-between;align-items:center;
+    font:800 12px/1 system-ui;letter-spacing:.12em;color:var(--amber);margin-bottom:10px}
+  #helpVoiceX{cursor:pointer;padding:2px 8px;color:var(--dim)}
+  #helpVoiceBody{margin:0;font:12px/1.6 ui-monospace,Menlo,monospace;color:var(--ink);
+    white-space:pre-wrap}
   #start{
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:14px;
@@ -108,6 +116,15 @@
   .rwin{position:absolute;z-index:10;touch-action:none;cursor:grab}
   /* Уголок правки тише и тает вместе с окном: он мешал кадру и висел,
      даже когда самой картинки уже не было. */
+  /* Метка главной камеры. Живёт СВОЕЙ жизнью: не в панели (её надо
+     разворачивать) и не рядом с ручкой ресайза (в неё промахиваешься).
+     Видна всегда, пока камера главная — по ней сразу понятно, кто в кадре. */
+  .rwin .wstar{position:absolute;right:6px;top:6px;z-index:3;display:none;
+    width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;
+    background:rgba(28,20,8,.82);border:1px solid var(--amber);color:var(--amber);
+    font-size:12px;line-height:1;pointer-events:none}
+  .rwin.hero .wstar{display:flex}
+  .rwin.hero{outline:2px solid rgba(255,180,84,.55);outline-offset:-2px}
   #win .grip, .rwin .grip{
     position:absolute;right:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;
     background:rgba(255,180,84,.8);transition:opacity .25s ease;
@@ -219,6 +236,16 @@
     letter-spacing:.04em;cursor:pointer;backdrop-filter:blur(6px);
   }
   .btn:active{transform:scale(.95)}
+  /* Компактный формат вкладки: кнопка сжимается до кружка со значком.
+     Нужен потому, что в ЭФИРЕ теперь двадцать кнопок — все важные в одном
+     месте, а крупными строками они не влезают ни на один экран. */
+  #bar.compact .btn{min-width:44px;width:44px;height:44px;padding:0;font-size:17px;
+    display:inline-flex;align-items:center;justify-content:center}
+  #bar.compact .row{gap:5px}
+  #tabFmt{margin-left:auto;padding:3px 9px;border-radius:999px;cursor:pointer;
+    border:1px solid rgba(232,227,216,.2);background:rgba(18,26,34,.8);
+    color:var(--dim);font-size:11px;font-weight:800;user-select:none}
+  #tabFmt.on{color:var(--amber);border-color:var(--amber)}
   .btn.on{border-color:var(--amber);color:var(--amber)}
   #btnRec{background:rgba(255,93,69,.16);border-color:rgba(255,93,69,.55);color:#ffb0a3;font-weight:800}
   #btnRec.on{background:var(--coral);color:#2a0800;border-color:var(--coral)}
@@ -410,17 +437,6 @@
     font-family:ui-monospace,Menlo,monospace;letter-spacing:.08em;text-shadow:0 1px 2px #000}
 
   /* ---- спасение оборванной записи ---- */
-  #rescueWrap{position:absolute;left:50%;transform:translateX(-50%);z-index:24;display:none;
-    bottom:calc(env(safe-area-inset-bottom,0px) + 182px);background:#121A22;
-    border:1px solid rgba(126,216,160,.5);border-radius:12px;padding:10px 14px;
-    font-size:13px;color:#E8E3D8;max-width:92vw}
-  #rescueWrap b{color:#7ED8A0}
-  #rescueWrap .row{display:flex;gap:8px;margin-top:8px}
-  #rescueWrap button{flex:1;height:36px;border-radius:9px;border:1px solid #333;
-    background:#0B0F14;color:#E8E3D8}
-  #rescueWrap button.go{background:#7ED8A0;color:#04180d;font-weight:800;border:none}
-
-  /* ---- сохранение ---- */
   #saveWrap{
     position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
     transform:translateX(-50%);z-index:22;display:none;
@@ -493,6 +509,11 @@
 <div id="zoneHint">Обведи пальцем область — замажу. Двойной тап по фону — стереть все зоны.</div>
 <div id="msg"></div>
 
+<div id="helpVoice">
+  <div id="helpVoiceHead">🎙 ГОЛОСОВЫЕ КОМАНДЫ <span id="helpVoiceX">✕</span></div>
+  <pre id="helpVoiceBody"></pre>
+</div>
+
 <div id="start">
   <h1>СКРИН-СТУДИЯ</h1>
   <p>Два режима: СТУДИЯ — камера и эхо-окно экрана; ЭФИР — YouTube во весь экран и твоя камера в окошке. Запись и выход на Twitch — по кнопкам.</p>
@@ -516,8 +537,8 @@
     <div class="tab" data-g="мир">🌍 МИР</div>
     <div class="tab" data-g="круг">🔗 КРУГ</div>
     <div class="tab" data-g="ещё">⚙ ЕЩЁ</div>
+    <div id="tabFmt" title="крупно / компактно">⤢</div>
   </div>
-  <button class="btn" id="btnRec">● REC</button>
   <div id="vu"><i></i></div>
   <button class="btn" id="btnPanic">ПАНИКА</button>
   <button class="btn" id="btnAspect" data-g="эфир">⬛ 16:9</button>
@@ -526,34 +547,35 @@
   <button class="btn" id="btnScene2" data-g="ещё">□ 2</button>
   <button class="btn" id="btnScene3" data-g="ещё">□ 3</button>
   <button class="btn" id="btnFeed" data-g="эфир">📢 ЛЕНТА</button>
-  <button class="btn" id="btnCohost" data-g="ещё">◆ СОВЕДУЩИЙ</button>
+  <button class="btn" id="btnCohost" data-g="эфир">◆ СОВЕДУЩИЙ</button>
   <button class="btn" id="btnMode" data-g="эфир">ЭФИР</button>
-  <button class="btn" id="btnRing" data-g="эфир">КОЛЬЦО</button>
-  <button class="btn" id="btnClip" data-g="эфир">КЛИП</button>
-  <button class="btn" id="btnMark" data-g="ещё">★ МЕТКА</button>
+  <button class="btn" id="btnRing" data-g="кадр">КОЛЬЦО</button>
+  <button class="btn" id="btnClip" data-g="кадр">КЛИП</button>
+  <button class="btn" id="btnMark" data-g="эфир">★ МЕТКА</button>
   <button class="btn" id="btnTwitch" data-g="эфир">TWITCH</button>
-  <button class="btn" id="btnMic" data-g="звук">МИК·выкл</button>
+  <button class="btn" id="btnMic" data-g="эфир">МИК·выкл</button>
   <button class="btn" id="btnGateMic" data-g="звук">⊘МИК</button>
-  <button class="btn" id="btnMon" data-g="звук">🎧 НАУШНИКИ</button>
+  <button class="btn" id="btnMon" data-g="эфир">🎧 НАУШНИКИ</button>
   <button class="btn" id="btnEar" data-g="звук">👂 УХО</button>
-  <button class="btn" id="btnSubs" data-g="звук">💬 СУБТИТРЫ</button>
-  <button class="btn" id="btnDuty" data-g="ещё">🤖 ДЕЖУРНЫЙ</button>
-  <button class="btn" id="btnWarm" data-g="мир">🔥 РАЗОГРЕВ</button>
+  <button class="btn" id="btnSubs" data-g="эфир">💬 СУБТИТРЫ</button>
+  <button class="btn" id="btnDuty" data-g="эфир">🤖 ДЕЖУРНЫЙ</button>
+  <button class="btn" id="btnWarm" data-g="эфир">🔥 РАЗОГРЕВ</button>
+  <button class="btn" id="btnRazbor" data-g="мир">📋 РАЗБОР</button>
   <button class="btn" id="btnPtt" data-g="звук">◉ РАЦИЯ</button>
-  <button class="btn" id="btnPrompt" data-g="звук">СУФЛЁР·ухо</button>
-  <button class="btn" id="btnDash" data-g="мир">◎ ПРИБОРЫ</button>
-  <button class="btn" id="btnMap" data-g="мир">🗺 КАРТА</button>
+  <button class="btn" id="btnPrompt" data-g="эфир">СУФЛЁР·ухо</button>
+  <button class="btn" id="btnDash" data-g="эфир">◎ ПРИБОРЫ</button>
+  <button class="btn" id="btnMap" data-g="эфир">🗺 КАРТА</button>
   <button class="btn" id="btnMe" data-g="мир">👋 ПОКАЗАТЬСЯ</button>
-  <button class="btn" id="btnFlip" data-g="кадр">⟲</button>
+  <button class="btn" id="btnFlip" data-g="эфир">⟲</button>
   <button class="btn" id="btnWin" data-g="кадр">ОКНО</button>
-  <button class="btn" id="btnScreen" data-g="кадр" style="display:none">ЭКРАН</button>
-  <button class="btn" id="btnGateCam" data-g="кадр">⊘КАМ</button>
+  <button class="btn" id="btnScreen" data-g="эфир" style="display:none">ЭКРАН</button>
+  <button class="btn" id="btnGateCam" data-g="эфир">⊘КАМ</button>
   <button class="btn" id="btnBlur" data-g="кадр">БЛЮР</button>
   <button class="btn" id="btnZone" data-g="кадр">ЗОНА</button>
-  <button class="btn" id="btnLink" data-g="круг">СВЯЗЬ</button>
+  <button class="btn" id="btnLink" data-g="эфир">СВЯЗЬ</button>
   <button class="btn" id="btnKrug" data-g="круг">👥 КРУГ</button>
   <button class="btn" id="btnRoster" data-g="круг">🎽 ИГРОКИ</button>
-  <button class="btn" id="btnPocket" data-g="ещё">КАРМАН</button>
+  <button class="btn" id="btnPocket" data-g="эфир">КАРМАН</button>
   <button class="btn" id="btnCheck" data-g="мир">ПРОГОН</button>
   <button class="btn" id="btnInfo" data-g="мир">ⓘ</button>
 </div>
@@ -623,17 +645,13 @@
     <div class="zbtn on" data-z="0">◉</div>
     <div class="zbtn" data-z="1">◎</div>
     <div class="zbtn" data-z="2">○</div>
+    <div class="zbtn" id="zProbe" title="чьи показания">◈</div>
   </div>
 </div>
 
 <div id="progPip"><img id="progImg" alt=""><span>ПРОГРАММА</span></div>
 
-<div id="rescueWrap">
-  <div>Найдена оборванная запись: <b id="rescueSize">…</b></div>
-  <div class="row"><button id="rescueDel">удалить</button><button class="go" id="rescueGet">СПАСТИ</button></div>
-</div>
-
-<div id="saveWrap"><a id="saveLink" href="#" download>Сохранить видео</a><div id="saveX">✕</div></div>
+<div id="saveWrap"><a id="saveLink" href="#" download>Сохранить клип</a><div id="saveX">✕</div></div>
 
 <div class="sheet" id="info"><div class="card mono" id="infoText"></div></div>
 
@@ -691,6 +709,7 @@
       <div class="bigcode" id="linkCode">····</div>
       <div id="linkWait" style="color:var(--dim)">жду телефоны…</div>
       <div id="engLine" style="color:var(--dim);font-size:12px;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></div>
+      <div class="row"><button class="quiet" id="btnHelpVoice">🎙 ГОЛОСОВЫЕ КОМАНДЫ</button></div>
       <div class="row">
         <button class="quiet" id="lnkLock">🔓 ВХОД ОТКРЫТ</button>
         <button class="quiet" id="lnkStop1">Разорвать всё</button>
@@ -840,7 +859,7 @@ let dispVideo = null, dispStream = null;      // реальный экран д�
 let micStream = null, micOn = false;
 let winOn = false, screenMode = false;   // эхо-окно поднимается по кнопке ОКНО
 let curGroup = 'эфир', screenAvail = false;
-let recorder = null, chunks = [], recStream = null, recT0 = 0, timerId = null, blobUrl = null;
+let timerId = null;                 // таймер эфира: записи в студии нет
 let audioCtx = null;
 let pc = null, whipResource = null, twitchOn = false;
 let peer = null, mediaCall = null, linkRole = null;
@@ -851,7 +870,7 @@ let ring = null, ringN = 14;                   // видеобуфер стра�
 const detHist = [];                            // история детекций лиц (t, faces)
 let lockOn = false;                            // КАРМАН
 let twitchSrcKind = '';
-let twScreenStream = null, twTabNode = null, recTabNode = null;
+let twScreenStream = null, twTabNode = null;
 let rubkaWs = null, rubkaConn = null, rubkaTimer = null;
 let pttKeyT = 0, pttSticky = false;            // кликеры-«пульсы»: рация-залипание
 let monitorOn = false;                         // шина вслух (для системной трансляции)
@@ -860,7 +879,6 @@ const FPS_LEVELS = [30, 24, 20];               // лестница темпа п
 const perf = { last: 0, ema: 33, level: 0, hotSince: 0, moved: 0 };
 let programConns = [], progConn = null, progTimer = null;   // ПРОГРАММА друзьям
 let camRetry = 0, linkStopping = false;        // автопереподключение камеры
-let recSess = 0;                               // сессия записи в IndexedDB
 let clipOn = false, clipRecs = null, clipTimer = null, clipBusy = false;
 const CLIP_P = 45;                             // период чехарды: клип выйдет 45–90 с
 const clipCv = document.createElement('canvas'), clipCtx = clipCv.getContext('2d');
@@ -1054,7 +1072,7 @@ function renderCode(){
 function toggleCode(){
   if (!linkCode || (linkCode[0] === 'r' && linkCode.length > 6)) return;
   if (codeShown){ codeShown = false; renderCode(); return; }
-  const onAir = twitchOn || screenMode || (recorder && recorder.state === 'recording');
+  const onAir = twitchOn || screenMode;
   if (onAir && !confirm('Идёт эфир — экран могут видеть зрители. Всё равно показать код?')) return;
   codeShown = true;
   renderCode();
@@ -1567,7 +1585,7 @@ const LANG = {
   btnMark: ['★ МЕТКА', '★ MARK'],
   btnDuty: ['🤖 ДЕЖУРНЫЙ', '🤖 DUTY'],
   btnWarm: ['🔥 РАЗОГРЕВ', '🔥 WARM UP'],
-  btnRec: ['● REC', '● REC'],
+  btnRazbor: ['📋 РАЗБОР', '📋 REVIEW'],
   btnPanic: ['ПАНИКА', 'PANIC'],
   btnInfo: ['ⓘ', 'ⓘ'],
   lnkDirector: ['Я СОБИРАЮ', 'I DIRECT'],
@@ -1620,6 +1638,29 @@ const TABS_LANG = {
   'круг': ['🔗 КРУГ', '🔗 CIRCLE'], 'ещё': ['⚙ ЕЩЁ', '⚙ MORE']
 };
 let lang = 0;                                   // 0 русский, 1 английский
+/* ДВА ФОРМАТА ВКЛАДКИ. Крупный — с названиями, для дома и спокойной руки.
+   Компактный — кружки со значками: в ЭФИРЕ двадцать кнопок, и на телефоне
+   иначе не влезает. Полное имя остаётся в подсказке. Выбор помнится. */
+let compact = false;
+try{ compact = localStorage.getItem('skrin-compact') === '1'; }catch(e){}
+function barPaint(){
+  document.querySelectorAll('#bar .btn').forEach(b => {
+    const full = (LANG[b.id] ? LANG[b.id][lang] : b.textContent) || '';
+    if (b.id === 'btnMic' && micOn) return;      // текст живёт своей жизнью
+    b.title = full;
+    b.textContent = compact ? (full.trim().split(' ')[0] || full) : full;
+  });
+}
+function setCompact(v){
+  compact = !!v;
+  $('bar').classList.toggle('compact', compact);
+  $('tabFmt').classList.toggle('on', compact);
+  try{ localStorage.setItem('skrin-compact', compact ? '1' : '0'); }catch(e){}
+  barPaint();
+  bb('вкладки: ' + (compact ? 'компактно' : 'с названиями'));
+  return compact ? 'компактно' : 'с названиями';
+}
+
 function setLang(v){
   const want = (v === 'en' || v === 1) ? 1 : 0;
   lang = want;
@@ -1636,6 +1677,7 @@ function setLang(v){
     const p = TABS_LANG[t.dataset.g];
     if (p) t.textContent = p[lang];
   });
+  barPaint();                     // формат переживает смену языка
   document.documentElement.lang = lang ? 'en' : 'ru';
   try{ localStorage.setItem('skrin-lang', lang ? 'en' : 'ru'); }catch(e){}
   bb('язык: ' + (lang ? 'english' : 'русский'));
@@ -1738,7 +1780,7 @@ function hhmmss(ms){
 }
 function markMoment(text, opts){
   const now = Date.now();
-  const rec = (recorder && recorder.state === 'recording' && recT0) ? (now - recT0) : null;
+  const rec = null;   // записи в студии больше нет: пишут очки и Twitch VOD
   const air = (twitchOn && twT0) ? (now - twT0) : null;
   const m = {
     t: now,
@@ -2137,8 +2179,10 @@ function projSize(){
   const s = Math.min(maxW / W, maxH / H);
   return { w: Math.round(W * s), h: Math.round(H * s), s };
 }
-function projDraw(){
-  if (!projOn) return;
+function projDraw(force){
+  /* force — считать макет, не показывая его на студии: так поле видит
+     монтаж у себя в руках, а режиссёру ничего не лезет на экран */
+  if (!projOn && !force) return;
   const c = projCv().getContext('2d');
   const { w, h } = projSize();
   if (projCv().width !== w){ projCv().width = w; projCv().height = h; }
@@ -2369,6 +2413,45 @@ function fit(){
 window.addEventListener('resize', fit);
 
 /* ---------- камера ---------- */
+/* ---------- СТРАЖ КАМЕРЫ ----------
+   Дорожка умирает молча: входящий звонок на iPhone, выдернутая USB-камера,
+   уснувшая система. Студия этого НЕ ЗАМЕЧАЛА — продолжала рисовать
+   застывший кадр и гнать его в эфир, а узнавал ты об этом из чата.
+   Теперь на каждую живую дорожку садится страж: пробует поднять камеру
+   заново (три попытки, пауза растёт), а если не вышло — говорит в кадр
+   прямо, чтобы не гадать. Молчаливой чёрной картинки в эфире не будет. */
+let camGuardTry = 0, camGuardT = null;
+function camGuard(stream, face){
+  if (!stream) return;
+  stream.getVideoTracks().forEach(t => {
+    t.onended = () => camLost(face);
+    t.onmute = () => bb('камера примолкла — жду');
+  });
+}
+async function camLost(face){
+  if (camGuardT) return;                     // одна попытка за раз
+  bb('камера пропала — поднимаю');
+  linkFlash('КАМЕРА ПРОПАЛА (звонок? сон? отключили?) — пробую поднять');
+  const wait = [400, 1500, 4000][Math.min(camGuardTry, 2)];
+  camGuardTry++;
+  camGuardT = setTimeout(async () => {
+    camGuardT = null;
+    try{
+      await openCam(face || facing);
+      camGuardTry = 0;
+      linkFlash('камера вернулась');
+      beep('on');
+    }catch(e){
+      if (camGuardTry < 3) camLost(face);
+      else {
+        linkFlash('КАМЕРА НЕ ВЕРНУЛАСЬ. Проверь: не занял ли её другой звонок или приложение. '
+                + 'Эфир идёт, но картинки с этой камеры нет');
+        beep('fail');
+      }
+    }
+  }, wait);
+}
+
 async function openCam(face){
   if (camStream) camStream.getTracks().forEach(t => t.stop());
   camStream = await navigator.mediaDevices.getUserMedia({
@@ -2387,9 +2470,53 @@ async function openCam(face){
     camHolder.appendChild(camVideo);
   }
   camVideo.srcObject = camStream;
+  camGuard(camStream, face);          // дорожка умрёт — заметим и поднимем
   camVideo.style.transform = (face === 'user') ? 'scaleX(-1)' : '';
   await camVideo.play();
 }
+
+/* ---------- ОЧКИ КАК КАМЕРА СТУДИИ ----------
+   Студию открывают и на ноуте, и на телефоне — значит очки нужны и ей.
+   Мост тот же и с теми же именами, что в поле: обёртке безразлично, какую
+   из двух страниц она открыла. Кадры ложатся в холст, из холста живёт
+   дорожка, она и подменяет локальную камеру. Звук эфира остаётся своим:
+   микрофон очков 8 кГц — он только для команд Клоду. */
+let glassCv = null, glassStream = null;
+function glassUse(track){
+  if (!track) return;
+  if (camStream) camStream.getVideoTracks().forEach(t => t.stop());
+  camStream = new MediaStream([track]);
+  if (!camVideo){
+    camVideo = document.createElement('video');
+    camVideo.playsInline = true; camVideo.muted = true; camVideo.autoplay = true;
+    camHolder.appendChild(camVideo);
+  }
+  camVideo.srcObject = camStream;
+  camVideo.style.transform = '';
+  camVideo.play().catch(() => {});
+  bb('очки: картинка пошла в студию');
+  linkFlash('ОЧКИ в кадре · звук эфира остался с этого устройства');
+}
+window.glassFrame = function (src){
+  if (!glassCv){
+    glassCv = document.createElement('canvas');
+    glassCv.width = 1280; glassCv.height = 720;
+  }
+  const c = glassCv.getContext('2d');
+  const draw = img => {
+    c.drawImage(img, 0, 0, glassCv.width, glassCv.height);
+    if (!glassStream){
+      glassStream = glassCv.captureStream(24);
+      glassUse(glassStream.getVideoTracks()[0]);
+    }
+  };
+  if (typeof src === 'string'){
+    const im = new Image();
+    im.onload = () => draw(im);
+    im.src = src;
+  } else if (src) draw(src);
+};
+window.glassTrack = function (track){ glassUse(track); };
 
 /* ---------- реальный экран в окно СТУДИИ ---------- */
 async function toggleScreen(){
@@ -2490,7 +2617,10 @@ function setHero(name){
     return 'нет такой камеры';
   }
   heroName = n;
-  remotes.forEach(r => { if (r.bHero) r.bHero.classList.toggle('on', r.label === n); });
+  remotes.forEach(r => {
+    if (r.bHero) r.bHero.classList.toggle('on', r.label === n);
+    if (r.dom) r.dom.classList.toggle('hero', r.label === n);   // метка на самом окне
+  });
   /* главный экран во весь кадр — приборы уходят в угол; сняли — отпускаем */
   if (n && n !== 'я') setRadarMode('gta');
   else if (radar.mode === 'gta') setRadarMode('free');
@@ -2948,7 +3078,8 @@ function speakEar(text){
   try{
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(String(text));
-    u.lang = 'ru-RU'; u.rate = 1.05;
+    u.lang = (typeof besedaLang !== 'undefined' && besedaLang === 'en') ? 'en-US' : 'ru-RU';
+    u.rate = 1.05;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -3149,75 +3280,6 @@ function setPanic(v){
   $('btnPanic').classList.toggle('on', panic);
   applyDomBlur();
   linkFlash(panic ? '⚠ ПАНИКА — весь кадр замазан' : 'паника снята');
-}
-
-/* ---------- спасение записи: куски дублируются в IndexedDB ----------
-   Файл записи живёт в памяти вкладки до остановки; браузер упал —
-   час эфира пропал бы. Теперь каждый кусок тихо ложится и на диск:
-   при следующем открытии страница предложит СПАСТИ оборванную запись.
-   Чистый стоп очищает склад. Один слот: новый REC затирает старый. */
-function idb(){
-  if (idb.p) return idb.p;
-  idb.p = new Promise((res, rej) => {
-    const r = indexedDB.open('skrin-rec', 1);
-    r.onupgradeneeded = () => {
-      r.result.createObjectStore('chunks', { autoIncrement: true });
-      r.result.createObjectStore('meta');
-    };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-  return idb.p;
-}
-function idbPut(store, val, key){
-  return idb().then(d => new Promise((res, rej) => {
-    const t = d.transaction(store, 'readwrite');
-    const q = key === undefined ? t.objectStore(store).add(val) : t.objectStore(store).put(val, key);
-    q.onsuccess = () => res(); q.onerror = () => rej(q.error);
-  })).catch(() => {});
-}
-function idbAll(store){
-  return idb().then(d => new Promise((res, rej) => {
-    const q = d.transaction(store).objectStore(store).getAll();
-    q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error);
-  })).catch(() => []);
-}
-function idbClear(){
-  return idb().then(d => new Promise(res => {
-    const t = d.transaction(['chunks', 'meta'], 'readwrite');
-    t.objectStore('chunks').clear();
-    t.objectStore('meta').clear();
-    t.oncomplete = () => res();
-  })).catch(() => {});
-}
-async function rescueScan(){
-  try{
-    const meta = await idb().then(d => new Promise(res => {
-      const q = d.transaction('meta').objectStore('meta').get('cur');
-      q.onsuccess = () => res(q.result); q.onerror = () => res(null);
-    }));
-    if (!meta) return;
-    const rows = await idbAll('chunks');
-    let size = 0;
-    rows.forEach(r => size += (r.b && r.b.size) || 0);
-    if (size < 20000){ idbClear(); return; }   // огрызок меньше 20 КБ спасать нечего
-    $('rescueSize').textContent = (size / 1048576).toFixed(1) + ' МБ';
-    $('rescueWrap').style.display = 'block';
-    bb('найдена оборванная запись: ' + (size / 1048576).toFixed(1) + ' МБ');
-    $('rescueGet').onclick = () => {
-      const blob = new Blob(rows.sort((a, b) => (a.i || 0) - (b.i || 0)).map(r => r.b),
-        { type: meta.mime || 'video/mp4' });
-      const a = $('saveLink');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'skrin-спасено-' + new Date(meta.t0).toISOString().slice(0, 16).replace(/[:T]/g, '-')
-        + ((meta.mime || '').indexOf('mp4') >= 0 ? '.mp4' : '.webm');
-      $('saveWrap').style.display = 'flex';
-      $('rescueWrap').style.display = 'none';
-      bb('запись спасена: ' + (size / 1048576).toFixed(1) + ' МБ');
-      idbClear();
-    };
-    $('rescueDel').onclick = () => { $('rescueWrap').style.display = 'none'; idbClear(); };
-  }catch(e){}
 }
 
 /* ---------- конвейер-страховка блюра ----------
@@ -3497,6 +3559,13 @@ function drawDash(c, w, h){
   const r = radarBox(w, h);
   const R = r.w / 2 - Math.max(3, w * 0.004), cx = r.x + r.w / 2, cy = r.y + r.w / 2;
   const angle = trustHead(P) ? P.head : 0;   // не верим курсу — север вверх
+  /* Чей это радар и почему стрелка стоит. Показания могут приходить с
+     телефона в поле, а могут со своих датчиков — глядя на кружок, этого не
+     угадать. Курсу верим только при компасе или движении: иначе север
+     вверх, и об этом надо сказать словом, а не оставлять гадать. */
+  const radarWho = (P && P.who) ? P.who : 'мои';
+  const radarWhy = trustHead(P) ? '' :
+    (P && P.compass === false && !(P.spd >= MOVING) ? ' · север вверх: нет компаса' : ' · север вверх');
   const G = '224,205,160';                 // песочный: спокойнее зелёного и
   const INK = '10,10,10';                  // читается на воде, бетоне и небе
   /* тонкий чёрный контур: сначала линия темнее и толще, следом песочная —
@@ -3512,6 +3581,21 @@ function drawDash(c, w, h){
   c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.clip();
   c.fillStyle = 'rgba(4,7,16,0.97)'; c.fillRect(cx - R, cy - R, R * 2, R * 2);
   radarTiles(c, cx, cy, R, angle, P);
+  /* подпись рисуется до поворота слоёв: она всегда читается горизонтально */
+  (function radarTag(){
+    const fs = Math.max(8, Math.round(r.w * 0.075));
+    c.save();
+    c.font = '700 ' + fs + 'px ui-monospace,Menlo,monospace';
+    c.textAlign = 'center';
+    c.textBaseline = 'top';
+    const t = radarWho + radarWhy;
+    c.lineWidth = Math.max(2, fs * 0.28);
+    c.strokeStyle = 'rgba(' + INK + ',.85)';
+    c.strokeText(t, cx, r.y + r.w + fs * 0.25);
+    c.fillStyle = 'rgba(' + G + ',.92)';
+    c.fillText(t, cx, r.y + r.w + fs * 0.25);
+    c.restore();
+  })();
   /* второй проход больше не нужен: карта осветляется фильтром при отрисовке */
 
   /* внутренние кольца убраны: они дробили карту и мешали читать.
@@ -3717,6 +3801,22 @@ function setProbe(name){
   return probeFrom;
 }
 
+/* ЧЬИ ПОКАЗАНИЯ. Приборы и радар питаются от одного источника: свои
+   датчики или телефон в поле. Раньше выбрать можно было только командой
+   `probe` — в эфире это значило добежать до ноутбука. Теперь кнопка ◈
+   рядом с зумом гоняет по кругу: сами выберутся → мои → каждая камера →
+   снова сами. Подпись под радаром сразу показывает, кого выбрали. */
+function probeNext(){
+  const ring = ['auto', 'я'].concat(remotes.map(r => r.label).filter(Boolean));
+  const i = ring.indexOf(probeFrom === '' ? 'я' : probeFrom);
+  const next = ring[(i + 1) % ring.length];
+  const r = setProbe(next === 'я' ? '' : next);
+  const shown = (next === 'auto') ? 'сами выберутся' : (next === 'я' ? 'мои' : next);
+  linkFlash('приборы: ' + shown);
+  beep('on');
+  return shown;
+}
+
 async function setDash(v){
   dashOn = !!v;
   if (dashOn){
@@ -3738,6 +3838,94 @@ async function setDash(v){
   }
   $('btnDash').classList.toggle('on', dashOn);
   bb('приборы ' + (dashOn ? 'вкл' : 'выкл'));
+}
+
+/* ---------- ИСТОЧНИК ЭФИРА ----------
+   Что уходит на Twitch: полотно студии (эхо-картинка — собранный кадр),
+   камера ноутбука или экран/вкладка. Выбирается и с телефона: на воде до
+   ноутбука не дотянуться. Смена на живом эфире требует перезапуска потока
+   — говорим об этом честно, а не молчим. */
+const ISTOK_NAMES = { canvas: 'полотно студии (эхо)', camera: 'камера ноутбука',
+                      screen: 'экран или вкладка' };
+function setIstok(v){
+  const sel = $('twSource');
+  if (!sel) return 'выбора источника нет';
+  const s = String(v == null ? '' : v).toLowerCase();
+  const kind = /эхо|полотн|canvas|студи/.test(s) ? 'canvas'
+    : (/экран|вклад|screen|tab/.test(s) ? 'screen'
+    : (/кам|camera|cam/.test(s) ? 'camera' : null));
+  if (!kind) return 'источник: ' + (ISTOK_NAMES[sel.value] || sel.value);
+  sel.value = kind;
+  try{ localStorage.setItem('skrin-twsrc', kind); }catch(e){}
+  bb('источник эфира: ' + ISTOK_NAMES[kind]);
+  linkFlash(twitchOn
+    ? ('источник сменён на «' + ISTOK_NAMES[kind] + '» — применится при перезапуске эфира')
+    : ('в эфир пойдёт: ' + ISTOK_NAMES[kind]));
+  return ISTOK_NAMES[kind] + (twitchOn ? ' (после перезапуска эфира)' : '');
+}
+
+/* ---------- ЯЗЫК БЕСЕДЫ ----------
+   Отдельно от языка интерфейса (тот — кнопка LANG). Здесь меняется САМ
+   РАЗГОВОР: распознавание переходит на en-US (иначе английскую речь ухо
+   калечит), голос читает по-английски, Клод отвечает по-английски.
+   Слово-триггер остаётся русским: EAR_WAKE его и так ловит, а менять
+   триггер на лету — верный способ остаться без управления посреди эфира.
+   Сайд-квест по языку живёт на ноуте, в роли Клода — здесь только канал. */
+let besedaLang = 'ru';
+function setBesedaLang(v){
+  const s = String(v == null ? '' : v).toLowerCase();
+  besedaLang = /(англ|english|en)/.test(s) ? 'en' : 'ru';
+  if (earRec){
+    /* перезапуск распознавания: язык на лету не меняется */
+    try{ earRec.stop(); }catch(e){}
+    earRec.lang = (besedaLang === 'en') ? 'en-US' : 'ru-RU';
+    if (earOn) setTimeout(() => { try{ earRec.start(); }catch(e){} }, 300);
+  }
+  engSend({ op: 'note', data: 'beseda-lang:' + besedaLang });
+  bb('язык беседы: ' + besedaLang);
+  linkFlash(besedaLang === 'en'
+    ? 'BESEDA IN ENGLISH · ухо слушает en-US, «рут код» по-прежнему по-русски'
+    : 'беседа по-русски');
+  return besedaLang;
+}
+
+/* ---------- НАЕДИНЕ: закрытый разговор с Клодом ----------
+   Иногда надо проработать техническое или личное, пока эфир идёт. Одним
+   движением: микрофон уходит из эфира, соведущий приостанавливается,
+   Клод говорит только в ухо, а КАРТИНКА ПРОДОЛЖАЕТ ИДТИ — зрители видят,
+   что человек работает, а не чёрный экран.
+   Главное здесь не удобство, а разделение: приватное НЕ попадает в
+   стенограмму эфира. Не метка ⊘ на общей странице, а другая страница —
+   иначе однажды техническое или личное прозвучит из клипа.
+   Возврат восстанавливает ровно то, что было: гейт и соведущий, а не
+   «как обычно». Ничего не остаётся включённым по забывчивости. */
+let naedine = false, naedineWas = null;
+function setNaedine(v){
+  const on = (v !== false);
+  if (on === naedine) return naedine ? 'уже наедине' : 'уже в эфире';
+  if (on){
+    naedineWas = { mic: micMuted, cohost: cohostOn };
+    setMicMuted(true);                    // голос из эфира — прочь
+    if (cohostOn) setCohost(false);       // соведущий умолкает, вернём потом
+    naedine = true;
+    engSend({ op: 'note', data: 'naedine:on' });
+    bb('наедине: закрытый разговор');
+    linkFlash('НАЕДИНЕ · микрофон вне эфира, Клод говорит только в ухо, '
+            + 'запись разговора отдельно от стенограммы. Картинка идёт');
+    beep('off');
+  } else {
+    naedine = false;
+    if (naedineWas){
+      setMicMuted(naedineWas.mic);
+      if (naedineWas.cohost) setCohost(true);
+      naedineWas = null;
+    }
+    engSend({ op: 'note', data: 'naedine:off' });
+    bb('снова в эфире');
+    linkFlash('снова в эфире: вернул микрофон и соведущего как было');
+    beep('on');
+  }
+  return naedine ? 'наедине' : 'в эфире';
 }
 
 /* ---------- РАЗОГРЕВ ----------
@@ -3768,7 +3956,9 @@ function warmAsk(){
    память не идут — они служебные и уже лежат в журнале как voice. */
 let pamyatMode = 'off';                     // off · efir · vse
 function pamyatLive(){
-  return !micMuted && !pttHeld && !panicOn && !pocketOn;
+  /* naedine — закрытый разговор: его речь идёт в свой файл, а не в
+     стенограмму эфира. Здесь она просто не отправляется. */
+  return !micMuted && !pttHeld && !panic && !lockOn && !naedine;
 }
 function pamyatSay(text){
   if (pamyatMode === 'off') return false;
@@ -4116,7 +4306,7 @@ function setTip(arg, corner){
 }
 function drawTip(c, w, h){
   if (!tipMs || !tipQR) return;
-  if (panicOn || pocketOn) return;                 // приватность сильнее доната
+  if (panic || lockOn) return;                     // приватность сильнее доната
   const age = performance.now() - tipT0;
   if (age > tipMs){ tipMs = 0; return; }
   const a = Math.min(1, age / 300) * Math.min(1, Math.max(0, (tipMs - age) / 500));
@@ -4197,8 +4387,6 @@ const EAR_TABLE = [
   [['картинка'], { op: 'cmd', name: 'camMute', args: [false] }],
   [['тихо'], { op: 'cmd', name: 'micGate', args: [true] }],
   [['звук'], { op: 'cmd', name: 'micGate', args: [false] }],
-  [['запись'], { op: 'cmd', name: 'rec', args: [true] }],
-  [['снято', 'стоп запись'], { op: 'cmd', name: 'rec', args: [false] }],
   [['карман'], { op: 'cmd', name: 'pocket', args: [true] }],
   [['без блюра'], { op: 'cmd', name: 'blur', args: [false] }],
   [['блюр', 'блур'], { op: 'cmd', name: 'blur', args: [true] }],
@@ -4244,7 +4432,20 @@ const EAR_TABLE = [
   [['помни эфир', 'память включи'], { op: 'cmd', name: 'pamyat', args: [true] }],
   [['не помни', 'память стоп'], { op: 'cmd', name: 'pamyat', args: [false] }],
   [['помни всё', 'помни все', 'память полная'], { op: 'cmd', name: 'pamyat', args: ['всё'] }],
+  [['зачёт', 'зачет', 'спасибо залу'], { op: 'cmd', name: 'zachet', args: [''] }],
+  [['убери сайт', 'закрой сайт'], { op: 'cmd', name: 'sait', args: [false] }],
+  [['закрой карман', 'запри карман'], { op: 'cmd', name: 'poleLock', args: [true] }],
+  [['открой карман', 'отопри карман'], { op: 'cmd', name: 'poleLock', args: [false] }],
+  [['налегке', 'лёгкий режим'], { op: 'cmd', name: 'lite', args: [true] }],
+  [['полный режим', 'не налегке'], { op: 'cmd', name: 'lite', args: [false] }],
   [['разогрев', 'разогреться'], { op: 'cmd', name: 'warm', args: [] }],
+  [['разбор полёта', 'разбор полета', 'разбери эфир'], { op: 'cmd', name: 'razbor', args: [] }],
+  [['поговорим', 'зал пуст'], { op: 'cmd', name: 'beseda', args: [true] }],
+  [['по-английски', 'английский'], { op: 'cmd', name: 'besedaLang', args: ['en'] }],
+  [['по-русски', 'русский'], { op: 'cmd', name: 'besedaLang', args: ['ru'] }],
+  [['помолчи', 'без беседы'], { op: 'cmd', name: 'beseda', args: [false] }],
+  [['наедине', 'закрой разговор'], { op: 'cmd', name: 'naedine', args: [true] }],
+  [['в эфир', 'открой разговор'], { op: 'cmd', name: 'naedine', args: [false] }],
   [['без ударов', 'удары стоп'], { op: 'cmd', name: 'udar', args: [false] }],
   [['донат стоп', 'закрой донат'], { op: 'cmd', name: 'tip', args: [false] }],
   [['без ловца', 'стоп ловец'], { op: 'cmd', name: 'hunt', args: [false] }],
@@ -4287,12 +4488,21 @@ const EAR_ECHO = {
   frame: () => 'скрин снят',
   map: m => m === 'off' ? 'карта убрана' : m === 'mini' ? 'мини карта' : 'карта',
   dash: on => on ? 'приборы' : 'приборы убраны',
+  ear: on => on ? 'ухо слушает' : 'ухо закрыто',
+  lite: on => on ? 'поле налегке' : 'поле в полном режиме',
+  poleLock: on => on ? 'карман поля заперт' : 'карман поля открыт',
+  sait: () => 'сайт в кадре',
+  zachet: () => 'зачёт залу',
   hunt: on => on ? 'ловец на посту' : 'ловец спит',
   tip: on => on ? 'дверь доната открыта' : 'дверь закрыта',
   udar: on => on ? 'удары включены' : 'удары выключены',
   pamyat: v => ({ off: 'память спит', efir: 'память пишет эфир',
                   vse: 'память пишет всё' }[v] || 'память'),
   warm: () => 'собираю разогрев',
+  razbor: () => 'разбираю эфир',
+  naedine: on => on ? 'наедине' : 'снова в эфире',
+  beseda: on => on ? 'поговорим' : 'молчу',
+  besedaLang: v => v === 'en' ? 'english' : 'по-русски',
   hero: n => n ? 'главный экран' : 'обычный фон',
   tidy: () => 'разложил',
   text: () => 'титр стоит'
@@ -4349,6 +4559,15 @@ function earRoute(t, from){
     const r = CMDS.poll({ q: t.slice(6), ms: 60000 });
     earSay(String(r).indexOf('не на связи') >= 0 ? 'рубка не на связи' : 'опрос пошёл');
     bb('ухо: опрос «' + t.slice(6) + '»');
+    return;
+  }
+  if (t.indexOf('зачёт ') === 0 || t.indexOf('зачет ') === 0){   // «зачёт Ивану»
+    engSend({ op: 'zachet', user: t.slice(6).trim(), via: 'ear' });
+    beep('on');
+    return;
+  }
+  if (t.indexOf('сайт ') === 0){               // «сайт windy точка ком»
+    earDo('sait', [t.slice(5).trim()]);
     return;
   }
   if (t.indexOf('память ') === 0){             // «память ветер» — поиск по стенограмме
@@ -4754,7 +4973,7 @@ async function presenceStart(){
 /* показать себя может только человек — здесь и нигде больше */
 async function presenceAsk(){
   if (!await presenceStart()) return;
-  const onAir = twitchOn || screenMode || (recorder && recorder.state === 'recording');
+  const onAir = twitchOn || screenMode;
   if (mayak.ask(onAir)){
     $('btnMe').classList.add('on');
     $('btnMe').textContent = '👋 Я НА КАРТЕ';
@@ -4997,98 +5216,10 @@ function setEye(sec){
   }
 }
 
-/* ---------- запись ---------- */
-function pickMime(){
-  const list = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
-  for (const m of list)
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
-  return '';
-}
-
-function stopRecTracks(){
-  if (recStream) recStream.getTracks().forEach(t => t.stop());
-  recStream = null;
-}
-
-async function toggleRec(){
-  if (recorder && recorder.state === 'recording'){ recorder.stop(); return; }
-  if (!window.MediaRecorder){ showMsg('Этот браузер не умеет MediaRecorder'); return; }
-
-  let stream;
-  if (mode === 'studio'){
-    stream = out.captureStream(30);          // эфирный выход: с блюром — застрахованный кадр
-    ensureMicChain();
-    stream.addTrack(busTrack());             // шина: микрофон, друзья — и все, кто войдёт ПОЗЖЕ
-  } else {
-    /* ЭФИР: слой YouTube — чужой iframe, в canvas его не нарисовать.
-       На компе берём захват вкладки; на телефоне честно шлём к Пункту управления. */
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)){
-      showHowto(); return;
-    }
-    try{
-      const gdm = await navigator.mediaDevices.getDisplayMedia({
-        video: true, audio: true, preferCurrentTab: true
-      });
-      ensureMicChain();
-      const tabA = gdm.getAudioTracks();
-      recTabNode = tabA.length ? connectToBus(new MediaStream(tabA)) : null;
-      stream = new MediaStream([...gdm.getVideoTracks(), busTrack()]);
-      recStream = gdm;
-      gdm.getVideoTracks()[0].addEventListener('ended', () => {
-        if (recorder && recorder.state === 'recording') recorder.stop();
-      });
-    }catch(e){ showMsg('Захват не дали: ' + e.name); return; }
-  }
-
-  $('saveWrap').style.display = 'none';
-  if (blobUrl){ URL.revokeObjectURL(blobUrl); blobUrl = null; }
-  const mime = pickMime();
-  chunks = [];
-  recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-  recorder.ondataavailable = e => {
-    if (!(e.data && e.data.size)) return;
-    chunks.push(e.data);
-    idbPut('chunks', { s: recSess, i: chunks.length, b: e.data });   // тихий дубль на диск
-  };
-  recorder.onstop = () => {
-    clearInterval(timerId);
-    if (!twitchOn) $('hud').style.display = 'none';
-    $('btnRec').classList.remove('on');
-    stopRecTracks();
-    if (recTabNode){ try{ recTabNode.disconnect(); }catch(e){} recTabNode = null; }
-    bb('запись: стоп');
-    idbClear();   // файл собран чисто — страховочный склад очищаем
-    const type = recorder.mimeType || mime || 'video/mp4';
-    const blob = new Blob(chunks, { type });
-    blobUrl = URL.createObjectURL(blob);
-    const a = $('saveLink');
-    a.href = blobUrl;
-    a.download = 'skrin-studia.' + (type.includes('mp4') ? 'mp4' : 'webm');
-    a.textContent = 'Сохранить видео · ' + (blob.size / 1048576).toFixed(1) + ' МБ';
-    $('saveWrap').style.display = 'flex';
-  };
-  if ($('rescueWrap').style.display === 'block'){
-    $('rescueWrap').style.display = 'none';
-    showMsg('Старая оборванная запись затёрта новой');
-  }
-  recSess = Date.now();
-  idbClear().then(() => idbPut('meta', { id: recSess, mime, t0: recSess }, 'cur'));
-  recorder.start(1000);
-  recT0 = Date.now();
-  startTimer();
-  $('btnRec').classList.add('on');
-  bb('запись: старт (' + (mime || 'авто') + ')');
-}
-
-function startTimer(){
-  $('hud').style.display = 'flex';
-  clearInterval(timerId);
-  timerId = setInterval(() => {
-    const s = Math.floor((Date.now() - recT0) / 1000);
-    $('timer').textContent =
-      String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-  }, 250);
-}
+/* Записи в студии нет намеренно (26.07): очки пишут сами в своём
+   качестве, Twitch хранит VOD, а второй энкодер на слабом ноуте отнимал
+   то самое, чего не хватает эфиру. Кольцо клипов живёт отдельно — оно
+   буфер момента, а не архив. */
 
 /* ---------- YouTube ---------- */
 function ytId(s){
@@ -5104,6 +5235,115 @@ $('btnWatch').onclick = () => {
     '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
   $('ytUrl').blur();
 };
+
+/* ---------- СПИСОК ГОЛОСОВЫХ КОМАНД ----------
+   Семьдесят семь команд и шестьдесят семь фраз в голове не держатся.
+   Список СОБИРАЕТСЯ ИЗ ЖИВОЙ ТАБЛИЦЫ EAR_TABLE — не переписан руками,
+   поэтому не может разойтись с правдой: добавили фразу — она тут же
+   появилась в списке. Отдельно идут фразы с текстом (метка, титр, цель…):
+   у них после слова следует свой текст, таблицей их не опишешь.
+   Примечания — только там, где есть условие: без него команда молчит. */
+const HELP_NOTE = {
+  clip: 'нужно включённое кольцо',
+  rec: 'пишет на этом устройстве',
+  twitch: 'нужен ключ канала',
+  duty: 'нужен дежурный на ноуте',
+  warm: 'нужна рубка',
+  hunt: 'метки и шёпот; видео не трогает',
+  pamyat: 'пишет на ноут; выкл · эфир · всё',
+  tip: 'сначала дай ссылку',
+  udar: 'звуки лежат в udary/',
+  lite: 'команда телефону в поле',
+  poleLock: 'команда телефону в поле',
+  goal: 'считает рубка',
+  sait: 'при источнике «полотно» зрители не увидят',
+  compact: 'формат вкладок',
+  probeNext: 'следующий источник приборов'
+};
+const HELP_PREFIX = [
+  ['метка ТЕКСТ', 'отметить момент своими словами'],
+  ['титр ТЕКСТ', 'надпись в кадре'],
+  ['опрос ВОПРОС', 'опрос зрителям (считает рубка)'],
+  ['цель 500 битов НА ЧТО', 'донат-цель; «цель стоп» — снять'],
+  ['память СЛОВО', 'поиск по стенограмме эфира'],
+  ['сайт АДРЕС', 'показать страницу зрителям'],
+  ['показания ИМЯ', 'чьи приборы в кадре']
+];
+function helpVoice(){
+  const rows = [];
+  EAR_TABLE.forEach(([words, act]) => {
+    const name = (act && act.name) || (act && act.op) || '';
+    rows.push({ say: words.join(' · '), cmd: name, note: HELP_NOTE[name] || '' });
+  });
+  return rows;
+}
+function helpText(){
+  const L = ['ГОЛОСОМ: сначала «рут код», потом фраза.', ''];
+  helpVoice().forEach(r => {
+    L.push('· ' + r.say + (r.note ? '   — ' + r.note : ''));
+  });
+  L.push('', 'ФРАЗЫ СО СВОИМ ТЕКСТОМ:');
+  HELP_PREFIX.forEach(([s, d]) => L.push('· ' + s + '   — ' + d));
+  L.push('', 'Всего фраз: ' + EAR_TABLE.length + '. Список собран из таблицы,'
+           + ' а не переписан — он не устареет.');
+  return L.join('\n');
+}
+function showHelpVoice(){
+  const box = $('helpVoice');
+  if (!box) return 'нет окна';
+  $('helpVoiceBody').textContent = helpText();
+  box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  return 'список голосовых команд';
+}
+
+/* ---------- САЙТ В КАДРЕ ----------
+   Кнопка ЭФИР умела ровно одно: видео с YouTube по ссылке. Клоду этого
+   мало — стример просит «покажи зрителям вот это», и это может быть карта
+   ветра, таблица, статья, что угодно.
+   ЧЕСТНЫЙ ПРЕДЕЛ, о котором нельзя молчать: чужой iframe в полотно не
+   рисуется — браузер не отдаёт чужую страницу в canvas. Значит если
+   источник эфира «полотно студии», ЗРИТЕЛИ САЙТА НЕ УВИДЯТ. Нужен захват
+   экрана или вкладки. Команда говорит об этом сразу, а не делает вид, что
+   показала.
+   Второй предел: половина сайтов запрещает встраивание (X-Frame-Options).
+   Такой сайт останется белым прямоугольником — виноват не мы, но сказать
+   надо. */
+function saitShow(url){
+  const s = String(url == null ? '' : url).trim();
+  if (s === '' ) return mode === 'efir'
+    ? ('в кадре: ' + (saitNow || 'пусто'))
+    : 'сайт не показывается';
+  if (/^(стоп|убери|хватит|off|false)$/i.test(s) || url === false){
+    setMode('studio');
+    saitNow = '';
+    bb('сайт убран из кадра');
+    return 'сайт убран, вернулись в студию';
+  }
+  let u = s;
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  try{ new URL(u); }catch(e){ return 'не понял адрес: ' + s; }
+  if (!/^https:/i.test(u)) return 'только https — иначе браузер не пустит';
+  const id = ytId(u);
+  $('yt').innerHTML = id
+    ? ('<iframe src="https://www.youtube-nocookie.com/embed/' + id +
+       '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>')
+    : ('<iframe src="' + u.replace(/"/g, '&quot;') +
+       '" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>');
+  saitNow = u;
+  if (mode !== 'efir') setMode('efir');
+  const srcSel = $('twSource') ? $('twSource').value : 'canvas';
+  const blind = twitchOn && srcSel === 'canvas';
+  bb('сайт в кадре: ' + u.slice(0, 60));
+  linkFlash(blind
+    ? 'САЙТ В КАДРЕ, НО ЗРИТЕЛИ ЕГО НЕ ВИДЯТ: источник эфира — полотно, а чужой iframe в полотно не рисуется. Переключи источник на «экран или вкладка»'
+    : ('сайт в кадре: ' + u.slice(0, 70)));
+  return (blind
+    ? 'показал, НО зрители не увидят: источник эфира — полотно студии, ' +
+      'чужой сайт в него не рисуется. Скажи «источник экран» и перезапусти эфир'
+    : 'показываю: ' + u.slice(0, 70)) +
+    '. Если останется белым — сайт запрещает встраивание';
+}
+let saitNow = '';
 
 /* ---------- режимы ---------- */
 function setMode(m){
@@ -5134,6 +5374,10 @@ $('btnMode').onclick = () => setMode(mode === 'studio' ? 'efir' : 'studio');
 
 /* ---------- Twitch · WHIP ---------- */
 let twCanvasStream = null, twStatTimer = null, twRetry = 0, twT0 = 0;
+/* Сторож первых 15 секунд. Его надо ХРАНИТЬ, иначе он доживает до конца
+   даже когда эфир остановлен рукой — и врёт «сервер не ответил» на ровном
+   месте, в самый нервный момент. */
+let twStartT = null;
 /* Сторож эфира: следит за настоящим состоянием соединения и за тем, что
    байты реально уходят. Молчаливый обрыв больше не выдаёт себя за эфир. */
 function twWatch(srcKind){
@@ -5176,7 +5420,11 @@ function twWatch(srcKind){
     }
     if (s === 'disconnected' && started) showMsg('Twitch: связь дрожит…', 4000);
   });
-  setTimeout(() => { if (!started && !twitchOn) fail('сервер не ответил за 15 секунд'); }, 15000);
+  clearTimeout(twStartT);
+  twStartT = setTimeout(() => {
+    twStartT = null;
+    if (!started && !twitchOn) fail('сервер не ответил за 15 секунд');
+  }, 15000);
   /* байты: если ничего не уходит — кодировать нечем или кодек не тот */
   clearInterval(twStatTimer);
   twStatTimer = setInterval(async () => {
@@ -5217,8 +5465,11 @@ async function twCodecCheck(){
   try{
     const k = localStorage.getItem('skrin-twkey');
     if (k) $('twKey').value = k;
+    /* Умолчание — ПОЛОТНО СТУДИИ: на ноуте камера смотрит в стену, а в эфир
+       нужен собранный кадр со всеми камерами, приборами и лентой. Раньше
+       умолчанием была камера — и первый эфир уходил в потолок. */
     const s = localStorage.getItem('skrin-twsrc');
-    if (s && $('twSource')) $('twSource').value = s;
+    if ($('twSource')) $('twSource').value = s || 'canvas';
   }catch(e){}
   $('twKey').addEventListener('change', () => {
     try{ localStorage.setItem('skrin-twkey', $('twKey').value.trim()); }catch(e){}
@@ -5326,6 +5577,7 @@ async function twitchStart(){
   }
 }
 function twitchStop(silent){
+  clearTimeout(twStartT); twStartT = null;   // остановили — сторож молчит, а не врёт
   if (pc){ try{ pc.close(); }catch(e){} pc = null; }
   if (whipResource){ fetch(whipResource, { method: 'DELETE' }).catch(() => {}); whipResource = null; }
   if (twScreenStream){ twScreenStream.getTracks().forEach(t => t.stop()); twScreenStream = null; }
@@ -5340,9 +5592,7 @@ function twitchStop(silent){
   twitchOn = false;
   $('btnTwitch').classList.remove('on');
   $('hud').classList.remove('live');
-  if (!(recorder && recorder.state === 'recording')){
-    clearInterval(timerId); $('hud').style.display = 'none';
-  }
+  clearInterval(timerId); $('hud').style.display = 'none';
   if (!silent) showMsg('Эфир остановлен');
 }
 $('btnTwitch').onclick = () => {
@@ -5406,8 +5656,29 @@ const CMDS = {
   hunt: v => setHunt(!!v),
   tip: (v, corner) => setTip(v, corner),
   udar: v => setUdar(v),
+  istok: v => setIstok(v),
   pamyat: v => setPamyat(v),
   warm: () => warmAsk(),
+  naedine: v => setNaedine(v),
+  besedaLang: v => setBesedaLang(v),
+  beseda: v => {
+    /* Команда дежурному: собеседник живёт на ноуте. Здесь только просьба
+       и честный ответ, если рубки нет. */
+    engSend({ op: 'voice', text: (v === false) ? 'помолчи' : 'поговорим' });
+    return engConns.length ? ((v === false) ? 'беседа выключена' : 'поговорим')
+                           : 'рубка не на связи — собеседник живёт на ноуте';
+  },
+  razbor: () => {
+    if (!engConns.length){
+      earSay('рубка не на связи — разбор живёт на ноуте');
+      return 'рубки нет';
+    }
+    engSend({ op: 'razbor' });
+    beep('on');
+    earSay('разбираю эфир');
+    bb('разбор полёта запрошен');
+    return 'разбор запрошен';
+  },
   subs: (v, lang) => setSubs(v, lang),
   aspect: a => setAspect(a),
   montage: v => setProj(!!v),
@@ -5461,6 +5732,41 @@ const CMDS = {
   },
   feed: ev => feedPush(ev),
   feedOn: v => setFeed(!!v),
+  ear: v => setEar(!!v),        // дистанционно: раньше ухо включалось только кнопкой на ноуте
+  compact: v => setCompact(v !== false),
+  sait: url => saitShow(url),
+  probeNext: () => probeNext(),
+  spisok: () => showHelpVoice(),
+  zachet: who => {
+    /* Команда рубке: вес советчика живёт у неё. Без имени — последнему
+       совету в очереди: чаще всего его Клод и озвучил. */
+    engSend({ op: 'zachet', user: who || '' });
+    return engConns.length ? 'зачёт передан' : 'рубка не на связи — вес не запишется';
+  },
+  poleLock: v => {
+    /* Замок кармана ПОЛЯ — не путать с `pocket`, это карман самой студии.
+       Телефон едет в гермочехле: снять замок пальцем нельзя, а голосом —
+       можно, звук проходит и через чехлы. */
+    const on = (v !== false);
+    let sent = 0;
+    programConns.forEach(c => {
+      try{ if (c.open){ c.send({ op: 'cmd', name: 'poleLock', args: [on] }); sent++; } }catch(e){}
+    });
+    bb('карман поля → ' + (on ? 'заперт' : 'открыт'));
+    return sent ? ('поле: карман ' + (on ? 'заперт' : 'открыт')) : 'поля нет на связи';
+  },
+  lite: v => {
+    /* Команда телефону, не студии: разбираем её здесь (таблица фраз одна),
+       а исполняет поле. Так «налегке» можно сказать голосом с воды. */
+    const on = (v !== false);
+    let sent = 0;
+    programConns.forEach(c => {
+      try{ if (c.open){ c.send({ op: 'cmd', name: 'lite', args: [on] }); sent++; } }catch(e){}
+    });
+    bb('налегке → полю: ' + (on ? 'вкл' : 'выкл'));
+    return sent ? ('поле: налегке ' + (on ? 'включено' : 'выключено'))
+                : 'поля нет на связи';
+  },
   feedPin: ev => {
     feed.pin = ev ? { kind: ev.kind || 'note', text: String(ev.text || '').slice(0, 90),
                       sub: ev.sub ? String(ev.sub).slice(0, 40) : '',
@@ -5557,7 +5863,6 @@ const CMDS = {
   blur: on => setAutoBlur(!!on),
   panic: on => setPanic(!!on),
   zoneClear: () => { manualZones.length = 0; linkFlash('ручные зоны стёрты'); },
-  rec: on => { const active = recorder && recorder.state === 'recording'; if (!!on !== active) toggleRec(); },
   state: () => ({
     mode, micOn, micMuted, camMuted, twitchOn,
     ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
@@ -5569,7 +5874,10 @@ const CMDS = {
     hunt: huntOn,
     tip: !!tipMs,
     udar: udarOn,
+    istok: ($('twSource') ? $('twSource').value : 'canvas'),
     pamyat: pamyatMode,
+    naedine: naedine,
+    besedaLang: besedaLang,
     hero: heroName || null,
     dash: dashOn,
     camRadar: camRadarOn,
@@ -5598,7 +5906,6 @@ const CMDS = {
       : 0,
     eye: eyeEvery,
     delay: bus ? +bus.delay.delayTime.value.toFixed(2) : 0,
-    rec: !!(recorder && recorder.state === 'recording'),
     cameras: remotes.map(r => r.label), layers: [...layers.keys()]
   })
 };
@@ -5624,6 +5931,16 @@ function handleEngMsg(raw){
     playEngineerAudio(m);
   } else if (m.op === 'moment'){
     momentCatch(m.kind || 'чат', m.note);   // рубка увидела вспышку чата
+  } else if (m.op === 'earText'){
+    /* Ухо поля не имеет своей таблицы фраз — и не должно: иначе фразы
+       разъедутся между телефоном и ноутом. Поле присылает только текст,
+       разбирает его студия тем же путём, что и собственный слух. */
+    const t = String(m.text || '').trim();
+    if (t){
+      linkFlash('🎙 поле: ' + t);
+      bb('ухо поля: «' + t + '»');
+      earRoute(earNorm(t), 'поле');
+    }
   } else if (m.op === 'voice'){
     linkFlash('🎙 ' + (m.text || ''));   // слух услышал — режиссёр видит, что именно
   } else if (m.op === 'js'){
@@ -5677,6 +5994,20 @@ function onDataConn(conn){
       const who0 = (md.name || '').slice(0, 16);
       if (trusted && (d.op === 'cmd' || d.op === 'ptt' || d.op === 'voice')){
         handleEngMsg(d);                 // те же команды, что у рубки и пульта
+        return;
+      }
+      if (d.op === 'help'){
+        /* поле не хранит список: он живёт там же, где таблица фраз */
+        try{ if (conn.open) conn.send({ op: 'help', text: helpText() }); }catch(e){}
+        return;
+      }
+      if (d.op === 'prog-on' || d.op === 'prog-off'){
+        /* Поле смотрит на программу только когда открыта панель. Раньше
+           кадры летели всем подряд: в кармане на воде это чистая трата
+           батареи на приём и разбор JPEG. Теперь — подписка. */
+        conn.wantProg = (d.op === 'prog-on');
+        conn.progKind = (d.kind === 'mont') ? 'mont' : 'prog';
+        if (conn.wantProg) progPulse(conn);
         return;
       }
       if (d.op === 'shape'){
@@ -5744,7 +6075,7 @@ function pultSend(one){
   let jpg;
   try{ jpg = pultTmp.toDataURL('image/jpeg', 0.55); }catch(e){ return; }
   const msg = { op: 'pult-view', jpg, w: W, h: H, layout: pultLayout(),
-                st: { twitch: twitchOn, rec: !!(recorder && recorder.state === 'recording'),
+                st: { twitch: twitchOn,
                       panic: panic, blur: autoBlur, ring: clipOn, mic: micMuted,
                       dash: dashOn, lock: projLock, cams: remotes.filter(r => !r.lost).length } };
   targets.forEach(c => { try{ if (c.open) c.send(msg); }catch(e){} });
@@ -5754,16 +6085,50 @@ function startPultFeed(){
   pultTimer = setInterval(() => { if (pultConns.length) pultSend(); }, 900);
 }
 const progTmp = document.createElement('canvas');
+/* Почему кадра нет — поле должно знать словами, а не пустым окном */
+function progWhy(){
+  if (!running) return 'студия не запущена — нажми СТАРТ на ноуте';
+  if (mode !== 'studio') return 'студия в другом режиме — программы нет';
+  return null;
+}
+function progPulse(conn){
+  const why = progWhy();
+  if (why){ try{ if (conn.open) conn.send({ op: 'prog-none', why }); }catch(e){} }
+}
 function startProgFeed(){
   if (progTimer) return;
   progTimer = setInterval(() => {
-    if (!programConns.length || mode !== 'studio' || !running) return;
-    const pw = 240, ph = Math.max(2, Math.round(240 * H / W));
-    progTmp.width = pw; progTmp.height = ph;
-    progTmp.getContext('2d').drawImage(out, 0, 0, pw, ph);   // эфирный out: со страховкой блюра
-    let jpg;
-    try{ jpg = progTmp.toDataURL('image/jpeg', 0.5); }catch(e){ return; }
-    programConns.forEach(c => { try{ if (c.open) c.send({ op: 'prog', jpg }); }catch(e){} });
+    const watching = programConns.filter(c => c.wantProg);
+    if (!watching.length) return;              // никто не смотрит — не считаем кадр
+    const why = progWhy();
+    if (why){
+      watching.forEach(c => { try{ if (c.open) c.send({ op: 'prog-none', why }); }catch(e){} });
+      return;
+    }
+    const wProg = watching.filter(c => c.progKind !== 'mont');
+    const wMont = watching.filter(c => c.progKind === 'mont');
+    if (wProg.length){
+      const pw = 240, ph = Math.max(2, Math.round(240 * H / W));
+      progTmp.width = pw; progTmp.height = ph;
+      progTmp.getContext('2d').drawImage(out, 0, 0, pw, ph);   // эфирный out: со страховкой блюра
+      let jpg;
+      try{ jpg = progTmp.toDataURL('image/jpeg', 0.5); }catch(e){ jpg = null; }
+      if (jpg) wProg.forEach(c => { try{ if (c.open) c.send({ op: 'prog', jpg }); }catch(e){} });
+    }
+    if (wMont.length){
+      /* макет режиссёра: рамки окон, радар, карта — то же, что видно в
+         проекции на ноуте, только считаем его для поля */
+      projDraw(true);
+      const cv = projCv();
+      if (cv && cv.width > 1){
+        const mw = 260, mh = Math.max(2, Math.round(260 * cv.height / cv.width));
+        progTmp.width = mw; progTmp.height = mh;
+        progTmp.getContext('2d').drawImage(cv, 0, 0, mw, mh);
+        let jm;
+        try{ jm = progTmp.toDataURL('image/jpeg', 0.55); }catch(e){ jm = null; }
+        if (jm) wMont.forEach(c => { try{ if (c.open) c.send({ op: 'prog', jpg: jm, kind: 'mont' }); }catch(e){} });
+      }
+    }
   }, 800);   // ~1.25 кадра/с, ~10–18 КБ на друга — копейки против видео
 }
 
@@ -5834,6 +6199,10 @@ function makeWinDom(rm){
   const g = document.createElement('div');
   g.className = 'grip';
   el.appendChild(g);
+  const star = document.createElement('div');
+  star.className = 'wstar';
+  star.textContent = '★';
+  el.appendChild(star);
   document.body.appendChild(el);
   rm.dom = el;
   rm.place = () => {
@@ -5901,18 +6270,44 @@ function makeWinDom(rm){
   });
   el.appendChild(wbar);
 
-  /* окно успокаивается через 2 с: уголок и панель прячутся, кадр чист */
-  let calmT = null;
-  const wake = () => {
-    el.classList.remove('calm');
-    clearTimeout(calmT);
-    calmT = setTimeout(() => el.classList.add('calm'), 2000);
-  };
-  el.addEventListener('pointerdown', wake);
-  wake();
+  /* ДВОЙНОЙ ТАП ПО ОКНУ — главная камера. Раньше до звёздочки надо было
+     добраться тремя касаниями: разбудить окно, развернуть панель, попасть
+     в кнопку. В эфире одной рукой это не работает. Кнопка ★ в панели
+     осталась — жест её не отменяет, а обгоняет. */
+  let tapAt = 0;
+  el.addEventListener('pointerdown', e => {
+    if (e.target === g || (e.target.closest && e.target.closest('.wbar'))) return;
+    const now = Date.now();
+    if (now - tapAt < 320){
+      tapAt = 0;
+      const r = setHero(heroName === rm.label ? '' : rm.label);
+      linkFlash(String(r).indexOf('нет камеры') >= 0
+        ? ('не вышло: ' + r) : ('главный экран: ' + (heroName || 'обычный фон')));
+      beep('on');
+    } else tapAt = now;
+  });
+  calmly(el);                       // уголок и панель тают через 2 с
   attachWinGestures(el, g, rm, rm.place);
   rm.place();
 }
+/* Окно успокаивается через две секунды: жёлтый уголок ресайза и панель
+   прячутся, кадр остаётся чистым. Правило было написано для окон друзей,
+   а радар и карта его не знали — и уголок торчал в эфире всегда. Теперь
+   одно правило на всех, как и задумывалось. */
+function calmly(el, ms){
+  if (!el || el.dataset.calmly) return null;
+  el.dataset.calmly = '1';
+  let t = null;
+  const wake = () => {
+    el.classList.remove('calm');
+    clearTimeout(t);
+    t = setTimeout(() => el.classList.add('calm'), ms || 2000);
+  };
+  el.addEventListener('pointerdown', wake);
+  wake();
+  return wake;
+}
+
 function onIncomingCall(call){
   const name = ((call.metadata && call.metadata.name) || '').slice(0, 16);
   /* Тот же друг вернулся — неважно, помечен потерянным или ещё числится живым.
@@ -6662,7 +7057,6 @@ $('btnMic').onclick = async () => {
 $('btnScreen').onclick = toggleScreen;
 $('btnGateMic').onclick = () => { ensureMicChain(); setMicMuted(!micMuted); };
 $('btnGateCam').onclick = () => setCamMuted(!camMuted);
-$('btnRec').onclick = toggleRec;
 
 /* РАЦИЯ на экране: удержание = говорю с Клодом (палец на телефоне) */
 const pttEl = $('btnPtt');
@@ -6765,6 +7159,12 @@ $('btnSubs').onclick = () => {
 };
 $('btnDuty').onclick = () => CMDS.duty(!dutyWanted);
 $('btnWarm').onclick = () => CMDS.warm();
+$('btnRazbor').onclick = () => CMDS.razbor();
+$('tabFmt').onclick = () => setCompact(!compact);
+$('zProbe').onclick = e => { e.stopPropagation(); probeNext(); };
+$('btnHelpVoice').onclick = () => showHelpVoice();
+$('helpVoiceX').onclick = () => { $('helpVoice').style.display = 'none'; };
+setCompact(compact);              // вернуть выбранный формат при запуске
 /* по кругу: экран → 16:9 → 9:16 → 1:1 → экран */
 $('btnAspect').onclick = () => {
   const order = ['экран', '16:9', '9:16', '1:1'];
@@ -6863,6 +7263,10 @@ function radarKeysShow(){
     $('zoombar').classList.add('away');
   }, 2000);
 }
+/* радар и карта — такие же окна: уголок прячется через две секунды */
+calmly($('radarWin'));
+calmly($('mapWin'));
+
 (function zoomButtons(){
   /* тап по самому радару будит кнопки */
   $('radarWin').addEventListener('pointerdown', () => radarKeysShow());
@@ -6966,8 +7370,8 @@ setInterval(() => {
   vi.style.background = lvl > 0.86 ? '#FF5D45' : '#7ED8A0';
   if (huntOn && running && mode === 'studio' && huntJudge(rms, Date.now(), hunt))
     momentCatch('звук взлетел');
-  const onAir = twitchOn || (recorder && recorder.state === 'recording');
-  const expect = (micOn && !micMuted && !pttHeld) || remotes.some(r => !r.lost) || twTabNode || recTabNode;
+  const onAir = twitchOn;
+  const expect = (micOn && !micMuted && !pttHeld) || remotes.some(r => !r.lost) || twTabNode;
   if (onAir && expect && rms < 0.006){
     if (!silentSince) silentSince = Date.now();
     else if (Date.now() - silentSince > 5000 && Date.now() - lastSilentFlash > 15000){
@@ -7322,7 +7726,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   wakeAllVideos();   // фон гасит воспроизведение — на возврате оживляем окна друзей
-  if (!wakeLock && (lockOn || linkRole || twitchOn || (recorder && recorder.state === 'recording')))
+  if (!wakeLock && (lockOn || linkRole || twitchOn))
     keepAwake();
   /* Свёрнутый браузер морозит вкладку: связь могла умереть тихо.
      Вернулись — проверяем и, если оборвалось, звоним сами. */
@@ -7563,7 +7967,6 @@ try{
   }
 }catch(e){}
 dutyUp();
-rescueScan();
 fit();
 </script>
 </body>
