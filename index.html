@@ -53,6 +53,10 @@
   }
 
   /* ---- стартовый экран ---- */
+  /* то же и в студии: её открывают с телефона, и там долгие нажатия
+     тоже ловят выделение вместо жеста */
+  body{-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  .btn, .tab, .zbtn, .wbar, .grip, #tabFmt{-webkit-user-select:none;user-select:none}
   #helpVoice{position:fixed;inset:auto 12px 12px 12px;max-height:64vh;z-index:60;display:none;
     background:rgba(8,11,16,.97);border:1px solid rgba(232,227,216,.18);border-radius:16px;
     padding:12px 14px;overflow:auto;-webkit-overflow-scrolling:touch}
@@ -696,7 +700,14 @@
       </div>
       <div class="row"><button class="quiet" id="lnkRoomGo">🔒 ПОДНЯТЬ КОМНАТУ</button></div>
       <div class="row"><button class="quiet" id="lnkKrug">👥 МОЙ КРУГ — кто в сети</button></div>
-      <div class="row"><button class="quiet" id="lnkPult">📱 Я — ПУЛЬТ (студия на другом устройстве)</button></div>
+      <div class="row"><a class="quiet" id="lnkPole" target="_blank" rel="noopener"
+         href="https://pneuron1321.github.io/SSpole/"
+         style="display:flex;align-items:center;justify-content:center;text-decoration:none">
+         📱 ПОЛЕ — камера и пульт с телефона</a></div>
+      <small style="margin-bottom:8px">Поле — отдельная лёгкая страница: камера,
+      пульт студии, приборы и режим НАЛЕГКЕ. Открой её на телефоне и введи код
+      этой комнаты.</small>
+      <div class="row"><button class="quiet" id="lnkPult">📱 Я — ПУЛЬТ (устаревшее)</button></div>
       <input id="lnkPultKey" autocomplete="off" maxlength="12" autocapitalize="characters"
              placeholder="ключ рубки — если входишь не по комнате с паролем">
       <div class="row" id="roomBack" style="display:none">
@@ -708,8 +719,10 @@
       Дай друзьям ссылку на эту страницу и скажи код:
       <div class="bigcode" id="linkCode">····</div>
       <div id="linkWait" style="color:var(--dim)">жду телефоны…</div>
+      <div class="row"><button class="quiet" id="lnkNewCode">🔄 НОВЫЙ КОД — закрыть комнату</button></div>
       <div id="engLine" style="color:var(--dim);font-size:12px;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></div>
       <div class="row"><button class="quiet" id="btnHelpVoice">🎙 ГОЛОСОВЫЕ КОМАНДЫ</button></div>
+      <div class="row"><button class="quiet" id="btnWakeTune">🔧 НАСТРОИТЬ СЛОВО</button></div>
       <div class="row">
         <button class="quiet" id="lnkLock">🔓 ВХОД ОТКРЫТ</button>
         <button class="quiet" id="lnkStop1">Разорвать всё</button>
@@ -1721,7 +1734,8 @@ function sceneApply(n){
     placeWinDom();
   }
   if (s.radar){
-    Object.assign(radar, { nx: s.radar.nx, ny: s.radar.ny, nw: s.radar.nw });
+    Object.assign(radar, { nx: s.radar.nx, ny: s.radar.ny,
+      nw: Math.max(RADAR_MIN, Math.min(RADAR_MAX, +s.radar.nw || 0.3)) });
     if (s.radar.mode) setRadarMode(s.radar.mode);
     if (s.radar.zoom != null) CMDS.radarZoom(s.radar.zoom);
     if (s.radar.on && !dashOn) setDash(true);
@@ -2181,8 +2195,15 @@ function projSize(){
 }
 function projDraw(force){
   /* force — считать макет, не показывая его на студии: так поле видит
-     монтаж у себя в руках, а режиссёру ничего не лезет на экран */
+     монтаж у себя в руках, а режиссёру ничего не лезет на экран.
+     02.08: монтаж из поля молчал именно здесь — полотно проекции имеет
+     нулевой размер, пока её не открыли на ноуте, и кадр не с чего было
+     снимать. Теперь размер ставится и без показа. */
   if (!projOn && !force) return;
+  if (force && (!projCv().width || projCv().width < 2)){
+    const z = projSize();
+    projCv().width = z.w; projCv().height = z.h;
+  }
   const c = projCv().getContext('2d');
   const { w, h } = projSize();
   if (projCv().width !== w){ projCv().width = w; projCv().height = h; }
@@ -2618,8 +2639,15 @@ function setHero(name){
   }
   heroName = n;
   remotes.forEach(r => {
-    if (r.bHero) r.bHero.classList.toggle('on', r.label === n);
-    if (r.dom) r.dom.classList.toggle('hero', r.label === n);   // метка на самом окне
+    const me = (r.label === n);
+    if (r.bHero) r.bHero.classList.toggle('on', me);
+    if (r.dom){
+      r.dom.classList.toggle('hero', me);
+      /* 02.08: у главной камеры оставалось и маленькое окно — с золотой
+         рамкой, звездой и троеточием поверх той же картинки во весь кадр.
+         Двойник в кадре не нужен: окно героя убираем, вернём при снятии. */
+      r.dom.style.display = me ? 'none' : '';
+    }
   });
   /* главный экран во весь кадр — приборы уходят в угол; сняли — отпускаем */
   if (n && n !== 'я') setRadarMode('gta');
@@ -2713,7 +2741,15 @@ function frame(){
     if (heroName && rm.label === heroName) continue;   // герой уже во весь фон
     const live = !rm.lost && rm.video && rm.video.videoWidth;
     if (!live && !rm.lost) continue;               // картинка ещё не пошла
-    const rp = rectPx(rm), rad2 = Math.min(rp.w, rp.h) * 0.06;
+    /* ОБРЫВ СВОРАЧИВАЕТСЯ. Замороженный кадр во весь размер занимал место
+       в композите зря: смотреть там нечего, а держать позицию нужно —
+       камера вернётся на своё. Поэтому пропавшее окно ужимается в узкую
+       плашку с именем: место помнится, кадр освобождается. */
+    const rpFull = rectPx(rm);
+    const rp = rm.lost
+      ? { x: rpFull.x, y: rpFull.y, w: rpFull.w, h: Math.min(rpFull.h, W * 0.055) }
+      : rpFull;
+    const rad2 = Math.min(rp.w, rp.h) * 0.06;
     ctx.save();
     if (rm.rot){
       const cx = rp.x + rp.w / 2, cy = rp.y + rp.h / 2;
@@ -2725,14 +2761,9 @@ function frame(){
       drawCoverRect(ctx, rm.video, rp.x, rp.y, rp.w, rp.h, false);
     } else {
       /* друг пропал: тёмное окно, полупрозрачная заморозка последнего кадра */
+      /* в плашке кадра нет: только фон. Замороженную картинку держим в
+         памяти — она пригодится, если понадобится развернуть обратно */
       ctx.fillStyle = '#0F151C'; ctx.fillRect(rp.x, rp.y, rp.w, rp.h);
-      if (rm.freeze){
-        const iw = rm.freeze.width, ih = rm.freeze.height;
-        const sc = Math.max(rp.w / iw, rp.h / ih);
-        ctx.globalAlpha = 0.35;
-        ctx.drawImage(rm.freeze, rp.x + (rp.w - iw * sc) / 2, rp.y + (rp.h - ih * sc) / 2, iw * sc, ih * sc);
-        ctx.globalAlpha = 1;
-      }
     }
     ctx.restore();
     rr(ctx, rp.x, rp.y, rp.w, rp.h, rad2);
@@ -2744,9 +2775,37 @@ function frame(){
       ctx.strokeStyle = 'rgba(255,180,84,0.4)';
       ctx.stroke();
     }
+    /* ПРИБОРЫ В ОКНЕ КАМЕРЫ. 02.08: телефон слал показания, студия их
+       принимала и хранила — а увидеть их можно было, только сделав эту
+       камеру источником общего радара. С двумя-тремя камерами это неверно
+       по существу: у каждой своя скорость и свой курс.
+       Теперь они подписаны прямо в её окне, мелко, под именем. Правила
+       честных цифр те же, что у большого радара: неуверенный GPS — не
+       показываем ничего, а не врём. */
+    if (!rm.lost && rm.probe && Date.now() - rm.probe.t < 8000 && dashOn){
+      const pr = rm.probe;
+      const bits = [];
+      /* свежие данные от камеры и есть её «ok»: поля с таким именем в
+         присланном нет, а честность проверяется точностью GPS */
+      if (trustSpeed(Object.assign({ ok: true }, pr)))
+        bits.push((pr.spd * 3.6).toFixed(1) + ' км/ч');
+      if (pr.compass && pr.head != null) bits.push(Math.round(pr.head) + '°');
+      if (bits.length){
+        const ps = Math.max(9, Math.min(W * 0.013, rp.h * 0.34));
+        ctx.font = '700 ' + ps + 'px ui-monospace, Menlo, monospace';
+        const t = bits.join('  ');
+        const pw = ctx.measureText(t).width;
+        const px = rp.x + rp.w / 2 - pw / 2, py = rp.y + ps * 1.6;
+        ctx.fillStyle = 'rgba(11,15,20,0.6)';
+        rr(ctx, px - ps * 0.5, py - ps * 1.15, pw + ps, ps * 1.5, ps * 0.75);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(126,216,160,0.95)';
+        ctx.fillText(t, px, py);
+      }
+    }
     const lbl = rm.lost ? ((rm.label || 'камера') + ' · переподключается…') : rm.label;
     if (lbl){
-      const fs = Math.max(12, W * 0.018);
+      const fs = Math.max(12, Math.min(W * 0.018, rp.h * 0.5));
       ctx.font = '700 ' + fs + 'px ui-monospace, Menlo, monospace';
       const tw = ctx.measureText(lbl).width;
       const lx = rp.x + rp.w / 2 - tw / 2, ly = rp.y + rp.h - fs * 0.7;
@@ -3491,6 +3550,10 @@ function moonPos(date, lat, lng){
 /* ---------- РАДАР И ПОКАЗАТЕЛИ: прибор прямо в кадре ----------
    Рисуется на эфирном полотне, потому виден зрителям. Геометрия — как у
    окна (доли экрана), чтобы раскладка могла его учитывать. */
+/* nw — доля ширины кадра. 02.08 радар, включённый из поля, вылезал
+   огромным: приезжало чужое значение из памяти комнаты, а предела не
+   было. Теперь размер зажат в разумных берегах при любом источнике. */
+const RADAR_MIN = 0.12, RADAR_MAX = 0.34;
 const radar = { nx: 0.035, ny: 0.40, nw: 0.30, nh: 0.30, rot: 0, range: 500,
                 zoom: 0, mode: 'free' };
 /* ---------- ГДЕ СТОИТ РАДАР ----------
@@ -4377,7 +4440,88 @@ function setHunt(v){
 let earOn = false, earRec = null, earMode = 'idle', earSrc = '';
 let dutyWanted = false;
 let earBuf = '', earQuiet = null, earHard = null, earWasGate = false;
-const EAR_WAKE = /(root\s*code|ру[дт]\s*?ко[дт]|рут\s*?код|рудко[дт])/i;
+/* ---------- СЛОВО-ТРИГГЕР ----------
+   02.08, поле: «рут код» не распознан НИ РАЗУ из десяти. «Рут код щит»
+   услышалось как «трубку общит».
+   Причина не в регулярке. Распознавание не выдаёт произвольные звуки — оно
+   выдаёт РУССКИЕ СЛОВА. «Рут код» словом не является, и движок подбирает
+   ближайшее настоящее. Список подмен непредсказуем и зависит от голоса,
+   телефона и ветра, поэтому перечислить их заранее нельзя.
+   Лечение тройное:
+   1. ОСНОВНОЕ СЛОВО ТЕПЕРЬ НАСТОЯЩЕЕ — «рубка». Своё в проекте, два слога,
+      в обычной речи почти не встречается. И, судя по промаху («трубку»),
+      движок метил именно туда.
+   2. ИСКАЖЕНИЯ НЕ ВЫДУМЫВАЮТСЯ, А ИЗМЕРЯЮТСЯ: «рут код, настрой слово» —
+      скажи слово несколько раз, ухо запишет, что услышало НА САМОМ ДЕЛЕ.
+   3. СРАВНЕНИЕ ПО ЗВУКОВОМУ СКЕЛЕТУ, а не по буквам: глухие и звонкие
+      пары сводятся, безударные гласные тоже, окончания отбрасываются.
+   Старые «рут код» и «root code» остаются: привычка дороже чистоты. */
+const WAKE_BASE = ['терминал плюс', 'плюс плюс', 'терминал'];
+let WAKE_LEARNED = [];
+try{ WAKE_LEARNED = JSON.parse(localStorage.getItem('skrin-wake') || '[]'); }catch(e){}
+/* звуковой скелет: б=п, д=т, г=к, в=ф, ж=ш, з/с/ц=с, о=а, и=ы, мягкий знак прочь */
+function wakeSkel(s){
+  return String(s || '').toLowerCase().replace(/ё/g, 'е')
+    .replace(/[^а-яa-z]/g, '')
+    .replace(/[бп]/g, 'п').replace(/[дт]/g, 'т').replace(/[гк]/g, 'к')
+    .replace(/[вф]/g, 'ф').replace(/[жш]/g, 'ш').replace(/[зсц]/g, 'с')
+    .replace(/[оа]/g, 'а').replace(/[иы]/g, 'и').replace(/[ьъ]/g, '');
+}
+/* Скелеты ЦЕЛЫХ фраз, без пробелов, с отброшенным окончанием. Целых —
+   принципиально: сравнивай по словам, и одинокое «плюс» в обычной речи
+   включало бы пульт. «Плюс плюс» же произносится только нарочно. */
+const WAKE_SKEL = () => WAKE_BASE.concat(WAKE_LEARNED)
+  .map(wakeSkel).filter(s => s.length >= 6)
+  .map(s => s.slice(0, s.length - 1));
+function wakeRe(){
+  const esc = w => String(w).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+  const parts = WAKE_BASE.concat(WAKE_LEARNED).map(esc).filter(Boolean);
+  parts.push('термина[лв]\\w*');                  // терминал · термина · терминалы
+  parts.push('[пб]лю[сзцш]\\s*[пб]лю[сзцш]');     // плюс-плюс и его подмены
+  return new RegExp('(' + parts.join('|') + ')', 'i');
+}
+let EAR_WAKE = wakeRe();
+/* Скелет ловит то, чего нет ни в одном списке: слово могло исказиться
+   впервые. Короткие обрывки отсекаем — на них легко сработать зря. */
+function wakeHeard(text){
+  if (EAR_WAKE.test(text)) return true;
+  const heard = wakeSkel(text);
+  if (heard.length < 6) return false;
+  return WAKE_SKEL().some(k => heard.indexOf(k) >= 0);
+}
+/* КАЛИБРОВКА. Тридцать секунд ухо не исполняет команд, а записывает всё
+   короткое, что услышало: это и есть настоящие искажения твоего слова на
+   твоём телефоне. Гадать больше не нужно.
+   Включается КНОПКОЙ, не голосом: включать настройку слова тем самым
+   словом, которое не слышится, — замкнутый круг. */
+let wakeUchu = false, wakeUchuT = null;
+function setWakeTune(on){
+  wakeUchu = !!on;
+  clearTimeout(wakeUchuT);
+  if (wakeUchu){
+    if (!earOn) setEar(true);
+    wakeUchuT = setTimeout(() => setWakeTune(false), 30000);
+    linkFlash('НАСТРОЙКА СЛОВА · 30 секунд говори «терминал плюс» или '
+            + '«плюс плюс» с паузами. Запишу, как оно слышится на самом деле');
+    earSay('говори слово, слушаю');
+    return 'слушаю 30 секунд';
+  }
+  linkFlash('слово настроено · вариантов: ' + WAKE_LEARNED.length
+          + (WAKE_LEARNED.length ? ' (' + WAKE_LEARNED.join(', ') + ')' : ''));
+  earSay('готово, вариантов ' + WAKE_LEARNED.length);
+  return 'вариантов: ' + WAKE_LEARNED.length;
+}
+
+function wakeLearn(text){
+  const t = String(text || '').trim().toLowerCase();
+  if (!t || t.split(/\s+/).length > 3 || t.length > 24) return false;
+  if (WAKE_LEARNED.indexOf(t) >= 0) return false;
+  WAKE_LEARNED.push(t);
+  if (WAKE_LEARNED.length > 24) WAKE_LEARNED.shift();
+  try{ localStorage.setItem('skrin-wake', JSON.stringify(WAKE_LEARNED)); }catch(e){}
+  EAR_WAKE = wakeRe();
+  return true;
+}
 const EAR_TABLE = [
 
   [['отбой', 'отмена'], null],
@@ -4432,6 +4576,7 @@ const EAR_TABLE = [
   [['помни эфир', 'память включи'], { op: 'cmd', name: 'pamyat', args: [true] }],
   [['не помни', 'память стоп'], { op: 'cmd', name: 'pamyat', args: [false] }],
   [['помни всё', 'помни все', 'память полная'], { op: 'cmd', name: 'pamyat', args: ['всё'] }],
+  [['настрой слово', 'настройка слова'], { op: 'cmd', name: 'wakeTune', args: [true] }],
   [['зачёт', 'зачет', 'спасибо залу'], { op: 'cmd', name: 'zachet', args: [''] }],
   [['убери сайт', 'закрой сайт'], { op: 'cmd', name: 'sait', args: [false] }],
   [['закрой карман', 'запри карман'], { op: 'cmd', name: 'poleLock', args: [true] }],
@@ -4492,6 +4637,7 @@ const EAR_ECHO = {
   lite: on => on ? 'поле налегке' : 'поле в полном режиме',
   poleLock: on => on ? 'карман поля заперт' : 'карман поля открыт',
   sait: () => 'сайт в кадре',
+  wakeTune: on => on ? 'слушаю слово' : 'слово настроено',
   zachet: () => 'зачёт залу',
   hunt: on => on ? 'ловец на посту' : 'ловец спит',
   tip: on => on ? 'дверь доната открыта' : 'дверь закрыта',
@@ -4764,12 +4910,25 @@ function setEar(v){
       if (fin.trim() && earMode !== 'capture')
         pamyatSay(fin.replace(EAR_WAKE, ' ').trim());  // память живёт и без титров
       if (earMode === 'idle'){
+        if (wakeUchu){                       // калибровка: копим, что услышали
+          if (fin.trim() && wakeLearn(fin.trim())){
+            bb('услышал вариант: ' + fin.trim());
+            earSay('записал: ' + fin.trim());
+          }
+          return;
+        }
         const hit = f.match(EAR_WAKE);
         if (hit){
           earCapture('wake');
           const tail = f.slice(f.indexOf(hit[0]) + hit[0].length).trim();
           if (tail){ earBuf = tail + ' '; earBump(700); } else earBump(1600);
-        } else if (EAR_WAKE.test(m)){
+        } else if (wakeHeard(f)){
+          /* слово исказилось так, что в списке его нет — скелет узнал.
+             Хвост после первого слова считаем командой. */
+          earCapture('wake');
+          const tail = f.split(/\s+/).slice(1).join(' ').trim();
+          if (tail){ earBuf = tail + ' '; earBump(700); } else earBump(1600);
+        } else if (wakeHeard(m)){
           earCapture('wake'); earBump(1600);
         }
         return;
@@ -5117,6 +5276,18 @@ function setMap(mode, z){
   } else {
     mapMode = (m === 'full' || m === 'полный') ? 'full' : 'mini';
     geoStart();
+    presenceStart();          // слушаем круг: видеть других можно и не показываясь
+    /* 02.08: карта открылась пустой, и было непонятно, почему. Быть в эфире
+       и быть на карте — разное: показать себя может только человек, кнопкой.
+       Молчащая пустота выглядит поломкой, поэтому говорим прямо. */
+    setTimeout(() => {
+      let n = 0;
+      try{ n = (window.mayak ? mayak.points(true).length : 0); }catch(e){}
+      const я = !!(window.mayak && mayak.state && mayak.state().visible);
+      if (!n && !я)
+        linkFlash('на карте пусто. Быть в эфире и быть на карте — разное: '
+                + 'чтобы видеть друг друга, каждый жмёт ПОКАЗАТЬСЯ');
+    }, 2500);
     layers.set('карта', (c, w, h) => {
       if (mapMode === 'full') drawMap(c, 0, 0, w, h, mapZoom);
       else drawMap(c, mapWin.nx * w, mapWin.ny * h, mapWin.nw * w, mapWin.nh * h, mapZoom);
@@ -5736,7 +5907,20 @@ const CMDS = {
   compact: v => setCompact(v !== false),
   sait: url => saitShow(url),
   probeNext: () => probeNext(),
+  camAudio: (name, which, on) => {
+    /* Ручка звука ОДНОЙ камеры — то же, что кнопки 🔊 и 🎧 на её окне,
+       только дистанционно. Без имени — все разом. */
+    const w = (which === 'ear') ? 'ear' : 'efir';
+    const list = name ? remotes.filter(r => r.label === name) : remotes;
+    if (!list.length) return 'нет такой камеры: ' + name;
+    list.forEach(r => setRemoteAudio(r, w, !!on));
+    const kto = name || 'все камеры';
+    bb('звук ' + kto + ': ' + w + ' ' + (on ? 'вкл' : 'выкл'));
+    return kto + ' · ' + (w === 'ear' ? 'в наушниках' : 'в эфире') + ': '
+         + (on ? 'слышно' : 'тихо');
+  },
   spisok: () => showHelpVoice(),
+  wakeTune: v => setWakeTune(v !== false),
   zachet: who => {
     /* Команда рубке: вес советчика живёт у неё. Без имени — последнему
        совету в очереди: чаще всего его Клод и озвучил. */
@@ -5996,6 +6180,16 @@ function onDataConn(conn){
         handleEngMsg(d);                 // те же команды, что у рубки и пульта
         return;
       }
+      if (d.op === 'bye'){
+        /* камера ушла сама — не обрыв: убираем окно сразу, а не морозим */
+        const gone = remotes.find(r => r.call && r.call.peer === conn.peer);
+        if (gone){
+          bb('камера попрощалась: ' + (gone.label || '—'));
+          showMsg((gone.label || 'Камера') + ' отключилась');
+          removeRemote(gone.call);
+        }
+        return;
+      }
       if (d.op === 'help'){
         /* поле не хранит список: он живёт там же, где таблица фраз */
         try{ if (conn.open) conn.send({ op: 'help', text: helpText() }); }catch(e){}
@@ -6074,15 +6268,47 @@ function pultSend(one){
   try{ pultTmp.getContext('2d').drawImage(out, 0, 0, pw, ph); }catch(e){ return; }
   let jpg;
   try{ jpg = pultTmp.toDataURL('image/jpeg', 0.55); }catch(e){ return; }
-  const msg = { op: 'pult-view', jpg, w: W, h: H, layout: pultLayout(),
-                st: { twitch: twitchOn,
-                      panic: panic, blur: autoBlur, ring: clipOn, mic: micMuted,
-                      dash: dashOn, lock: projLock, cams: remotes.filter(r => !r.lost).length } };
+  const msg = { op: 'pult-view', jpg, w: W, h: H, layout: pultLayout(), st: stSnap() };
   targets.forEach(c => { try{ if (c.open) c.send(msg); }catch(e){} });
 }
+/* СНИМОК СОСТОЯНИЯ для пульта и поля. Раньше он собирался прямо в отправке
+   и знал только восемь полей старого пульта — а пульт поля с тех пор вырос
+   до двенадцати клавиш. Каждая недостающая строка означала, что клавиша
+   считает себя выключенной и шлёт «включить»: карта не закрывалась,
+   приборы не убирались, наушники не выключались. */
+function stSnap(){
+  return {
+    twitch: twitchOn, panic: panic, blur: autoBlur, ring: clipOn,
+    mic: micMuted, camMuted: camMuted, lock: projLock, cams: remotes.filter(r => !r.lost).length,
+    dash: dashOn, map: mapMode, ear: earOn, subs: subsOn,
+    cohost: cohostOn, duty: dutyWanted, monitor: monitorOn, feedOn: feedOn,
+    prompterAloud: prompterAloud, pocket: lockOn, hunt: huntOn,
+    istok: ($('twSource') ? $('twSource').value : 'canvas'),
+    pamyat: pamyatMode, naedine: naedine, hero: heroName,
+    /* Список камер со звуком: пульту мало общего числа. 02.08 Александр
+       заметил верно — глушить всех разом недостаточно, пульт обязан
+       уметь каждого по отдельности. */
+    camList: remotes.map(r => ({ name: r.label || '—', lost: !!r.lost,
+                                 efir: r.onEfir !== false, ear: r.onEar !== false }))
+  };
+}
+
+/* Поле подключается каналом «program» и снимка не получало вовсе — оттого
+   пульт в поле был слеп. Шлём ему то же состояние, только без кадра:
+   картинку он просит отдельно, когда откроет окно. */
+function stToPole(){
+  const st = stSnap();
+  programConns.forEach(c => {
+    try{ if (c.open) c.send({ op: 'pult-view', st }); }catch(e){}
+  });
+}
+
 function startPultFeed(){
   if (pultTimer) return;
-  pultTimer = setInterval(() => { if (pultConns.length) pultSend(); }, 900);
+  pultTimer = setInterval(() => {
+    if (pultConns.length) pultSend();
+    if (programConns.length) stToPole();     // пульту поля нужно состояние, не кадр
+  }, 900);
 }
 const progTmp = document.createElement('canvas');
 /* Почему кадра нет — поле должно знать словами, а не пустым окном */
@@ -7163,6 +7389,25 @@ $('btnRazbor').onclick = () => CMDS.razbor();
 $('tabFmt').onclick = () => setCompact(!compact);
 $('zProbe').onclick = e => { e.stopPropagation(); probeNext(); };
 $('btnHelpVoice').onclick = () => showHelpVoice();
+/* КНОПКОЙ, а не голосом: иначе замкнутый круг */
+$('btnWakeTune').onclick = () => setWakeTune(!wakeUchu);
+/* НОВЫЙ КОД. 02.08: сменить код было нечем — старая комната оставалась
+   открытой навсегда, и всякий, кто её знал, мог войти. Теперь одной
+   кнопкой: всех отпускаем, брокера закрываем, поднимаемся под новым
+   именем. Спрашиваем подтверждение — камеры в эфире отвалятся. */
+$('lnkNewCode').onclick = async () => {
+  const n = remotes.length;
+  if (n && !confirm('Сменить код? ' + n + ' камер(ы) отключатся, старая комната закроется.')) return;
+  remotes.slice().forEach(r => { try{ if (r.call) removeRemote(r.call); }catch(e){} });
+  try{ if (peer) peer.destroy(); }catch(e){}
+  peer = null;
+  linkCode = '';
+  try{ localStorage.removeItem('skrin-room'); }catch(e){}
+  bb('комната закрыта, поднимаю новую');
+  linkFlash('старая комната закрыта — поднимаю новую');
+  await startDirector('');
+  showMsg('Новый код: ' + linkCode);
+};
 $('helpVoiceX').onclick = () => { $('helpVoice').style.display = 'none'; };
 setCompact(compact);              // вернуть выбранный формат при запуске
 /* по кругу: экран → 16:9 → 9:16 → 1:1 → экран */
