@@ -4405,6 +4405,51 @@ layers.set('дверь доната', (c, w, h) => drawTip(c, w, h));
    скрытый слой включает человек. */
 let huntOn = false;
 const hunt = { base: 0.02, last: 0 };
+/* ---------- ЗВУКОВОЙ ПОРТРЕТ ----------
+   Клод глух. Он читает субтитры немого фильма: знает слова, не знает,
+   крик это был или шёпот, ветер или тишина. Звук ему передать нельзя —
+   он его не принимает. Но можно передать ХАРАКТЕР звука числами.
+   Громкость и так считается в VU-цикле каждые несколько миллисекунд и
+   умирает на месте. Здесь она копится в окно и раз в 12 секунд уходит
+   одной короткой сводкой: ноль вызовов Клода, десяток байт по каналу.
+   Честный предел, который надо назвать: это характер, а не сам звук.
+   По портрету не понять, смешно ли было — только что было громко, часто
+   и рвано. */
+const ZVUK = { окно: [], послед: 0, всплески: 0 };
+function zvukСлово(средн, тихо, всплесков, рвано){
+  const громко = средн > 0.18 ? 'громко' : (средн > 0.06 ? 'средний' : 'тихо');
+  const ход = rvanoСлово(рвано);
+  const т = tихоСлово(тихо);
+  return громко + ', ' + ход + (т ? ', ' + т : '')
+       + (всплесков ? ', всплесков ' + всплесков : '');
+}
+function rvanoСлово(р){ return р > 0.55 ? 'рвано' : (р > 0.25 ? 'живо' : 'ровно'); }
+function tихоСлово(доля){
+  if (doleПроцент(доля) >= 60) return 'больше половины времени тишина';
+  if (doleПроцент(доля) >= 25) return 'тишины ' + doleПроцент(доля) + '%';
+  return '';
+}
+function doleПроцент(д){ return Math.round(д * 100); }
+/* чистая функция: кольцо прожигает её без браузера */
+function zvukПортрет(окно){
+  if (!окно || !окно.length) return null;
+  const n = окно.length;
+  const средн = окно.reduce((a, b) => a + b, 0) / n;
+  const тихо = окно.filter(v => v < 0.012).length / n;
+  const порог = Math.max(0.09, средн * 2.2);
+  let всплесков = 0, был = false;
+  for (const v of окно){
+    if (v > порог && !был){ всплесков++; был = true; }
+    else if (v <= порог) был = false;
+  }
+  /* рваность: как сильно соседние отсчёты скачут относительно среднего */
+  let скачки = 0;
+  for (let i = 1; i < n; i++) скачки += Math.abs(окно[i] - окно[i - 1]);
+  const рвано = средн > 0.001 ? Math.min(1, (скачки / (n - 1)) / средн) : 0;
+  return { средн, тихо, всплесков, рвано,
+           слово: zvukСлово(средн, тихо, всплесков, рвано) };
+}
+
 function huntJudge(rms, now, st){
   const COOL = 25000;                       // не чаще раза в 25 с
   st.base = st.base * 0.995 + rms * 0.005;  // медленный фон: минуты, не секунды
@@ -6276,6 +6321,31 @@ function pultSend(one){
    до двенадцати клавиш. Каждая недостающая строка означала, что клавиша
    считает себя выключенной и шлёт «включить»: карта не закрывалась,
    приборы не убирались, наушники не выключались. */
+/* ---------- ОПИСЬ СЦЕНЫ ----------
+   Клод видит кадр картинкой, но не знает её СОСТАВА: какие окна открыты,
+   кто главный, висит ли титр, включена ли лента. Просить ради этого
+   свежий кадр дорого и медленно — а состав студия и так знает про себя.
+   Строка идёт в снимке состояния, то есть бесплатно. */
+function scenaOpis(){
+  const ч = [];
+  ч.push(heroName ? ('во весь кадр: ' + heroName)
+                  : (camMuted ? 'своя камера закрыта' : 'своя камера'));
+  const окна = remotes.filter(r => r.label !== heroName)
+    .map(r => r.label + (r.lost ? ' (нет связи)' : ''));
+  if (окна.length) ч.push('окна: ' + окна.join(', '));
+  const слои = [];
+  if (subsOn) слои.push('субтитры');
+  if (feedOn) слои.push('лента');
+  if (dashOn) слои.push('приборы');
+  if (mapMode && mapMode !== 'off') слои.push('карта');
+  if (tipMs) слои.push('дверь доната');
+  if (cohostOn) слои.push('соведущий');
+  if (слои.length) ч.push('поверх: ' + слои.join(', '));
+  if (panic) ч.push('ПАНИКА: кадр закрыт');
+  if (autoBlur) ч.push('страховка блюра');
+  return ч.join(' · ');
+}
+
 function stSnap(){
   return {
     twitch: twitchOn, panic: panic, blur: autoBlur, ring: clipOn,
@@ -6284,7 +6354,7 @@ function stSnap(){
     cohost: cohostOn, duty: dutyWanted, monitor: monitorOn, feedOn: feedOn,
     prompterAloud: prompterAloud, pocket: lockOn, hunt: huntOn,
     istok: ($('twSource') ? $('twSource').value : 'canvas'),
-    pamyat: pamyatMode, naedine: naedine, hero: heroName,
+    pamyat: pamyatMode, naedine: naedine, hero: heroName, scena: scenaOpis(),
     /* Список камер со звуком: пульту мало общего числа. 02.08 Александр
        заметил верно — глушить всех разом недостаточно, пульт обязан
        уметь каждого по отдельности. */
@@ -7615,6 +7685,20 @@ setInterval(() => {
   vi.style.background = lvl > 0.86 ? '#FF5D45' : '#7ED8A0';
   if (huntOn && running && mode === 'studio' && huntJudge(rms, Date.now(), hunt))
     momentCatch('звук взлетел');
+  /* копим окно и раз в 12 с отдаём портрет: Клоду нужен характер звука,
+     а не поток чисел */
+  ZVUK.окно.push(rms);
+  if (ZVUK.окно.length > 400) ZVUK.окно.shift();
+  if (running && Date.now() - ZVUK.послед > 12000){
+    ZVUK.послед = Date.now();
+    const п = zvukПортрет(ZVUK.окно);
+    if (п){
+      engSend({ op: 'zvuk', slovo: п.слово, sredn: +п.средн.toFixed(3),
+                tiho: +п.тихо.toFixed(2), vspl: п.всплесков,
+                rvano: +п.рвано.toFixed(2) });
+      ZVUK.окно.length = 0;
+    }
+  }
   const onAir = twitchOn;
   const expect = (micOn && !micMuted && !pttHeld) || remotes.some(r => !r.lost) || twTabNode;
   if (onAir && expect && rms < 0.006){
