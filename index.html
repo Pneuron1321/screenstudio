@@ -102,6 +102,19 @@
   @media (prefers-reduced-motion:reduce){#hud .dot{animation:none}}
 
   /* ---- статус связи ---- */
+  /* ЧТО ВИДЯТ ЗРИТЕЛИ, А ЧТО ТОЛЬКО ТЫ.
+     20.08, живой запуск: «в верхнем углу постоянно пишется ожидаю камеры и
+     ключ, а это будет в эфире вместе с экраном».
+     Правда: при источнике «полотно» служебные надписи в эфир НЕ попадают —
+     туда идёт только composite. Но при источнике «экран/вкладка» браузер
+     снимает страницу целиком, вместе с интерфейсом, и всё служебное
+     уезжает зрителям.
+     Поэтому: класс body.screen прячет всё, что нужно только режиссёру.
+     Ставится сам, когда эфир идёт с захвата экрана. */
+  body.screen #linkStatus,
+  body.screen #linkWait,
+  body.screen #engLine,
+  body.screen .bigcode{ display:none !important }
   #linkStatus{
     position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;
     display:none;z-index:22;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -672,6 +685,8 @@
     <select id="twSource">
       <option value="camera">Камера + микрофон</option>
       <option value="screen">Экран/вкладка (только на компе)</option>
+      <!-- при выборе экрана зрители увидят СТРАНИЦУ целиком: служебные
+           надписи прячутся сами, но чужие вкладки и уведомления — нет -->
       <option value="canvas">Полотно СТУДИИ (эхо-картинка)</option>
     </select>
     <div class="row">
@@ -5699,7 +5714,22 @@ async function twitchStart(){
   const key = $('twKey').value.trim();
   const srcKind = $('twSource').value;
   twitchSrcKind = srcKind;
-  if (!key){ showMsg('Нужен ключ трансляции из панели Twitch'); return; }
+  /* ЧЕРЕЗ МОСТ КЛЮЧ НЕ НУЖЕН. 20.08, живой запуск: вписал свой адрес,
+     оставил ключ пустым — и студия отказалась выходить. Она требовала
+     ключ всегда, потому что знала только Twitch.
+     Мост (most.py на ноуте) держит ключ у себя, а от студии ему нужен
+     только поток. Отличаем по адресу: свой мост — это http на локальную
+     сеть, а не сервер Twitch. */
+  /* при захвате экрана в кадр уезжает вся страница — прячем служебное */
+  document.body.classList.toggle('screen', srcKind === 'screen');
+  const черезМост = /^https?:\/\/(127\.|localhost|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i
+                    .test(endpoint);
+  if (!key && !черезМост){
+    showMsg('Нужен ключ трансляции. Через свой мост ключ не нужен — '
+          + 'но адрес должен быть локальным (http://192.168.…)');
+    return;
+  }
+  if (черезМост) bb('эфир через свой мост: ключ держит мост');
 
   let vTrack = null, aTracks = [];
   try{
@@ -5805,6 +5835,7 @@ function twitchStop(silent){
     twCanvasStream = null;
   }
   bb('twitch: стоп');
+  document.body.classList.remove('screen');   // вернуть служебные надписи
   twitchOn = false;
   $('btnTwitch').classList.remove('on');
   $('hud').classList.remove('live');
@@ -6156,8 +6187,29 @@ function handleEngMsg(raw){
     engSend({ op: 'result', of: m.name, result: (r === undefined ? 'ок' : r) });
   } else if (m.op === 'whisper'){
     prompterWhisper(m.text);
+    /* Речь Плюса без Piper: рубка помечает golos:'brauzer', и тогда
+       произносит студия. На айфоне голоса Apple лучше Piper и бесплатны.
+       Если фраза шла в эфир — её слышат зрители, иначе только ты. */
+    if (m.golos === 'brauzer'){
+      if (m.efir && typeof cohostSay === 'function') cohostSay(m.text);
+      else earSay(m.text);
+    }
   } else if (m.op === 'audio'){
     playEngineerAudio(m);
+  } else if (m.op === 'lite' || m.op === 'poleLock'){
+    /* ОТВЕТ ПОЛЯ О СЕБЕ. Найдено разбором связей 20.08: поле честно слало
+       эти два сообщения («студия покажет режиссёру» — так и в комментарии
+       написано), а студия их не принимала вовсе. Команды шли только в одну
+       сторону, и нажатие НАЛЕГКЕ или КАРМАН на телефоне оставалось
+       невидимым: режиссёр не знал, почему камера вдруг замерла чёрной. */
+    const кто = (remotes.find(r => r.call && r.call.peer === conn.peer) || {}).label
+                || 'поле';
+    const что = (m.op === 'lite')
+      ? (m.on ? 'ушло НАЛЕГКЕ — экран чёрный, камера и голос живы'
+              : 'вернулось из налегке')
+      : (m.on ? 'заперло карман — касания не проходят' : 'открыло карман');
+    linkFlash(кто + ': ' + что);
+    bb('поле ' + m.op + ': ' + (m.on ? 'вкл' : 'выкл'));
   } else if (m.op === 'moment'){
     momentCatch(m.kind || 'чат', m.note);   // рубка увидела вспышку чата
   } else if (m.op === 'earText'){
@@ -6247,6 +6299,25 @@ function onDataConn(conn){
         conn.wantProg = (d.op === 'prog-on');
         conn.progKind = (d.kind === 'mont') ? 'mont' : 'prog';
         if (conn.wantProg) progPulse(conn);
+        return;
+      }
+      if (d.op === 'orient'){
+        /* КАК ПОВЁРНУТ ТЕЛЕФОН. Поле сообщало это с самого начала, а
+           студия выбрасывала — нашлось разбором связей 20.08. Режиссёр не
+           знал, снимают вертикально или горизонтально, и не понимал,
+           почему окно вдруг стало другой формы: телефон просто повернули.
+           Форму окна не трогаем — её задаёт shape по настоящему кадру;
+           здесь только говорим человеку, что произошло. */
+        const ro = remotes.find(r => r.label === who0);
+        if (ro){
+          const был = ro.angle;
+          ro.angle = +d.angle || 0;
+          const бок = (ro.angle === 90 || ro.angle === 270);
+          if (был !== undefined && был !== ro.angle)
+            linkFlash((who0 || 'камера') + ': телефон повернули — '
+                    + (бок ? 'горизонтально' : 'вертикально'));
+          bb('поворот ' + (who0 || '—') + ': ' + ro.angle + '°');
+        }
         return;
       }
       if (d.op === 'shape'){
@@ -6376,6 +6447,15 @@ function stToPole(){
 function startPultFeed(){
   if (pultTimer) return;
   pultTimer = setInterval(() => {
+    /* Мёртвые соединения копятся: событие close приходит не всегда —
+       телефон уснул, сеть моргнула, вкладку закрыли рывком. Отправка их
+       пропускает, но список растёт весь эфир, и каждый такт мы обходим
+       призраков. Подметаем здесь же, раз в такт. */
+    const было = pultConns.length + programConns.length;
+    pultConns = pultConns.filter(c => c && c.open !== false);
+    programConns = programConns.filter(c => c && c.open !== false);
+    const стало = pultConns.length + programConns.length;
+    if (стало < было) bb('убрал мёртвых соединений: ' + (было - стало));
     if (pultConns.length) pultSend();
     if (programConns.length) stToPole();     // пульту поля нужно состояние, не кадр
   }, 900);
