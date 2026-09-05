@@ -738,6 +738,7 @@
       <div id="engLine" style="color:var(--dim);font-size:12px;margin-top:8px;font-family:ui-monospace,Menlo,monospace"></div>
       <div class="row"><button class="quiet" id="btnHelpVoice">🎙 ГОЛОСОВЫЕ КОМАНДЫ</button></div>
       <div class="row"><button class="quiet" id="btnWakeTune">🔧 НАСТРОИТЬ СЛОВО</button></div>
+      <div class="row"><button class="quiet" id="btnReload">♻ ПЕРЕЗАПУСТИТЬ СТРАНИЦУ</button></div>
       <div class="row">
         <button class="quiet" id="lnkLock">🔓 ВХОД ОТКРЫТ</button>
         <button class="quiet" id="lnkStop1">Разорвать всё</button>
@@ -1515,7 +1516,7 @@ const SLOTS = [
 let wakeLock = null;
 let pttHeld = false, prompterAloud = false, pttLearn = false;
 let autoBlur = false, panic = false, zoneMode = false;
-let faceDetector = null, faceLoading = false, lastDet = 0;
+let faceDetector = null, faceLoading = false, lastDet = 0, detBed = 0;
 let faces = [];              // {nx,ny,nw,nh,seen}
 const manualZones = [];      // {nx,ny,nw,nh}
 let pttKey = (() => { try { return localStorage.getItem('skrin_ptt_key') || ''; } catch (e) { return ''; } })();
@@ -2802,38 +2803,60 @@ function frame(){
       const bits = [];
       /* свежие данные от камеры и есть её «ok»: поля с таким именем в
          присланном нет, а честность проверяется точностью GPS */
-      if (trustSpeed(Object.assign({ ok: true }, pr)))
-        bits.push((pr.spd * 3.6).toFixed(1) + ' км/ч');
+      if (trustSpeed(Object.assign({ ok: true }, pr))){
+        /* МЕРА ЧЕСТНОСТИ ЗАДАЁТСЯ ШКУРОЙ. В игровом облике «три деления
+           из пяти» правдивее ложной десятой доли: игра и точность — разные
+           режимы честности, и это решение шкуры, а не кода. */
+        const дел = shGrubo(pr.spd * 3.6, 40);
+        bits.push(дел ? дел : ((pr.spd * 3.6).toFixed(1) + ' км/ч'));
+      }
       if (pr.compass && pr.head != null) bits.push(Math.round(pr.head) + '°');
       if (bits.length){
         const ps = Math.max(9, Math.min(W * 0.013, rp.h * 0.34));
-        ctx.font = '700 ' + ps + 'px ui-monospace, Menlo, monospace';
+        ctx.font = '700 ' + ps + 'px ' + SH().шрифт;
         const t = bits.join('  ');
         const pw = ctx.measureText(t).width;
         const px = rp.x + rp.w / 2 - pw / 2, py = rp.y + ps * 1.6;
-        ctx.fillStyle = 'rgba(11,15,20,0.6)';
-        rr(ctx, px - ps * 0.5, py - ps * 1.15, pw + ps, ps * 1.5, ps * 0.75);
+        ctx.fillStyle = SH().фон;
+        rr(ctx, px - ps * 0.5, py - ps * 1.15, pw + ps, ps * 1.5, ps * SH().скруг);
         ctx.fill();
-        ctx.fillStyle = 'rgba(126,216,160,0.95)';
+        ctx.fillStyle = SH().удача;
         ctx.fillText(t, px, py);
       }
     }
+    /* НАЛЁТ КАМЕРЫ в её окне: человек видит, сколько он уже с нами.
+       Показываем только когда накопилось хоть что-то — пустой ноль в
+       кадре ничего не говорит. */
+    if (!rm.lost && rm.label && koiny[rm.label] && koiny[rm.label].сек > 30){
+      const ks = Math.max(9, Math.min(W * 0.012, rp.h * 0.3));
+      ctx.font = '800 ' + ks + 'px ui-monospace, Menlo, monospace';
+      const kt = '◉ ' + koinFmt(koiny[rm.label].сек);
+      const kw = ctx.measureText(kt).width;
+      ctx.fillStyle = 'rgba(11,15,20,0.55)';
+      rr(ctx, rp.x + rp.w - kw - ks * 1.4, rp.y + ks * 0.4, kw + ks, ks * 1.5, ks * 0.7);
+      ctx.fill();
+      ctx.fillStyle = '#FFC64B';
+      ctx.fillText(kt, rp.x + rp.w - kw - ks * 0.9, rp.y + ks * 1.45);
+    }
     const lbl = rm.lost ? ((rm.label || 'камера') + ' · переподключается…') : rm.label;
     if (lbl){
+      const ш = SH();
       const fs = Math.max(12, Math.min(W * 0.018, rp.h * 0.5));
-      ctx.font = '700 ' + fs + 'px ui-monospace, Menlo, monospace';
-      const tw = ctx.measureText(lbl).width;
+      ctx.font = '700 ' + fs + 'px ' + ш.шрифт;
+      const текст = ш.подпись(lbl);
+      const tw = ctx.measureText(текст).width;
       const lx = rp.x + rp.w / 2 - tw / 2, ly = rp.y + rp.h - fs * 0.7;
-      ctx.fillStyle = 'rgba(11,15,20,0.65)';
-      rr(ctx, lx - fs * 0.5, ly - fs * 1.05, tw + fs, fs * 1.5, fs * 0.75);
+      ctx.fillStyle = ш.фон;
+      rr(ctx, lx - fs * 0.5, ly - fs * 1.05, tw + fs, fs * 1.5, fs * ш.скруг);
       ctx.fill();
-      ctx.fillStyle = '#FFB454';
-      ctx.fillText(lbl, lx, ly);
+      ctx.fillStyle = ш.ярко;
+      ctx.fillText(текст, lx, ly);
     }
     ctx.restore();                    // конец поворота окна друга
   }
 
   const nowT = performance.now();
+  koinTick();                                 // налёт капает, пока идёт эфир
   if (autoBlur && ring) snapshotRing(nowT);   // чистый кадр в буфер ДО живой мозаики
   privacyPass(nowT);
 
@@ -3150,11 +3173,32 @@ function beep(kind){
 /* голос в ухо: системный TTS телефона — в эфирный микс НЕ входит */
 function speakEar(text){
   try{
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(String(text));
-    u.lang = (typeof besedaLang !== 'undefined' && besedaLang === 'en') ? 'en-US' : 'ru-RU';
-    u.rate = 1.05;
-    speechSynthesis.speak(u);
+    /* ХРИП. 21.08, живой запуск: голос разогрева хрипел. Причина не в
+       голосе — в конкуренции: синтез речи на телефоне делит процессор с
+       композитом и кодировщиком эфира, и когда все трое работают разом,
+       звук рвётся.
+       Три меры, все дешёвые:
+       · чуть медленнее (1.05 → 0.98) — синтезатору легче укладываться;
+       · не обрываем предыдущую фразу на полуслове без нужды: cancel()
+         посреди речи и даёт тот самый треск;
+       · длинную фразу режем на предложения и говорим по одному — короткие
+         куски телефон тянет ровнее длинных. */
+    const s = String(text || '').trim();
+    if (!s) return;
+    if (speechSynthesis.speaking && s.length < 40){
+      /* короткая реплика поверх текущей — пусть подождёт очереди */
+    } else if (speechSynthesis.speaking){
+      speechSynthesis.cancel();
+    }
+    const язык = (typeof besedaLang !== 'undefined' && besedaLang === 'en')
+                 ? 'en-US' : 'ru-RU';
+    const куски = s.split(/(?<=[.!?…])\s+/).filter(Boolean);
+    (куски.length ? куски : [s]).forEach(кусок => {
+      const u = new SpeechSynthesisUtterance(кусок);
+      u.lang = язык;
+      u.rate = 0.98;
+      speechSynthesis.speak(u);
+    });
   }catch(e){}
 }
 /* аудио-буфер от инженера: aloud=true — в эфир (и в монитор), иначе — только в ухо */
@@ -3253,17 +3297,33 @@ async function ensureFaceDetector(){
   if (faceDetector || faceLoading) return;
   faceLoading = true;
   showMsg('загружаю детектор лиц…', 3000);
+  /* СРОК НА ЗАГРУЗКУ. 21.08, живой запуск: нажатие блюра вешало
+     приложение наглухо. Причина — модель тянется из интернета вместе с
+     wasm, и на телефоне через мобильную сеть это может не кончиться
+     никогда: обещание не отклоняется, а просто висит, и вместе с ним
+     висит вся страница.
+     Теперь ждём не дольше 20 секунд и честно сдаёмся. */
+  const срок = new Promise((_, плохо) =>
+    setTimeout(() => плохо(new Error('не дождался за 20 с')), 20000));
   try{
-    const vision = await import(MP + '/vision_bundle.mjs');
-    const fileset = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
-    faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' },
-      runningMode: 'VIDEO', minDetectionConfidence: 0.4
-    });
+    const готово = (async () => {
+      const vision = await import(MP + '/vision_bundle.mjs');
+      const fileset = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
+      return await vision.FaceDetector.createFromOptions(fileset, {
+        /* CPU, а не GPU: на iPhone делегат GPU в WebGL капризен и способен
+           застрять на инициализации. Мы и так детектим не каждый кадр —
+           разница в скорости здесь меньше, чем риск повиснуть. */
+        baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'CPU' },
+        runningMode: 'VIDEO', minDetectionConfidence: 0.4
+      });
+    })();
+    faceDetector = await Promise.race([готово, срок]);
     showMsg('детектор лиц готов — лица замазываются', 2500);
   }catch(e){
     autoBlur = false; $('btnBlur').classList.remove('on');
-    showMsg('детектор не загрузился: ' + (e.message || e), 6000);
+    showMsg('детектор лиц не загрузился (' + (e.message || e) + '). '
+          + 'Эфир идёт как шёл; лица замазать можно рукой — ЗОНА.', 7000);
+    bb('детектор лиц: ' + (e.message || e));
   }
   faceLoading = false;
 }
@@ -3290,7 +3350,22 @@ function detectFaces(now){
   det.width = dw; det.height = dh;
   dctx.drawImage(cv, 0, 0, dw, dh);
   let res;
-  try{ res = faceDetector.detectForVideo(det, now); }catch(e){ return; }
+  try{
+    res = faceDetector.detectForVideo(det, now);
+  }catch(e){
+    /* Детекция синхронная: она останавливает отрисовку кадра, пока считает.
+       Одна ошибка — ладно, но если сыплется подряд, лучше выключить блюр,
+       чем отдавать зрителям рваную картинку. */
+    detBed = (detBed || 0) + 1;
+    if (detBed > 5){
+      autoBlur = false;
+      $('btnBlur').classList.remove('on');
+      showMsg('детектор лиц сбоит — выключил блюр, эфир продолжается', 6000);
+      bb('блюр выключен: детектор сбоил ' + detBed + ' раз');
+    }
+    return;
+  }
+  detBed = 0;
   const found = [];
   (res && res.detections || []).forEach(d => {
     const b = d.boundingBox;
@@ -4067,6 +4142,285 @@ function setPamyat(v){
 }
 /* ---------- КОНЕЦ ПАМЯТИ ---------- */
 
+/* ---------- ШКУРЫ: ОБЛИК КАК ЯЗЫК ----------
+   Разбор козырями привёл к корню: облик — это ЯЗЫК, а не украшение.
+   Пиксельный вид не «красивее» обычного, он ГОВОРИТ ДРУГОЕ о том же
+   самом. Отсюда главный ход — шкура должна быть ДАННЫМИ, а не кодом.
+
+   РЕЛЬСОРЕЗ ПРЕДУПРЕДИЛ, чем это притворится сделанным: можно нарисовать
+   красивый пиксельный вид, назвать «системой шкур» и остаться с одним
+   скином под громким именем — потому что внутри будет «если пиксель, то
+   так». Вторая шкура потребует правки студии, и системы не окажется.
+   Поэтому проверка встроена в саму работу: шкур сразу ДВЕ, и вторая не
+   пиксельная. Если морская получилась одним объектом без правок студии —
+   система доказана.
+
+   ЧТО ЗАДАЁТ ШКУРА: цвета, шрифт, форму приборов и МЕРУ ОГРУБЛЕНИЯ.
+   Последнее — не косметика: в игровом облике «три деления из пяти»
+   честнее ложной десятой доли, потому что игра и точность — разные
+   режимы честности. */
+const SHKURY = {
+  своя: {
+    имя: 'СВОЯ',
+    шрифт: 'ui-monospace, Menlo, monospace',
+    ярко: '#FFB454', тепло: '#E8E3D8', тихо: 'rgba(232,227,216,0.55)',
+    фон: 'rgba(11,15,20,0.65)', удача: '#7ED8A0', беда: '#FF5D45',
+    скруг: 0.75,          // доля от кегля
+    грубо: 0,             // 0 — точные числа, N — делений на шкале
+    подпись: v => v
+  },
+  пиксель: {
+    имя: '16-БИТ',
+    шрифт: '"Courier New", ui-monospace, monospace',
+    ярко: '#FFD23F', тепло: '#F5F5DC', тихо: 'rgba(245,245,220,0.6)',
+    фон: 'rgba(24,20,37,0.82)', удача: '#4ADE80', беда: '#F43F5E',
+    скруг: 0,             // прямые углы: пиксель не знает скруглений
+    грубо: 5,             // пять делений вместо цифры
+    подпись: v => String(v).toUpperCase()
+  },
+  море: {
+    имя: 'МОРЕ',
+    шрифт: 'ui-monospace, Menlo, monospace',
+    ярко: '#7ED8A0', тепло: '#DCEEF5', тихо: 'rgba(220,238,245,0.5)',
+    фон: 'rgba(6,20,28,0.7)', удача: '#9BE7C4', беда: '#FFB454',
+    скруг: 1.2,           // мягче обычного: вода круглая
+    грубо: 0,             // на воде точность важна: числа как есть
+    подпись: v => v
+  }
+};
+let shkuraId = 'своя';
+try{ shkuraId = localStorage.getItem('skrin-shkura') || 'своя'; }catch(e){}
+if (!SHKURY[shkuraId]) shkuraId = 'своя';
+function SH(){ return SHKURY[shkuraId]; }
+/* Огрубление: шкура решает, сколько делений. Ноль — число как есть.
+   Это и есть «мера честности», о которой говорил разбор. */
+function shGrubo(знач, предел){
+  const ш = SH();
+  if (!ш.грубо) return null;
+  const n = Math.max(0, Math.min(ш.грубо,
+    Math.round((знач / (предел || 1)) * ш.грубо)));
+  return '█'.repeat(n) + '░'.repeat(ш.грубо - n);
+}
+function setShkura(v){
+  const id = String(v || '').toLowerCase().trim();
+  const ключ = Object.keys(SHKURY).find(k => k === id || SHKURY[k].имя.toLowerCase() === id);
+  if (!ключ) return 'не знаю такой шкуры: ' + (v || '—')
+                  + '. Есть: ' + Object.keys(SHKURY).join(', ');
+  shkuraId = ключ;
+  try{ localStorage.setItem('skrin-shkura', ключ); }catch(e){}
+  document.body.dataset.shkura = ключ;
+  bb('облик: ' + SH().имя);
+  linkFlash('ОБЛИК · ' + SH().имя + (SH().грубо ? ' · приборы делениями' : ''));
+  return 'облик ' + SH().имя;
+}
+
+/* ---------- ЭКРАН ПОСЛЕ МАТЧА ----------
+   Разбор полёта пишет отчёт ТЕКСТОМ на ноутбуке, куда никто не смотрит.
+   А это ровно тот экран, который в играх показывают в конце: сколько
+   длилось, что случилось, кто был рядом.
+   Здесь он становится КАДРОМ — тем, что видят зрители на прощание и что
+   идёт в клипы. Данные все уже есть: метки, коины, камеры, донаты,
+   события. Не хватало только вида.
+
+   ЧЕСТНОСТЬ ТА ЖЕ, ЧТО ВЕЗДЕ: показываем только то, что действительно
+   посчитано. Нет донатов — строки про донаты нет, а не «0 ₽». Пустых
+   граф не рисуем: пустая графа в итогах врёт сильнее отсутствия. */
+let itogOn = false, itogT0 = 0, itogSnap = null;
+function itogDraw(c, w, h){
+  const прошло = Math.max(0, Date.now() - itogT0) / 1000;
+  const появись = Math.min(1, прошло / 0.6);      // мягкий вход
+  c.save();
+  c.globalAlpha = появись;
+  c.fillStyle = 'rgba(8,11,15,0.90)';
+  c.fillRect(0, 0, w, h);
+
+  const S = w / 1000;                             // всё меряем от ширины
+  let y = h * 0.16;
+  const слева = w * 0.10;
+
+  const ш = SH();
+  c.fillStyle = ш.ярко;
+  c.font = '800 ' + Math.round(42 * S) + 'px ' + ш.шрифт;
+  c.fillText(ш.подпись('ЭФИР ЗАКОНЧЕН'), слева, y);
+  y += 30 * S;
+  c.fillStyle = 'rgba(232,227,216,0.45)';
+  c.font = '700 ' + Math.round(15 * S) + 'px ui-monospace, Menlo, monospace';
+  c.fillText(new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
+             слева, y);
+  y += 52 * S;
+
+  /* строки итога — только те, где есть что сказать */
+  const снимок = itogSnap || koiny;
+  const мой = снимок['я'] || { сек: 0, эфирСек: 0 };
+  const мин = Math.floor(мой.эфирСек / 60);
+  const строки = [];
+  строки.push(['ПРОДОЛЖИТЕЛЬНОСТЬ',
+               (мин >= 60 ? Math.floor(мин / 60) + ' ч ' + (мин % 60) + ' мин'
+                          : мин + ' мин')]);
+  строки.push(['НАЛЁТ ЗА ЭФИР', '◉ ' + koinFmt(мой.эфирСек)]);
+  строки.push(['НАЛЁТ ВСЕГО', '◉ ' + koinFmt(мой.сек)]);
+  const метки = (itogSnap && itogSnap.меток) || 0;
+  if (метки) строки.push(['МОМЕНТОВ ОТМЕЧЕНО', String(метки)]);
+  const камеры = Object.keys(снимок)
+    .filter(k => k !== 'я' && k !== 'меток' && снимок[k] && снимок[k].эфирСек > 30);
+  if (камеры.length) строки.push(['БЫЛИ РЯДОМ', String(камеры.length)]);
+
+  c.font = '700 ' + Math.round(19 * S) + 'px ui-monospace, Menlo, monospace';
+  строки.forEach(([что, сколько]) => {
+    c.fillStyle = 'rgba(232,227,216,0.55)';
+    c.fillText(что, слева, y);
+    c.fillStyle = '#E8E3D8';
+    c.font = '800 ' + Math.round(24 * S) + 'px ui-monospace, Menlo, monospace';
+    const tw = c.measureText(сколько).width;
+    c.fillText(сколько, w - слева - tw, y);
+    c.font = '700 ' + Math.round(19 * S) + 'px ui-monospace, Menlo, monospace';
+    y += 40 * S;
+  });
+
+  /* кто был рядом — поимённо, с их налётом за этот эфир */
+  if (камеры.length){
+    y += 16 * S;
+    c.fillStyle = 'rgba(255,198,75,0.75)';
+    c.font = '800 ' + Math.round(16 * S) + 'px ui-monospace, Menlo, monospace';
+    c.fillText('В КРУГЕ', слева, y);
+    y += 30 * S;
+    c.font = '700 ' + Math.round(18 * S) + 'px ui-monospace, Menlo, monospace';
+    камеры.sort((a, b) => снимок[b].эфирСек - снимок[a].эфирСек).slice(0, 5)
+      .forEach(имя => {
+        c.fillStyle = '#E8E3D8';
+        c.fillText(имя, слева, y);
+        c.fillStyle = 'rgba(255,198,75,0.8)';
+        const t = '+' + koinFmt(снимок[имя].эфирСек);
+        c.fillText(t, w - слева - c.measureText(t).width, y);
+        y += 30 * S;
+      });
+  }
+
+  c.fillStyle = 'rgba(232,227,216,0.3)';
+  c.font = '700 ' + Math.round(14 * S) + 'px ui-monospace, Menlo, monospace';
+  c.fillText('спасибо, что были', слева, h - h * 0.08);
+  c.restore();
+}
+function setItog(v){
+  const on = (v !== false);
+  if (on === itogOn) return itogOn ? 'итоги уже в кадре' : 'итогов нет';
+  itogOn = on;
+  if (on){
+    itogT0 = Date.now();
+    /* ЦИФРЫ ЗАМИРАЮТ. Проверка живым браузером показала: пока экран
+       итогов висит, налёт капает дальше, и числа на «итоговом» экране
+       ползут вверх. Итог обязан быть итогом — снимаем слепок в момент
+       показа и рисуем его, а не живые счётчики. */
+    itogSnap = {};
+    Object.keys(koiny).forEach(k => {
+      itogSnap[k] = { сек: koiny[k].сек || 0, эфирСек: koiny[k].эфирСек || 0 };
+    });
+    itogSnap.меток = (typeof marksLoad === 'function') ? marksLoad().length : 0;
+    layers.set('итоги', (c, w, h) => itogDraw(c, w, h));
+    bb('итоги эфира в кадре');
+    linkFlash('ИТОГИ В КАДРЕ · «убери итоги» — снять');
+  } else {
+    layers.delete('итоги');
+    bb('итоги убраны');
+  }
+  return on ? 'итоги в кадре' : 'итоги убраны';
+}
+
+/* ---------- КОИНЫ: НАЛЁТ ЭФИРА ----------
+   Идея Александра. Монета за минуту участия — но не всякому, а тому, кто
+   ЗАШЁЛ СО СВОЕЙ КАМЕРОЙ. Это честнее награды за просмотр: платится за
+   участие, а не за присутствие рядом.
+
+   ПОЧЕМУ ИХ НЕЛЬЗЯ ПОТРАТИТЬ. Соблазн будет — «купить эффект»,
+   «разблокировать скин». Но коины здесь не деньги, а НАЛЁТ, как часы у
+   пилота: цифра, которая растёт годами и говорит, сколько ты был в деле.
+   Налёт, который можно потратить, перестаёт быть налётом.
+
+   ДВА СЧЁТЧИКА, как просил Александр: крупный — за всю жизнь, мелкий
+   рядом — за этот эфир.
+
+   Начисляем ПОСЕКУНДНО (1.00 в минуту = 0.0167 в секунду), а не раз в
+   минуту: живая цифра, которая шевелится, приятнее статичной, и ради
+   этого и нужны два знака после запятой.
+*/
+const KOIN_KEY = 'skrin-koiny';
+const KOIN_V_MINUTU = 1.0;
+let koiny = {};            // имя → { всего, эфир }
+let koinLast = 0;
+try{ koiny = JSON.parse(localStorage.getItem(KOIN_KEY) || '{}') || {}; }catch(e){ koiny = {}; }
+
+function koinSave(){
+  try{
+    const чисто = {};
+    /* на диск идёт только пожизненный счёт: эфирный обнуляется сам */
+    Object.keys(koiny).forEach(k => { чисто[k] = { сек: Math.round(koiny[k].сек || 0) }; });
+    localStorage.setItem(KOIN_KEY, JSON.stringify(чисто));
+  }catch(e){}
+}
+function koinPara(имя){
+  /* Считаем СЕКУНДЫ, а не складываем дроби. Проверка показала: час
+     сложения по 1/60 даёт 59,99 вместо 60,00 — дробь не ложится в
+     двоичное число ровно, и ошибка копится. Налёт обязан быть точным:
+     он растёт годами, и кривая цифра за год станет заметной. */
+  if (!koiny[имя]) koiny[имя] = { сек: 0, эфирСек: 0 };
+  const п = koiny[имя];
+  if (п.сек === undefined) п.сек = Math.round((п.всего || 0) * 60);   // старая запись
+  if (п.эфирСек === undefined) п.эфирСек = 0;
+  return п;
+}
+function koinFmt(секунд){
+  const v = (секунд || 0) * KOIN_V_MINUTU / 60;
+  return (Math.floor(v * 100) / 100).toFixed(2).replace('.', ',');
+}
+/* Кому капает: мне (я в эфире) и каждой ЖИВОЙ камере в связи.
+   Потерянная камера не копит: она сейчас не участвует. */
+function koinTick(){
+  if (!running) return;
+  const now = Date.now();
+  if (!koinLast){ koinLast = now; return; }
+  const сек = (now - koinLast) / 1000;
+  koinLast = now;
+  if (сек <= 0 || сек > 30) return;      // проснулись из фона — не дарим час
+  const кому = ['я'].concat(remotes.filter(r => !r.lost && r.label).map(r => r.label));
+  кому.forEach(имя => {
+    const п = koinPara(имя);
+    const было = Math.floor(п.сек * KOIN_V_MINUTU / 60);
+    п.сек += сек; п.эфирСек += сек;
+    const стало = Math.floor(п.сек * KOIN_V_MINUTU / 60);
+    /* каждая сотая — заметная веха: звон и слово */
+    if (стало > было && стало % 100 === 0){
+      bb('коины ' + имя + ': ' + стало);
+      if (имя === 'я') showMsg('НАЛЁТ ' + стало + ' — сотня', 4000);
+      else linkFlash(имя + ': налёт ' + стало);
+      try{ beep('on'); }catch(e){}
+    }
+  });
+  if ((now / 1000 | 0) % 20 === 0) koinSave();   // на диск нечасто
+}
+/* Слой в кадре: свой налёт в углу, у камер — рядом с их окнами (там их
+   рисует окно само). Мелко и не мешая: это фон, а не главное. */
+function drawKoiny(c, w, h){
+  const п = koinPara('я');
+  const ш = SH();
+  const fs = Math.max(11, w * 0.016);
+  c.save();
+  c.font = '800 ' + fs + 'px ' + ш.шрифт;
+  const крупно = '◉ ' + koinFmt(п.сек);
+  const мелко = '+' + koinFmt(п.эфирСек);
+  const tw = c.measureText(крупно).width;
+  const x = w - tw - fs * 2.4, y = h - fs * 1.1;
+  c.fillStyle = ш.фон;
+  rr(c, x - fs * 0.5, y - fs * 1.05, tw + fs * 3.2, fs * 1.5, fs * ш.скруг);
+  c.fill();
+  c.fillStyle = ш.ярко;
+  c.fillText(крупно, x, y);
+  c.font = '700 ' + Math.round(fs * 0.72) + 'px ' + ш.шрифт;
+  c.fillStyle = ш.тихо;
+  c.fillText(мелко, x + tw + fs * 0.4, y);
+  c.restore();
+}
+layers.set('коины', (c, w, h) => drawKoiny(c, w, h));
+
 /* ---------- СУПЕРУДАРЫ: награда, которую слышно ----------
    Звуки записывает Александр — своей рукой, своим слухом. Студия их только
    принимает: манифест udary.json + файлы в udary/. Путь звука — bus.master
@@ -4637,6 +4991,12 @@ const EAR_TABLE = [
   [['не помни', 'память стоп'], { op: 'cmd', name: 'pamyat', args: [false] }],
   [['помни всё', 'помни все', 'память полная'], { op: 'cmd', name: 'pamyat', args: ['всё'] }],
   [['настрой слово', 'настройка слова'], { op: 'cmd', name: 'wakeTune', args: [true] }],
+  [['налёт', 'налет', 'коины'], { op: 'cmd', name: 'koiny', args: [''] }],
+  [['итоги', 'итоги эфира', 'экран итогов'], { op: 'cmd', name: 'itog', args: [true] }],
+  [['облик пиксель', 'шкура пиксель', 'шестнадцать бит'], { op: 'cmd', name: 'shkura', args: ['пиксель'] }],
+  [['облик море', 'шкура море'], { op: 'cmd', name: 'shkura', args: ['море'] }],
+  [['облик свой', 'шкура своя', 'обычный облик'], { op: 'cmd', name: 'shkura', args: ['своя'] }],
+  [['убери итоги', 'сними итоги'], { op: 'cmd', name: 'itog', args: [false] }],
   [['зачёт', 'зачет', 'спасибо залу'], { op: 'cmd', name: 'zachet', args: [''] }],
   [['убери сайт', 'закрой сайт'], { op: 'cmd', name: 'sait', args: [false] }],
   [['закрой карман', 'запри карман'], { op: 'cmd', name: 'poleLock', args: [true] }],
@@ -4698,6 +5058,9 @@ const EAR_ECHO = {
   poleLock: on => on ? 'карман поля заперт' : 'карман поля открыт',
   sait: () => 'сайт в кадре',
   wakeTune: on => on ? 'слушаю слово' : 'слово настроено',
+  koiny: () => 'налёт',
+  itog: on => on ? 'итоги эфира' : 'итоги убраны',
+  shkura: v => 'облик ' + v,
   zachet: () => 'зачёт залу',
   hunt: on => on ? 'ловец на посту' : 'ловец спит',
   tip: on => on ? 'дверь доната открыта' : 'дверь закрыта',
@@ -5217,10 +5580,22 @@ function presenceHide(){
    осветляются фильтром brightness(4.5) contrast(1.15), и только тогда
    на них что-то видно. Берём ту же меру. Если браузер фильтр не умеет
    (старые Safari), карта останется тёмной, но работать будет. */
-let MAP_FILTER = 'brightness(4.5) contrast(1.15)';
+/* Фильтр был подобран под ТЁМНЫЕ тайлы Carto: он их высветлял. У
+   OpenStreetMap тайлы светлые, и та же мера превратила бы карту в белое
+   пятно. Теперь наоборот — притемняем и слегка обесцвечиваем, чтобы
+   карта не спорила с кадром. */
+let MAP_FILTER = 'brightness(0.72) saturate(0.55) contrast(1.1)';
+/* ИСТОЧНИКИ КАРТЫ. 21.08, живой запуск: на радаре зрителям светилась
+   надпись «API KEY REQUIRED» — Carto стал требовать ключ и отдаёт вместо
+   карты картинку с этой надписью. Коварство в том, что картинка приходит
+   УСПЕШНО: сбоя нет, переключаться не на что, и запасной источник не
+   включался.
+   Поэтому OpenStreetMap теперь первый: он открыт, ключа не просит и
+   работает без учётной записи. Carto оставлен вторым — если однажды
+   появится ключ, вернём его наверх. */
 const TILE_SRC = [
-  z => 'https://a.basemaps.cartocdn.com/dark_all/' + z + '/{x}/{y}.png',
-  z => 'https://tile.openstreetmap.org/' + z + '/{x}/{y}.png'
+  z => 'https://tile.openstreetmap.org/' + z + '/{x}/{y}.png',
+  z => 'https://a.basemaps.cartocdn.com/dark_all/' + z + '/{x}/{y}.png'
 ];
 const tiles = new Map();        // url → Image
 let tileSrcIdx = 0, tileFails = 0;
@@ -5996,6 +6371,25 @@ const CMDS = {
          + (on ? 'слышно' : 'тихо');
   },
   spisok: () => showHelpVoice(),
+  itog: v => setItog(v),
+  shkura: v => setShkura(v),
+  koiny: kto => {
+    /* Посмотреть налёт: свой, чужой или всех. Тратить нельзя — это
+       налёт, а не деньги; можно только смотреть, как растёт. */
+    if (kto === 'сброс'){
+      Object.keys(koiny).forEach(k => { koiny[k].эфирСек = 0; });
+      return 'счёт за эфир обнулён, пожизненный остался';
+    }
+    const имя = String(kto || '').trim();
+    if (имя && koiny[имя])
+      return имя + ': ' + koinFmt(koiny[имя].сек) + ' (за эфир +'
+           + koinFmt(koiny[имя].эфирСек) + ')';
+    const все = Object.keys(koiny)
+      .sort((a, b) => koiny[b].сек - koiny[a].сек)
+      .slice(0, 6)
+      .map(k => k + ' ' + koinFmt(koiny[k].сек));
+    return все.length ? все.join(' · ') : 'налёта пока нет';
+  },
   wakeTune: v => setWakeTune(v !== false),
   zachet: who => {
     /* Команда рубке: вес советчика живёт у неё. Без имени — последнему
@@ -6426,6 +6820,11 @@ function stSnap(){
     prompterAloud: prompterAloud, pocket: lockOn, hunt: huntOn,
     istok: ($('twSource') ? $('twSource').value : 'canvas'),
     pamyat: pamyatMode, naedine: naedine, hero: heroName, scena: scenaOpis(),
+    /* НАГРЕВ — не градусы, а честный признак: сколько кадров студия
+       успевает рисовать. Градусов браузеру не дают, а лестница темпа
+       у нас и так есть — просто о ней никто не знал, кроме самого
+       композита. Пульту и Плюсу это важнее числа на термометре. */
+    temp: FPS_LEVELS[perf.level], tempLvl: perf.level,
     /* Список камер со звуком: пульту мало общего числа. 02.08 Александр
        заметил верно — глушить всех разом недостаточно, пульт обязан
        уметь каждого по отдельности. */
@@ -7541,6 +7940,19 @@ $('zProbe').onclick = e => { e.stopPropagation(); probeNext(); };
 $('btnHelpVoice').onclick = () => showHelpVoice();
 /* КНОПКОЙ, а не голосом: иначе замкнутый круг */
 $('btnWakeTune').onclick = () => setWakeTune(!wakeUchu);
+/* ПЕРЕЗАПУСК СТРАНИЦЫ. 21.08, слово Александра: приложение зависло, а
+   обновить нечем — на домашнем экране адресной строки нет, и жест
+   «потянуть вниз» в полноэкранном режиме не работает.
+   Перед уходом гасим эфир и связь по-хорошему: иначе на той стороне
+   останутся мёртвые окна и висящий эфир на площадке. */
+$('btnReload').onclick = () => {
+  if (twitchOn && !confirm('Эфир идёт. Перезапустить страницу?')) return;
+  try{ if (twitchOn) twitchStop(true); }catch(e){}
+  try{ remotes.slice().forEach(r => { if (r.call) r.call.close(); }); }catch(e){}
+  try{ if (peer) peer.destroy(); }catch(e){}
+  bb('перезапуск страницы по кнопке');
+  setTimeout(() => location.reload(), 250);
+};
 /* НОВЫЙ КОД. 02.08: сменить код было нечем — старая комната оставалась
    открытой навсегда, и всякий, кто её знал, мог войти. Теперь одной
    кнопкой: всех отпускаем, брокера закрываем, поднимаемся под новым
@@ -7752,6 +8164,7 @@ $('netSave').onclick = () => {
 
 /* ---------- VU-метр, сторож тишины, батарея ---------- */
 let silentSince = 0, lastSilentFlash = 0, batteryWarned = false, vuTick = 0;
+let batStage = 0;      // ступень предупреждения о заряде: 0 · 25% · 10% · 5%
 setInterval(() => {
   if (!bus) return;
   const a = new Uint8Array(bus.an.fftSize);
@@ -7790,12 +8203,35 @@ setInterval(() => {
       engSend({ op: 'note', data: 'silence' });
     }
   } else silentSince = 0;
-  if ((vuTick++ % 66) === 0 && !batteryWarned && onAir && navigator.getBattery){
+  if ((vuTick++ % 66) === 0 && onAir && navigator.getBattery){
+    /* БАТАРЕЯ. Предупреждение было ОДНО, при 25% — дальше телефон садился
+       молча, и эфир обрывался на полуслове. Теперь три ступени: рано
+       (25%) — успеешь дойти до провода; поздно (10%) — громче; край (5%) —
+       говорим и ЗРИТЕЛЯМ титром, чтобы обрыв не выглядел поломкой канала.
+       Эфир сами не останавливаем: уйти — решение человека, не наше. */
     navigator.getBattery().then(b => {
-      if (!b.charging && b.level < 0.25 && !batteryWarned){
-        batteryWarned = true;
-        bb('батарея <25%');
-        showMsg('Батарея ' + Math.round(b.level * 100) + '% — эфиру нужен провод', 6000);
+      if (b.charging){ batStage = 0; return; }
+      const п = Math.round(b.level * 100);
+      if (п <= 5 && batStage < 3){
+        batStage = 3; batteryWarned = true;
+        bb('батарея 5%: край');
+        showMsg('БАТАРЕЯ ' + п + '% — эфир вот-вот оборвётся', 9000);
+        /* титр зрителям: у команды три довода — имя слоя, текст, вид.
+           Проверил сигнатуру, прежде чем звать: с двумя было бы неверно. */
+        try{
+          CMDS.text('батарея', 'связь может прерваться', { size: 0.028 });
+          setTimeout(() => { try{ CMDS.text('батарея', ''); }catch(e){} }, 15000);
+        }catch(e){}
+        beep('fail');
+      } else if (п <= 10 && batStage < 2){
+        batStage = 2; batteryWarned = true;
+        bb('батарея 10%');
+        showMsg('Батарея ' + п + '% — провод нужен сейчас, иначе эфир оборвётся', 9000);
+        beep('off');
+      } else if (п <= 25 && batStage < 1){
+        batStage = 1; batteryWarned = true;
+        bb('батарея 25%');
+        showMsg('Батарея ' + п + '% — эфиру нужен провод', 6000);
       }
     }).catch(() => {});
   }
@@ -8105,7 +8541,33 @@ $('btnStart').onclick = async () => {
     await openCam('environment');
   }catch(e1){
     try{ await openCam('user'); }
-    catch(e2){ showMsg('Камера недоступна: ' + e2.name + '. Нужен HTTPS и разрешение.', 8000); return; }
+    catch(e2){
+      /* ПЕРВОЕ, ЧТО ВИДИТ НОВЫЙ ЧЕЛОВЕК, если что-то не так. Раньше здесь
+         показывалось имя ошибки — «NotAllowedError», — а оно не говорит
+         ни о причине, ни о том, что делать. Разбираем по причинам и в
+         каждом случае называем следующий шаг. */
+      const имя = (e2 && e2.name) || '';
+      let что;
+      if (имя === 'NotAllowedError' || имя === 'SecurityError'){
+        что = 'Доступ к камере запрещён. На айфоне: Настройки → Safari → '
+            + 'Камера → Разрешить, потом перезагрузи страницу. В Chrome — '
+            + 'замок слева от адреса.';
+      } else if (имя === 'NotFoundError' || имя === 'OverconstrainedError'){
+        что = 'Камера не найдена. Если она занята другим приложением '
+            + '(видеозвонок, другая вкладка) — закрой его и попробуй снова.';
+      } else if (имя === 'NotReadableError'){
+        что = 'Камеру держит другое приложение. Закрой его — и жми СТАРТ.';
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost'){
+        что = 'Страница открыта не по HTTPS — браузер не даст камеру. '
+            + 'Открой адрес, начинающийся с https://';
+      } else {
+        что = 'Камера недоступна (' + (имя || 'без имени') + '). '
+            + 'Нужен HTTPS и разрешение на камеру.';
+      }
+      showMsg(что, 12000);
+      bb('камера не открылась: ' + имя);
+      return;
+    }
   }
   $('start').style.display = 'none';
   $('bar').style.display = 'flex';
@@ -8152,6 +8614,66 @@ document.addEventListener('visibilitychange', () => {
       }
     }, 700);   // даём браузеру мгновение ожить
   }
+  /* А ЭТО — ПРО РЕЖИССЁРА, и до 21.08 его не было вовсе.
+     Возврат чинил роль камеры, но не сам ЭФИР. Свернул студию на минуту —
+     iOS заморозил вкладку, соединение с площадкой могло умереть; ты
+     вернулся, видишь свою картинку и уверен, что всё идёт, а зрители
+     смотрят застывший кадр. Хуже всего, что это молчит.
+     Проверяем состояние соединения и говорим правду. */
+  if (twitchOn){
+    setTimeout(() => {
+      if (!twitchOn) return;
+      const st = pc && pc.connectionState;
+      const плохо = !pc || st === 'failed' || st === 'closed' || st === 'disconnected';
+      if (плохо){
+        bb('возврат из фона: эфир оборвался (' + (st || 'нет соединения') + ')');
+        linkFlash('ЭФИР ОБОРВАЛСЯ, пока студия была свёрнута — '
+                + 'переподключаюсь');
+        const k = twitchSrcKind;
+        twitchStop(true);
+        setTimeout(() => { if (!twitchOn){ $('twSource').value = k; twitchStart(); } }, 1200);
+      } else {
+        /* соединение живо, но холст мог замереть: пинаем цикл отрисовки */
+        bb('возврат из фона: эфир жив (' + st + ')');
+      }
+    }, 900);
+  }
+});
+
+/* ---------- СЕТЬ ПРОПАЛА И ВЕРНУЛАСЬ ----------
+   До 21.08 этого не замечал никто. А в дороге и на воде связь моргает
+   постоянно: телефон переходит с вышки на вышку, ныряет в тень здания.
+   Браузер знает об этом раньше, чем оборвутся соединения, — и молчал.
+   Что делаем: говорим человеку сразу (иначе он решит, что сломалась
+   студия), а на возврате проверяем эфир и связь и поднимаем, что упало.
+   Честный предел: браузер знает только про СВОЙ сетевой интерфейс. Wi-Fi
+   есть, а интернета за ним нет — этого он не увидит, и мы тоже. */
+window.addEventListener('offline', () => {
+  bb('сеть пропала');
+  linkFlash('СЕТЬ ПРОПАЛА. Эфир и камеры оборвутся; вернётся — подниму сам');
+});
+window.addEventListener('online', () => {
+  bb('сеть вернулась');
+  linkFlash('сеть вернулась — проверяю эфир и связь');
+  setTimeout(() => {
+    /* эфир: если соединение умерло, пересобираем */
+    if (twitchOn){
+      const st = pc && pc.connectionState;
+      if (!pc || st === 'failed' || st === 'closed' || st === 'disconnected'){
+        const k = twitchSrcKind;
+        twitchStop(true);
+        setTimeout(() => { if (!twitchOn){ $('twSource').value = k; twitchStart(); } }, 1200);
+      }
+    }
+    /* брокер: без него не придут ни камеры, ни рубка */
+    if (linkRole && peer && peer.disconnected && !peer.destroyed){
+      try{ peer.reconnect(); bb('брокер: переподключаюсь'); }catch(e){}
+    }
+    if (linkRole === 'camera' && !linkStopping){
+      const dead = !mediaCall || mediaCall.open === false;
+      if (dead){ camRetry = 0; cameraRedial(); }
+    }
+  }, 1500);   // даём сети встать на ноги
 });
 
 /* ссылка-приглашение: #krug=секрет&me=ник — принять круг одним тапом */
