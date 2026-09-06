@@ -557,6 +557,15 @@
     <div id="tabFmt" title="крупно / компактно">⤢</div>
   </div>
   <div id="vu"><i></i></div>
+  <!-- КНОПКИ КО ВСЕМУ НОВОМУ. Замечание Александра 22.08, справедливое:
+       я достраивал возможности и оставлял их только голосом, а слово-
+       триггер слышится не всегда. Голос — удобство, кнопка — право. -->
+  <button class="btn" id="btnShkura" data-g="кадр">◧ ОБЛИК</button>
+  <button class="btn" id="btnLico" data-g="кадр">☺ ЛИЦО</button>
+  <button class="btn" id="btnKach" data-g="эфир">▤ 720p</button>
+  <button class="btn" id="btnKoin" data-g="кадр">◉ НАЛЁТ</button>
+  <button class="btn" id="btnItog" data-g="эфир">🏁 ИТОГИ</button>
+  <button class="btn" id="btnPerevod" data-g="мир">🌍 ПЕРЕВОД</button>
   <button class="btn" id="btnPanic">ПАНИКА</button>
   <button class="btn" id="btnAspect" data-g="эфир">⬛ 16:9</button>
   <button class="btn" id="btnMontage" data-g="эфир">⧉ МОНТАЖ</button>
@@ -4398,6 +4407,18 @@ function setPerevod(v, язык){
 let licoMode = 'речь';       // 'всегда' | 'нет' | 'речь'
 try{ licoMode = localStorage.getItem('skrin-lico-rezhim') || 'речь'; }catch(e){}
 const LICO = { морг: 0, моргДо: 0, дых: 0, качT: 0, рот: 0, состояние: 'тихо' };
+/* МЕСТО И РАЗМЕР — как у радара и окон камер. Замечание Александра 22.08:
+   всё в кадре должно двигаться и менять размер, иначе это не инструмент,
+   а картинка. Доли кадра, а не пиксели: тогда одинаково на телефоне и
+   на ноуте. */
+const licoWin = { nx: 0.035, ny: 0.62, scale: 1 };
+try{
+  const с = JSON.parse(localStorage.getItem('skrin-lico-win') || 'null');
+  if (с && с.nx !== undefined) Object.assign(licoWin, с);
+}catch(e){}
+function licoSave(){
+  try{ localStorage.setItem('skrin-lico-win', JSON.stringify(licoWin)); }catch(e){}
+}
 
 /* состояние берётся из системы, а не выдумывается */
 function licoSostoyanie(){
@@ -4414,9 +4435,9 @@ function licoDraw(c, w, h){
 
   const ш = SH();
   const t = performance.now();
-  const P = Math.max(2, Math.round(w * 0.0055));      // размер одной точки
+  const P = Math.max(2, Math.round(w * 0.0055 * licoWin.scale));
   const W16 = 16 * P, H16 = 16 * P;
-  const x0 = w * 0.035, y0 = h - H16 - h * 0.16;
+  const x0 = w * licoWin.nx, y0 = h * licoWin.ny;
 
   /* МОРГАНИЕ: раз в 3-6 секунд, длится 120 мс. Живость, но не суета. */
   if (t > LICO.моргДо){
@@ -4771,6 +4792,14 @@ function setItog(v){
    этого и нужны два знака после запятой.
 */
 const KOIN_KEY = 'skrin-koiny';
+const koinWin = { nx: 0.72, ny: 0.93, scale: 1 };
+try{
+  const с = JSON.parse(localStorage.getItem('skrin-koin-win') || 'null');
+  if (с && с.nx !== undefined) Object.assign(koinWin, с);
+}catch(e){}
+function koinWinSave(){
+  try{ localStorage.setItem('skrin-koin-win', JSON.stringify(koinWin)); }catch(e){}
+}
 const KOIN_V_MINUTU = 1.0;
 let koiny = {};            // имя → { всего, эфир }
 let koinLast = 0;
@@ -4802,7 +4831,11 @@ function koinFmt(секунд){
 /* Кому капает: мне (я в эфире) и каждой ЖИВОЙ камере в связи.
    Потерянная камера не копит: она сейчас не участвует. */
 function koinTick(){
-  if (!running) return;
+  /* НАЛЁТ КАПАЕТ ТОЛЬКО В ЭФИРЕ. Была моя ошибка: running значит «студия
+     открыта», а не «идёт трансляция». Монеты копились, пока страница
+     просто висела — налёт переставал быть налётом и превращался в счётчик
+     времени за компьютером. Найдено Александром 22.08. */
+  if (!twitchOn) return;
   const now = Date.now();
   if (!koinLast){ koinLast = now; return; }
   const сек = (now - koinLast) / 1000;
@@ -4829,13 +4862,13 @@ function koinTick(){
 function drawKoiny(c, w, h){
   const п = koinPara('я');
   const ш = SH();
-  const fs = Math.max(11, w * 0.016);
+  const fs = Math.max(11, w * 0.016 * koinWin.scale);
   c.save();
   c.font = '800 ' + fs + 'px ' + ш.шрифт;
   const крупно = '◉ ' + koinFmt(п.сек);
   const мелко = '+' + koinFmt(п.эфирСек);
   const tw = c.measureText(крупно).width;
-  const x = w - tw - fs * 2.4, y = h - fs * 1.1;
+  const x = w * koinWin.nx, y = h * koinWin.ny;
   c.fillStyle = ш.фон;
   rr(c, x - fs * 0.5, y - fs * 1.05, tw + fs * 3.2, fs * 1.5, fs * ш.скруг);
   c.fill();
@@ -6839,6 +6872,22 @@ const CMDS = {
   itog: v => setItog(v),
   shkura: v => setShkura(v),
   lico: v => setLico(v),
+  licoWin: (nx, ny, scale) => {
+    if (nx !== undefined) licoWin.nx = Math.max(0, Math.min(0.92, +nx));
+    if (ny !== undefined) licoWin.ny = Math.max(0, Math.min(0.92, +ny));
+    if (scale !== undefined) licoWin.scale = Math.max(0.4, Math.min(3, +scale));
+    licoSave();
+    return 'лицо: ' + licoWin.nx.toFixed(2) + '/' + licoWin.ny.toFixed(2)
+         + ' ×' + licoWin.scale;
+  },
+  koinWin: (nx, ny, scale) => {
+    if (nx !== undefined) koinWin.nx = Math.max(0, Math.min(0.95, +nx));
+    if (ny !== undefined) koinWin.ny = Math.max(0, Math.min(0.98, +ny));
+    if (scale !== undefined) koinWin.scale = Math.max(0.4, Math.min(3, +scale));
+    koinWinSave();
+    return 'налёт: ' + koinWin.nx.toFixed(2) + '/' + koinWin.ny.toFixed(2)
+         + ' ×' + koinWin.scale;
+  },
   perevod: (v, ya) => setPerevod(v, ya),
   kach: v => setKachestvo(v),
   koiny: kto => {
@@ -8417,6 +8466,47 @@ $('btnWakeTune').onclick = () => setWakeTune(!wakeUchu);
    «потянуть вниз» в полноэкранном режиме не работает.
    Перед уходом гасим эфир и связь по-хорошему: иначе на той стороне
    останутся мёртвые окна и висящий эфир на площадке. */
+/* Каждая кнопка гоняет свой список по кругу: одно нажатие — следующий
+   вариант. Так шесть кнопок заменяют два десятка команд. */
+$('btnShkura').onclick = () => {
+  const все = Object.keys(SHKURY);
+  const i = (все.indexOf(shkuraId) + 1) % все.length;
+  setShkura(все[i]);
+  $('btnShkura').textContent = '◧ ' + SH().имя;
+};
+$('btnLico').onclick = () => {
+  const круг = ['речь', 'всегда', 'нет'];
+  const i = (круг.indexOf(licoMode) + 1) % круг.length;
+  setLico(круг[i]);
+  $('btnLico').textContent = '☺ ' + (круг[i] === 'нет' ? 'ЛИЦО ×'
+                            : круг[i] === 'всегда' ? 'ЛИЦО ✓' : 'ЛИЦО ~');
+  $('btnLico').classList.toggle('on', круг[i] !== 'нет');
+};
+$('btnKach').onclick = () => {
+  kachIdx = (kachIdx + 1) % KACHESTVO.length;
+  setKachestvo(KACH().имя);
+  $('btnKach').textContent = '▤ ' + KACH().имя;
+};
+$('btnKoin').onclick = () => {
+  const есть = layers.has('коины');
+  if (есть) layers.delete('коины');
+  else layers.set('коины', (c, w, h) => drawKoiny(c, w, h));
+  $('btnKoin').classList.toggle('on', !есть);
+  bb('налёт в кадре: ' + (!есть ? 'виден' : 'скрыт'));
+};
+$('btnItog').onclick = () => {
+  setItog(!itogOn);
+  $('btnItog').classList.toggle('on', itogOn);
+};
+$('btnPerevod').onclick = () => {
+  if (perevodOn){ setPerevod(false); $('btnPerevod').classList.remove('on'); return; }
+  const я = prompt('Язык перевода: ' + Object.keys(YAZYKI).join(', '), perevodYaz);
+  if (!я) return;
+  setPerevod(true, я.trim().toLowerCase());
+  $('btnPerevod').classList.add('on');
+  $('btnPerevod').textContent = '🌍 ' + perevodYaz.toUpperCase();
+};
+
 $('btnReload').onclick = () => {
   if (twitchOn && !confirm('Эфир идёт. Перезапустить страницу?')) return;
   try{ if (twitchOn) twitchStop(true); }catch(e){}
