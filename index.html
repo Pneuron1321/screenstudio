@@ -111,6 +111,8 @@
      уезжает зрителям.
      Поэтому: класс body.screen прячет всё, что нужно только режиссёру.
      Ставится сам, когда эфир идёт с захвата экрана. */
+  body.tiho #linkStatus, body.tiho #linkWait, body.tiho #engLine,
+  body.tiho .bigcode{ display:none !important }
   body.screen #linkStatus,
   body.screen #linkWait,
   body.screen #engLine,
@@ -566,6 +568,7 @@
   <button class="btn" id="btnKoin" data-g="кадр">◉ НАЛЁТ</button>
   <button class="btn" id="btnItog" data-g="эфир">🏁 ИТОГИ</button>
   <button class="btn" id="btnPerevod" data-g="мир">🌍 ПЕРЕВОД</button>
+  <button class="btn" id="btnTiho" data-g="кадр">◌ ЧИСТО</button>
   <button class="btn" id="btnPanic">ПАНИКА</button>
   <button class="btn" id="btnAspect" data-g="эфир">⬛ 16:9</button>
   <button class="btn" id="btnMontage" data-g="эфир">⧉ МОНТАЖ</button>
@@ -912,7 +915,8 @@ let twScreenStream = null, twTabNode = null;
 let rubkaWs = null, rubkaConn = null, rubkaTimer = null;
 let pttKeyT = 0, pttSticky = false;            // кликеры-«пульсы»: рация-залипание
 let monitorOn = false;                         // шина вслух (для системной трансляции)
-let FACE_MS = 70;                              // такт детектора лиц (растёт при жаре)
+let FACE_MS = 70;
+let perfLock = false;      // true — не сбавлять темп при нагреве                              // такт детектора лиц (растёт при жаре)
 const FPS_LEVELS = [30, 24, 20];               // лестница темпа под нагрев
 const perf = { last: 0, ema: 33, level: 0, hotSince: 0, moved: 0 };
 let programConns = [], progConn = null, progTimer = null;   // ПРОГРАММА друзьям
@@ -2709,7 +2713,7 @@ function frame(){
   perf.last = tNow;
   perf.ema = perf.ema * 0.9 + dtF * 0.1;
   const tgt = 1000 / FPS_LEVELS[perf.level];
-  if (perf.ema > tgt * 1.5){
+  if (!perfLock && perf.ema > tgt * 1.5){
     if (!perf.hotSince) perf.hotSince = tNow;
     else if (tNow - perf.hotSince > 6000 && perf.level < FPS_LEVELS.length - 1 && tNow - perf.moved > 8000){
       perf.level++; perf.moved = tNow; perf.hotSince = 0;
@@ -4178,7 +4182,15 @@ const KACHESTVO = [
   { имя: '900p',  w: 1600, h: 900,  fps: 30, kbps: 4000,
     про: 'заметно чётче, нужна крепкая сеть' },
   { имя: '1080p', w: 1920, h: 1080, fps: 30, kbps: 6000,
-    про: 'полное HD, слабый телефон не потянет' }
+    про: 'полное HD, слабый телефон не потянет' },
+  /* 4К добавлено по замечанию Александра: айфон 11 снимает 4К, и запрещать
+     это студией — врать о возможностях устройства. Но честно: полотно
+     студии почти всегда меньше, площадки часто режут, а батарея садится
+     вдвое быстрее. Ступень есть — решение за человеком. */
+  { имя: '1440p', w: 2560, h: 1440, fps: 30, kbps: 9000,
+    про: 'очень чётко, крепкая сеть и провод' },
+  { имя: '4K', w: 3840, h: 2160, fps: 30, kbps: 14000,
+    про: 'предел айфона: батарея сядет вдвое быстрее, площадки часто режут' }
 ];
 let kachIdx = 2;                 // 720p — рабочее по умолчанию
 try{ const s = +localStorage.getItem('skrin-kach'); if (s >= 0 && s < KACHESTVO.length) kachIdx = s; }catch(e){}
@@ -5559,7 +5571,7 @@ const EAR_ECHO = {
    если дословного совпадения нет, разбираем смысл: корень действия плюс
    отрицание. Отрицание сильнее: «останови запись» содержит слово «запись»,
    и без этого правила включило бы её вместо остановки. */
-const EAR_NEG = /(^|\s)(стоп|стой|останов|выключ|убер|убра|отмен|прекрат|хват|без|сними|снять|туши|погаси|долой|спи(?=\s|$)|спать|усни|уснуть|отбой)/;
+const EAR_NEG = /(^|\s)(стоп|стой|останов|выключ|убер|убра|отмен|прекрат|хват|без|спряч|пряч|сними|снять|туши|погаси|долой|спи(?=\s|$)|спать|усни|уснуть|отбой)/;
 const EAR_POS = /(^|\s)(включ|давай|начн|начин|запус|поставь|сделай|дай|поехали|врубай)/;
 const EAR_LOOSE = [
   { w: ['запис', 'пишем', 'пиши', 'снимаем'], cmd: 'rec' },
@@ -5581,13 +5593,48 @@ const EAR_LOOSE = [
   { w: ['донат', 'поддерж'], cmd: 'tip' },
   { w: ['удар', 'суперудар'], cmd: 'udar' },
   { w: ['памят', 'помни'], cmd: 'pamyat' },
-  { w: ['разогрев', 'разогре'], cmd: 'warm' }
+  { w: ['разогрев', 'разогре'], cmd: 'warm' },
+  /* ШЕСТЬ МОЛОДЫХ. Жили только в точной таблице, поэтому «облик не он»
+     (так распознавание слышит «неон») уходило Клоду. Здесь у них второй
+     слой, как у всего остального, и прожиг понимания видит их сам. */
+  { w: ['облик', 'шкур', 'неон', 'пиксел'], cmd: 'shkura', pick: [
+      [['неонпиксель', 'неон пиксел', 'не он пиксел'], ['неонпиксель']],
+      [['неон', 'не он', 'восемьдесят четыре'], ['неон']],
+      [['пиксел', 'шестнадцать бит'], ['пиксель']],
+      [['мор'], ['море']],
+      [['свой', 'своя', 'обычн', 'прежн'], ['своя']]
+    ] },
+  { w: ['лицо', 'аватар'], cmd: 'lico', on: ['всегда'], off: ['нет'],
+    pick: [[['реч', 'когда говор'], ['речь']]] },
+  { w: ['качеств'], cmd: 'kach', pick: [
+      [['1080', 'тысяча восемьдесят', 'полное'], ['1080p']],
+      [['720', 'семьсот двадцать'], ['720p']],
+      [['480', 'четыреста восемьдесят', 'эконом'], ['480p']]
+    ] },
+  /* налёт только смотрят — тратить нельзя, значит тумблера нет */
+  { w: ['налёт', 'налет', 'коин'], cmd: 'koiny', once: true },
+  { w: ['итог'], cmd: 'itog' },
+  { w: ['перевод', 'переводи', 'переводч'], cmd: 'perevod', off: [false], pick: [
+      [['английск', 'англ'], [true, 'en']],
+      [['хорватск', 'хорват'], [true, 'hr']],
+      [['немецк', 'немец'], [true, 'de']]
+    ] }
 ];
 function earLoose(t){
   const hits = EAR_LOOSE.filter(g => g.w.some(w => t.indexOf(w) >= 0));
   if (hits.length !== 1) return null;          // ноль или спор — не гадаем
   const g = hits[0];
   if (g.once) return { name: g.cmd, args: [] };
+  /* ЗНАЧЕНИЕ, А НЕ ТУМБЛЕР. Облик, качество и язык — не «вкл/выкл», у них
+     есть имя. pick ищет имя в самой фразе; порядок важен (неонпиксель
+     раньше неона). Не нашли имени и нет нужной стороны — возвращаем null
+     и отдаём фразу Клоду: гадать про облик хуже, чем не понять. */
+  if (g.pick){
+    for (const [ws, val] of g.pick)
+      if (ws.some(w => t.indexOf(w) >= 0)) return { name: g.cmd, args: val.slice() };
+    const neg0 = EAR_NEG.test(' ' + t) && !EAR_POS.test(' ' + t);
+    if (neg0 ? !g.off : !g.on) return null;
+  }
   const neg = EAR_NEG.test(' ' + t), pos = EAR_POS.test(' ' + t);
   const off = neg && !pos;
   const args = off ? (g.off || [false]) : (g.on || [true]);
@@ -6890,6 +6937,25 @@ const CMDS = {
   },
   perevod: (v, ya) => setPerevod(v, ya),
   kach: v => setKachestvo(v),
+  tiho: v => {
+    /* СЛУЖЕБНОЕ С ГЛАЗ. «Жду камеры» и код комнаты нужны при настройке и
+       мешают потом — а код ещё и показывать не стоит. Одна кнопка. */
+    const on = (v !== false);
+    document.body.classList.toggle('tiho', on);
+    bb('служебное: ' + (on ? 'скрыто' : 'видно'));
+    return on ? 'служебное скрыто' : 'служебное видно';
+  },
+  temp: v => {
+    /* «ЖАРКО, СБАВЛЯЮ ТЕМП» — защита студии: когда телефон греется,
+       система сама роняет частоту, чтобы эфир не рвался. Александр
+       охлаждает айфон и хочет запретить — его право: лучше он сам решит,
+       чем студия молча снизит качество. */
+    perfLock = (v !== false);
+    if (perfLock){ perf.level = 0; FACE_MS = 70; }
+    bb('темп: ' + (perfLock ? 'держу максимум, не сбавляю' : 'сбавляю при нагреве'));
+    return perfLock ? 'темп не сбавляю — следи за нагревом сам'
+                    : 'сбавляю темп при нагреве';
+  },
   koiny: kto => {
     /* Посмотреть налёт: свой, чужой или всех. Тратить нельзя — это
        налёт, а не деньги; можно только смотреть, как растёт. */
@@ -8468,6 +8534,70 @@ $('btnWakeTune').onclick = () => setWakeTune(!wakeUchu);
    останутся мёртвые окна и висящий эфир на площадке. */
 /* Каждая кнопка гоняет свой список по кругу: одно нажатие — следующий
    вариант. Так шесть кнопок заменяют два десятка команд. */
+/* ТЯНУТЬ ПАЛЬЦЕМ. Замечание Александра 22.08: я сделал команды переноса,
+   но он ждал ЖЕСТА — и был прав, командами в эфире не двигают.
+   Тянем прямо по кадру: касание рядом с лицом или налётом хватает их,
+   двумя пальцами — размер. Работает и мышью на ноуте. */
+(function tyaniVKadre(){
+  const кадр = $('stage') || document.body;
+  let что = null, старт = null, база = null, дист0 = 0;
+
+  const близко = (x, y, w) => {
+    const кx = licoWin.nx * W, кy = licoWin.ny * H;
+    const мx = koinWin.nx * W, мy = koinWin.ny * H;
+    const порог = W * 0.14;
+    if (Math.hypot(x - кx - порог * 0.3, y - кy - порог * 0.3) < порог) return 'лицо';
+    if (Math.hypot(x - мx, y - мy) < порог) return 'налёт';
+    return null;
+  };
+  const вКадр = e => {
+    const r = кадр.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W,
+             y: (e.clientY - r.top) / r.height * H };
+  };
+
+  кадр.addEventListener('pointerdown', e => {
+    if (!running || panic) return;
+    const т = вКадр(e);
+    что = близко(т.x, т.y, W);
+    if (!что) return;
+    старт = т;
+    база = (что === 'лицо') ? { ...licoWin } : { ...koinWin };
+    кадр.setPointerCapture && кадр.setPointerCapture(e.pointerId);
+  }, true);
+
+  кадр.addEventListener('pointermove', e => {
+    if (!что || !старт) return;
+    const т = вКадр(e);
+    const цель = (что === 'лицо') ? licoWin : koinWin;
+    цель.nx = Math.max(0, Math.min(0.95, база.nx + (т.x - старт.x) / W));
+    цель.ny = Math.max(0, Math.min(0.98, база.ny + (т.y - старт.y) / H));
+    e.preventDefault();
+  }, true);
+
+  кадр.addEventListener('pointerup', () => {
+    if (что){ (что === 'лицо') ? licoSave() : koinWinSave(); bb(что + ': перенесён'); }
+    что = null; старт = null;
+  }, true);
+
+  /* ДВА ПАЛЬЦА — РАЗМЕР. На телефоне это привычнее любой кнопки. */
+  кадр.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !что) return;
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                         e.touches[0].clientY - e.touches[1].clientY);
+    if (!дист0){ дист0 = d; return; }
+    const цель = (что === 'лицо') ? licoWin : koinWin;
+    цель.scale = Math.max(0.4, Math.min(3, база.scale * (d / дист0)));
+    e.preventDefault();
+  }, { passive: false });
+  кадр.addEventListener('touchend', () => { дист0 = 0; });
+})();
+
+$('btnTiho').onclick = () => {
+  const on = !document.body.classList.contains('tiho');
+  CMDS.tiho(on);
+  $('btnTiho').classList.toggle('on', on);
+};
 $('btnShkura').onclick = () => {
   const все = Object.keys(SHKURY);
   const i = (все.indexOf(shkuraId) + 1) % все.length;
