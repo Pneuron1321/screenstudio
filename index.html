@@ -4276,6 +4276,17 @@ layers.set('битрейт', (c, w, h) => drawBitrate(c, w, h));
 
 function setKachestvo(v){
   const s = String(v || '').toLowerCase().trim();
+  /* СОСЕДНЯЯ СТУПЕНЬ. Пульту нельзя знать лестницу — это был бы второй
+     список, который однажды разойдётся с этим. Он просит направление,
+     листает тот, кто лестницу держит. На воде это главное движение:
+     шкала покраснела — «ниже». */
+  if (s === 'ниже' || s === 'выше'){
+    const шаг = s === 'выше' ? 1 : -1;
+    const j = kachIdx + шаг;
+    if (j < 0) return 'уже самое лёгкое: ' + KACHESTVO[0].имя;
+    if (j >= KACHESTVO.length) return 'уже самое тяжёлое: ' + KACHESTVO[KACHESTVO.length - 1].имя;
+    return setKachestvo(KACHESTVO[j].имя);
+  }
   let i = KACHESTVO.findIndex(k => k.имя.toLowerCase() === s || k.имя.toLowerCase() === s + 'p');
   if (i < 0 && /^\d+$/.test(s)){
     /* дали число — понимаем и как высоту кадра, и как битрейт */
@@ -6637,14 +6648,23 @@ async function twitchStart(){
      сеть, а не сервер Twitch. */
   /* при захвате экрана в кадр уезжает вся страница — прячем служебное */
   document.body.classList.toggle('screen', srcKind === 'screen');
-  const черезМост = /^https?:\/\/(127\.|localhost|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i
-                    .test(endpoint);
+  /* 16.09, второй живой запуск: мост уехал за туннель, и правило «свой мост
+     = локальный адрес» перестало быть правдой. Туннель даёт
+     https://что-то.trycloudflare.com — для студии это выглядело чужой
+     площадкой, и она снова потребовала ключ.
+     Адрес больше не признак. Признак — ПУТЬ: `/efir/whip` задаёт most.py в
+     своём конфиге, это наше имя, и оно едет вместе с мостом куда угодно. */
+  const мостПоАдресу = /^https?:\/\/(127\.|localhost|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i
+                       .test(endpoint);
+  const мостПоПути = /\/efir\/whip\/?$/i.test(endpoint);
+  const черезМост = мостПоАдресу || мостПоПути;
   if (!key && !черезМост){
     showMsg('Нужен ключ трансляции. Через свой мост ключ не нужен — '
-          + 'но адрес должен быть локальным (http://192.168.…)');
+          + 'но адрес должен кончаться на /efir/whip (или быть локальным)');
     return;
   }
-  if (черезМост) bb('эфир через свой мост: ключ держит мост');
+  if (черезМост) bb('эфир через свой мост (' + (мостПоПути ? 'по пути /efir/whip' : 'локальный адрес')
+                    + '): ключ держит мост');
 
   let vTrack = null, aTracks = [];
   try{
@@ -7401,6 +7421,10 @@ function scenaOpis(){
 function stSnap(){
   return {
     twitch: twitchOn, panic: panic, blur: autoBlur, ring: clipOn,
+    /* Без этого кнопка качества на пульте не подсветится и не подтвердится,
+       а подтверждение по состоянию — единственное честное.
+       Записи здесь нет и не будет: она убрана из студии намеренно. */
+    kach: KACH().имя,
     mic: micMuted, camMuted: camMuted, lock: projLock, cams: remotes.filter(r => !r.lost).length,
     dash: dashOn, map: mapMode, ear: earOn, subs: subsOn,
     cohost: cohostOn, duty: dutyWanted, monitor: monitorOn, feedOn: feedOn,
