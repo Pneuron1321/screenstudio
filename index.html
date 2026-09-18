@@ -291,6 +291,18 @@
     background:rgba(255,180,84,.16);border:1px solid var(--amber);color:var(--amber);
     padding:7px 16px;border-radius:999px;letter-spacing:.06em;
   }
+  /* ВЫХОД ИЗ ГЛАВНОГО ЭКРАНА. Пока камера главная, её окно скрыто — чтобы
+     не двоить картинку. Но вместе с окном исчезала и единственная кнопка
+     под рукой: снять главного можно было только из списка круга, и найти
+     это было нечем. Теперь выход виден всегда, пока главный стоит. */
+  #heroOff{
+    position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 54px);
+    transform:translateX(-50%);display:none;align-items:center;gap:6px;z-index:25;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:800;
+    background:rgba(10,12,18,.72);border:1px solid var(--amber);color:var(--amber);
+    border-radius:999px;padding:7px 14px;cursor:pointer;
+  }
+  #heroOff:active{background:rgba(255,180,84,.22)}
   #pttHud .p{width:9px;height:9px;border-radius:50%;background:var(--amber);
     animation:pulse 1s ease-in-out infinite}
   #btnTwitch{border-color:rgba(176,140,255,.55);color:#cdb4ff}
@@ -526,6 +538,7 @@
 <div id="pttHud"><span class="p"></span><span>CODE ROOT · слушаю</span></div>
 <div id="zoneLayer"><div id="zoneRub"></div></div>
 <div id="zoneHint">Обведи пальцем область — замажу. Двойной тап по фону — стереть все зоны.</div>
+<button id="heroOff" type="button">★ <span id="heroWho"></span> · СНЯТЬ</button>
 <div id="msg"></div>
 
 <div id="helpVoice">
@@ -2678,6 +2691,16 @@ function setHero(name){
       r.dom.style.display = me ? 'none' : '';
     }
   });
+  /* Выход виден, пока главный стоит: окно героя скрыто, и без этого снять
+     его можно было только из списка круга — а найти это нечем. */
+  try{
+    const в = $('heroOff');
+    if (в){
+      в.style.display = n ? 'inline-flex' : 'none';
+      const кто = $('heroWho');
+      if (кто) кто.textContent = (n === 'я' ? 'своя камера' : n);
+    }
+  }catch(e){}
   /* главный экран во весь кадр — приборы уходят в угол; сняли — отпускаем */
   if (n && n !== 'я') setRadarMode('gta');
   else if (radar.mode === 'gta') setRadarMode('free');
@@ -8814,6 +8837,7 @@ calmly($('mapWin'));
 })();
 $('btnRing').onclick = () => setClipRing(!clipOn);
 $('btnClip').onclick = () => takeClip();
+$('heroOff').onclick = () => { setHero(''); try{ renderRoster(); }catch(e){} };
 $('btnMark').onclick = () => markMoment('');
 $('btnLang').onclick = () => {
   setLang(lang ? 'ru' : 'en');
