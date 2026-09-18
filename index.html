@@ -2457,7 +2457,21 @@ function fit(){
     cv.style.left = '0px'; cv.style.top = '0px';
     cv.style.width = '100%'; cv.style.height = '100%';
   } else {
-    W = ASPECTS[aspect][0]; H = ASPECTS[aspect][1];
+    /* РАЗМЕР ДАЁТ СТУПЕНЬ, ПРОПОРЦИЮ — ФОРМАТ. 17.09: найдено, что ступени
+       качества отдавали только битрейт и частоту, а размер полотна был
+       прибит: 16:9 всегда 1280×720. Выбрать «1080p» значило вылить 6000
+       кбит/с в кадр 720p — битрейт в картинку, которой нечего показывать.
+       Теперь ASPECTS задаёт отношение сторон, а сколько пикселей — ступень. */
+    const пр = ASPECTS[aspect][0] / ASPECTS[aspect][1];
+    const к = (typeof KACH === 'function') ? KACH() : null;
+    const длинная = к ? Math.max(к.w || 0, к.h || 0) : 0;
+    if (длинная >= 240){
+      if (пр >= 1){ W = Math.round(длинная); H = Math.round(длинная / пр); }
+      else        { H = Math.round(длинная); W = Math.round(длинная * пр); }
+      W -= W % 2; H -= H % 2;            // энкодеры не любят нечётных сторон
+    } else {
+      W = ASPECTS[aspect][0]; H = ASPECTS[aspect][1];
+    }
     const f = screenFrame();
     cv.style.left = f.x + 'px'; cv.style.top = f.y + 'px';
     cv.style.width = f.w + 'px'; cv.style.height = f.h + 'px';
@@ -6716,14 +6730,20 @@ async function twitchStart(){
     }
     ensureMicChain();
     aTracks = [busTrack()];   // шина даёт дорожку всегда, даже тихую — Twitch хочет видеть аудио
-    try{ vTrack.contentHint = (srcKind === 'screen') ? 'detail' : 'motion'; }catch(e){}
+    /* 'motion' — прямая просьба к энкодеру жертвовать разрешением первым.
+       В кадре студии приборы, радар, титры и цифры: терять детали нельзя,
+       лучше потерять плавность. Для экрана было верно и раньше. */
+    try{ vTrack.contentHint = 'detail'; }catch(e){}
 
     pc = new RTCPeerConnection({ iceServers: iceList() });
     const vt = pc.addTransceiver(vTrack, {
       direction: 'sendonly',
       /* битрейт и темп задаются сразу при создании: браузер иначе
          решает сам, и на слабой сети картинка рассыпается */
-      sendEncodings: [{ maxBitrate: kachKbps() * 1000, maxFramerate: KACH().fps }]
+      sendEncodings: [{ maxBitrate: kachKbps() * 1000, maxFramerate: KACH().fps,
+                        /* по умолчанию WebRTC роняет РАЗРЕШЕНИЕ первым;
+                           нам дороже размер, чем частота */
+                        degradationPreference: 'maintain-resolution' }]
     });
     if (aTracks.length) pc.addTransceiver(aTracks[0], { direction: 'sendonly' });
 
