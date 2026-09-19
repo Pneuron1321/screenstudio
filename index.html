@@ -906,6 +906,7 @@ const prev = document.createElement('canvas'), pctx = prev.getContext('2d');
 const det = document.createElement('canvas'), dctx = det.getContext('2d', { willReadFrequently: true });
 const tmp = document.createElement('canvas'), tctx = tmp.getContext('2d');
 const out = document.createElement('canvas'), octx = out.getContext('2d'); // эфирный выход: его пишут REC и Twitch
+let twFpsSync = null;      // ставится при старте эфира: подача идёт за темпом
 
 let mode = 'studio';                          // studio | efir
 let camVideo = null, camStream = null, facing = 'environment';
@@ -2428,7 +2429,12 @@ async function setMontage(v){
    '1:1' — квадрат.
    Экран показывает кадр вписанным; поля вокруг достаются пульту. */
 const ASPECTS = { '16:9': [1280, 720], '9:16': [720, 1280], '1:1': [1024, 1024] };
+/* ФОРМАТ ПЕРЕЖИВАЕТ ЗАПУСК. Ступень качества сохранялась, а формат нет —
+   и при каждом старте возвращался 'экран'. Размер от ступени считается
+   только в именованных форматах, значит он жил за всегда закрытой дверью
+   и не сработал ни разу. */
 let aspect = 'экран';
+try{ const a = localStorage.getItem('skrin-aspect'); if (a) aspect = a; }catch(e){}
 /* где кадр лежит на экране, в CSS-пикселях: от этого считаются все
    накладки — окна друзей, радар, карта, миниатюра */
 function screenFrame(){
@@ -2442,6 +2448,7 @@ function setAspect(a){
              : (ASPECTS[a] ? a : null);
   if (!want) return 'формат: экран, 16:9, 9:16 или 1:1';
   aspect = want;
+  try{ localStorage.setItem('skrin-aspect', want); }catch(e){}
   document.body.classList.toggle('framed', aspect !== 'экран');
   fit();
   bb('формат эфира: ' + aspect);
@@ -2481,7 +2488,11 @@ function fit(){
   const csc = Math.min(1, 1280 / Math.max(W, H));   // кольцо пишет 720p-класс: пол-цены энкода
   clipCv.width = Math.max(2, Math.round(W * csc));
   clipCv.height = Math.max(2, Math.round(H * csc));
-  if (ring) allocRing();
+  /* `if (ring)` была дверь в одну сторону: на большом полотне allocRing
+     ставит ring = null (не влезает в бюджет), и после возврата на 720p
+     страховка уже не восстанавливалась — условие проверяло кольцо, а
+     спрашивать надо про блюр. */
+  if (ring || autoBlur) allocRing();
   placeWinDom();
   if (mapMode === 'mini') placeMapWin();
   if (dashOn) placeRadarTab();
@@ -2756,6 +2767,7 @@ function frame(){
       perf.level++; perf.moved = tNow; perf.hotSince = 0;
       FACE_MS = 70 + perf.level * 45;
       bb('темп ↓ ' + FPS_LEVELS[perf.level] + ' к/с');
+      try{ if (twFpsSync) twFpsSync(FPS_LEVELS[perf.level]); }catch(e){}
       linkFlash('жарко: сбавляю темп до ' + FPS_LEVELS[perf.level] + ' к/с');
     }
   } else {
@@ -2764,6 +2776,7 @@ function frame(){
       perf.level--; perf.moved = tNow;
       FACE_MS = 70 + perf.level * 45;
       bb('темп ↑ ' + FPS_LEVELS[perf.level] + ' к/с');
+      try{ if (twFpsSync) twFpsSync(FPS_LEVELS[perf.level]); }catch(e){}
       linkFlash('остыло: возвращаю ' + FPS_LEVELS[perf.level] + ' к/с');
     }
   }
@@ -2928,7 +2941,11 @@ function frame(){
     ctx.fillText(t, (W - ctx.measureText(t).width) / 2, H / 2);
   }
 
-  pctx.drawImage(cv, 0, 0);
+  /* ПРОШЛЫЙ КАДР — ТОЛЬКО ЕСЛИ ЕГО КТО-ТО СМОТРИТ. Полнокадровая копия
+     делалась каждый кадр всегда, а нужна она ровно в одном месте: в
+     эхо-окне, и только когда там не экран. При закрытом окне это была
+     чистая трата — на 1920×1080 она тяжелее всего композита вместе. */
+  if (winOn && !(screenMode && dispVideo && dispVideo.videoWidth)) pctx.drawImage(cv, 0, 0);
   renderOut(nowT);
   if (clipOn && clipRecs) clipCtx.drawImage(out, 0, 0, clipCv.width, clipCv.height);
 }
@@ -3492,8 +3509,36 @@ function setPanic(v){
    замазанный по ВСЕМ детекциям вокруг его момента. Лицо, пойманное
    детектором на 200 мс позже появления, до зрителя не доедет.
    Цена страховки: задержка эфира и ~50 МБ памяти — только пока блюр горит. */
+/* КОЛЬЦО СЧИТАЕТСЯ ПО ПАМЯТИ, А НЕ ПО КАДРАМ. Раньше: BLUR_DELAY × 30 + 3
+   полных полотен. Пока полотно было прибито к 1440, это давало ~70 МБ и
+   сходило с рук. Со ступенями выше цена растёт как ПЛОЩАДЬ: 1920×1080 —
+   124 МБ, 2560×1440 — 221 МБ, 3840×2160 — около полугигабайта. Safari на
+   айфоне вкладку такого размера не оставит.
+   Сняв потолок 1440, мы сняли и ограничитель мощности — здесь он ставится
+   обратно, но честно: не выдуманным пределом разрешения, а бюджетом.
+   И кадров берём по НАСТОЯЩЕМУ темпу, а не по прибитым 30: на 20 к/с это
+   сразу на треть меньше. */
+const RING_BUDGET_MB = 120;        // потолок памяти под страховку блюра
 function allocRing(){
-  ringN = Math.ceil(BLUR_DELAY * 30) + 3;
+  const байтНаКадр = W * H * 4;
+  const темп = (typeof FPS_LEVELS !== 'undefined' && FPS_LEVELS[perf.level]) || 24;
+  const хочется = Math.ceil(BLUR_DELAY * темп) + 3;
+  const влезает = Math.floor(RING_BUDGET_MB * 1048576 / Math.max(1, байтНаКадр));
+  ringN = Math.max(0, Math.min(хочется, влезает));
+  if (ringN < 4){
+    /* На минимум не хватает: молча отдать половину страховки хуже, чем
+       сказать. Блюр без кольца работает по живому кадру — лицо, пойманное
+       детектором позже появления, успеет попасть к зрителю. */
+    ring = null;
+    bb('кольцо блюра не влезает в память на ' + W + '×' + H +
+       ' — страховка выключена, блюр идёт по живому кадру');
+    linkFlash('на этом размере страховка блюра не помещается в память');
+    return;
+  }
+  if (ringN < хочется){
+    bb('кольцо блюра урезано до ' + ringN + ' кадров (' + W + '×' + H +
+       ', бюджет ' + RING_BUDGET_MB + ' МБ): задержка страховки короче');
+  }
   ring = { i: 0, frames: [] };
   for (let k = 0; k < ringN; k++){
     const c = document.createElement('canvas');
@@ -4247,6 +4292,11 @@ async function kachPrimeni(){
     if (!пар.encodings || !пар.encodings.length) пар.encodings = [{}];
     пар.encodings[0].maxBitrate = kachKbps() * 1000;
     пар.encodings[0].maxFramerate = KACH().fps;
+    /* ЭТО ЧЛЕН ПАРАМЕТРОВ ОТПРАВИТЕЛЯ, А НЕ КОДИРОВКИ. Внутри encodings он
+       молча отбрасывается: лишние ключи словаря не ошибка, они просто
+       исчезают. По умолчанию WebRTC роняет именно РАЗРЕШЕНИЕ — а в кадре
+       студии приборы и цифры, и размер дороже плавности. */
+    пар.degradationPreference = 'maintain-resolution';
     await s.setParameters(пар);
     return kachKbps();
   }catch(e){
@@ -4317,6 +4367,9 @@ function setKachestvo(v){
      список, который однажды разойдётся с этим. Он просит направление,
      листает тот, кто лестницу держит. На воде это главное движение:
      шкала покраснела — «ниже». */
+  /* Смена ступени обязана пересобрать полотно: иначе новый размер ждёт
+     поворота экрана, а предупреждение «полотно меньше» считается по
+     старому и врёт ровно тогда, когда должно помочь. */
   if (s === 'ниже' || s === 'выше'){
     const шаг = s === 'выше' ? 1 : -1;
     const j = kachIdx + шаг;
@@ -4343,7 +4396,22 @@ function setKachestvo(v){
   kachIdx = i;
   kbpsRuchnoy = 0;
   try{ localStorage.setItem('skrin-kach', String(i)); }catch(e){}
+  /* ПОЛОТНО ПЕРЕСОБИРАЕТСЯ СРАЗУ — НО НЕ В ЭФИРЕ. Без fit() новый размер
+     ждал поворота экрана, а предупреждение «полотно меньше» считалось по
+     старому W и врало. Зато fit() в живом эфире делает сразу три резких
+     вещи: чистит контекст полотна, меняет разрешение дорожки на лету и
+     перевыделяет кольцо до сотни мегабайт. Мы просили у энкодера ровной
+     подачи — это самый резкий разрыв, какой можно устроить.
+     Поэтому в эфире меняем только битрейт и темп, а размер ждёт. */
+  const вЭфире = twitchOn || mostOn;
+  if (!вЭфире){ try{ fit(); }catch(e){} }
   const к = KACH();
+  /* Размер говорим вслух ВСЕГДА, в том числе в формате «экран», где он
+     приходит от вёрстки, а не от ступени: человек должен видеть, что
+     уходит на самом деле, а не то, что он выбрал. */
+  bb('полотно ' + W + '×' + H + (aspect === 'экран'
+     ? ' — формат «экран»: размер от экрана, не от ступени'
+     : ' — ступень ' + к.имя));
   bb('качество: ' + к.имя + ' @' + к.fps + ' · ' + к.kbps + ' кбит/с');
   /* ЧЕСТНО О ПРЕДЕЛЕ: полотно студии может быть меньше выбранного, и
      тогда картинка не станет чётче — растянется. Говорим об этом сразу,
@@ -4353,6 +4421,10 @@ function setKachestvo(v){
           + ' кбит/с — ' + к.про
           + (мельче ? ' ⚠ полотно студии ' + W + '×' + H
                     + ' — выше него картинка чётче не станет' : ''));
+  if (вЭфире)
+    bb('эфир идёт: полотно остаётся ' + W + '×' + H
+       + ' — размер меняется только между эфирами'
+       + (mostOn ? ' (на мосту: «мост перезапуск»)' : ''));
   if (twitchOn) kachPrimeni();     // на ходу, не разрывая эфир
   return к.имя + ' · ' + kachKbps() + ' кбит/с';
 }
@@ -6593,7 +6665,17 @@ function twWatch(srcKind){
       twRetry = 0;
       if (shieldOn && shieldText === 'СВЯЗЬ ВОССТАНАВЛИВАЕТСЯ') setShield(false);
       $('hud').classList.add('live');
-      recT0 = Date.now(); startTimer();
+      /* 19.09: здесь стояло `recT0 = Date.now(); startTimer();` — оба имени
+         в файле не существуют (запись из студии убрали, а вызов остался).
+         При 'use strict' присваивание необъявленной переменной бросает
+         ReferenceError ровно в секунду выхода в эфир, и всё, что ниже в
+         этом обработчике, не выполнялось: ни «В ЭФИРЕ», ни проверка кодека.
+         Эфир при этом шёл — поэтому и не замечалось. */
+      $('hud').style.display = 'flex';
+      clearInterval(timerId);
+      timerId = setInterval(() => {
+        try{ $('timer').textContent = hhmmss(Date.now() - twT0) || '00:00'; }catch(e){}
+      }, 1000);
       bb('twitch: В ЭФИРЕ (' + srcKind + ')');
       showMsg('Эфир пошёл. Смотри свой канал — задержка секунд 5–10.');
       if (H > W * 1.05)
@@ -6673,6 +6755,7 @@ async function twCodecCheck(){
   });
 })();
 async function twitchStart(){
+  if (mostOn){ showMsg('Сейчас идёт эфир через мост. Два выхода разом телефон не потянет.'); return; }
   const endpoint = $('twEndpoint').value.trim();
   const key = $('twKey').value.trim();
   const srcKind = $('twSource').value;
@@ -6721,6 +6804,30 @@ async function twitchStart(){
          рваные 30 с потерями. */
       const fps = FPS_LEVELS[perf.level] || 24;
       const cs = out.captureStream(fps);
+      /* ПОДАЧА ДОЛЖНА ИДТИ ЗА ТЕМПОМ. Частота бралась здесь один раз, и
+         дальше лестница нагрева двигала отрисовку, а поток оставался на
+         старом числе: кадры приходили в энкодер неровно, а для оценщика
+         битрейта рваная подача хуже ровной низкой. Теперь при смене темпа
+         поток и отправитель узнают об этом. */
+      twFpsSync = (n) => {
+        /* applyConstraints({frameRate}) тут стоял зря: дорожка полотна —
+           CanvasCaptureMediaStreamTrack, частоту через constraints она не
+           принимает и отклоняет промис. try/catch такое не ловит (это
+           reject, а не throw), так что в консоли копились необработанные
+           отклонения. Частота захвата задана один раз в captureStream и
+           работает как потолок: рисуем реже — приходит реже, это верно.
+           Настоящая работа здесь одна — сказать отправителю новый темп,
+           чтобы оценщик битрейта не принимал ровное снижение за срыв. */
+        try{
+          if (!pc) return;
+          const s = pc.getSenders().find(x => x.track && x.track.kind === 'video');
+          if (!s) return;
+          const пар = s.getParameters();
+          if (!пар.encodings || !пар.encodings[0]) return;
+          пар.encodings[0].maxFramerate = n;
+          s.setParameters(пар).catch(() => {});
+        }catch(e){}
+      };
       vTrack = cs.getVideoTracks()[0];
       twCanvasStream = cs;
       bb('twitch: полотно ' + W + '×' + H + ' @' + fps);
@@ -6740,10 +6847,7 @@ async function twitchStart(){
       direction: 'sendonly',
       /* битрейт и темп задаются сразу при создании: браузер иначе
          решает сам, и на слабой сети картинка рассыпается */
-      sendEncodings: [{ maxBitrate: kachKbps() * 1000, maxFramerate: KACH().fps,
-                        /* по умолчанию WebRTC роняет РАЗРЕШЕНИЕ первым;
-                           нам дороже размер, чем частота */
-                        degradationPreference: 'maintain-resolution' }]
+      sendEncodings: [{ maxBitrate: kachKbps() * 1000, maxFramerate: KACH().fps }]
     });
     if (aTracks.length) pc.addTransceiver(aTracks[0], { direction: 'sendonly' });
 
@@ -6812,6 +6916,7 @@ function twitchStop(silent){
   if (twScreenStream){ twScreenStream.getTracks().forEach(t => t.stop()); twScreenStream = null; }
   if (twTabNode){ try{ twTabNode.disconnect(); }catch(e){} twTabNode = null; }
   twitchSrcKind = '';
+  twFpsSync = null;                 // эфира нет — за темпом идти некуда
   clearInterval(twStatTimer); twStatTimer = null;
   if (twCanvasStream){
     try{ twCanvasStream.getTracks().forEach(t => t.stop()); }catch(e){}
@@ -6822,7 +6927,9 @@ function twitchStop(silent){
   twitchOn = false;
   $('btnTwitch').classList.remove('on');
   $('hud').classList.remove('live');
-  clearInterval(timerId); $('hud').style.display = 'none';
+  clearInterval(timerId); timerId = null;
+  $('timer').textContent = '00:00';
+  $('hud').style.display = 'none';
   if (!silent) showMsg('Эфир остановлен');
 }
 $('btnTwitch').onclick = () => {
@@ -6831,6 +6938,200 @@ $('btnTwitch').onclick = () => {
 };
 $('twCancel').onclick = () => $('twitchSheet').style.display = 'none';
 $('twGo').onclick = twitchStart;
+
+
+/* ---------- ЭФИР ЧЕРЕЗ МОСТ: MediaRecorder → WebSocket → ffmpeg → RTMP ----------
+
+   ПОЧЕМУ ВТОРОЙ ВЫХОД, А НЕ НАСТРОЙКА ПЕРВОГО.
+   WHIP — это WebRTC, а у WebRTC один контур управления: удержать задержку,
+   отдав картинку. maxBitrate там потолок, а не цель; минимального битрейта
+   в API нет вовсе; оценщик стартует с ~300 кбит/с и ползёт вверх десятки
+   секунд, а первая потеря — мгновенный срез. Это не настройка, это
+   устройство: поэтому contentHint, degradationPreference и ровный темп
+   помогают, но паритета с Moblin не дают.
+   Moblin делает обратный размен — копит в TCP-буфере, платит секундами,
+   картинку не отдаёт. Здесь то же самое: MediaRecorder отдаёт готовый
+   контейнер с картинкой и звуком, WebSocket поверх TCP довозит его до
+   моста, мост отдаёт в RTMP. Аппаратный энкодер телефона, явный битрейт,
+   транспорт без переговоров — и композит, которого у Moblin нет.
+
+   ЦЕНА, вся:
+   · +1–3 с задержки сверх обычных 5–10 у Twitch;
+   · обратное давление теперь наше. У WebRTC решение «что выбросить»
+     принимал оценщик; здесь очередь просто растёт и превращается в
+     отставание. Сторож ниже смотрит bufferedAmount и говорит вслух;
+   · интервал ключевых кадров MediaRecorder не отдаёт — мост при нужде
+     пережимает, и это стоит ядра на ноуте, а не на телефоне;
+   · нужен запущенный мост (most_ws.py) и туннель к нему. */
+
+let mostOn = false, mostWs = null, mostRec = null, mostCs = null,
+    mostTimer = null, mostBytes = 0;
+let mostAddr = '';
+try{ mostAddr = localStorage.getItem('skrin-most') || ''; }catch(e){}
+
+function mostUrl(){
+  /* Свой адрес, если задан, иначе выводим из адреса WHIP-моста: он уже
+     живёт за туннелем, и второй раз то же самое вводить незачем. */
+  const src = (mostAddr || ($('twEndpoint').value || '')).trim();
+  if (!src) return '';
+  try{
+    const u = new URL(src);
+    u.protocol = (u.protocol === 'https:' || u.protocol === 'wss:') ? 'wss:' : 'ws:';
+    u.pathname = /\/efir\/whip\/?$/i.test(u.pathname)
+               ? u.pathname.replace(/\/efir\/whip\/?$/i, '/efir/ws')
+               : (/\/efir\/ws\/?$/i.test(u.pathname) ? u.pathname : '/efir/ws');
+    u.search = ''; u.hash = '';
+    return u.toString();
+  }catch(err){ return ''; }
+}
+function mostMime(){
+  if (!window.MediaRecorder) return '';
+  /* H264 первым: тогда мост копирует дорожку как есть, без второго
+     кодирования. VP8/VP9 мост пережмёт сам — хуже, но работает. */
+  const список = [
+    'video/mp4;codecs="avc1.42E01F,mp4a.40.2"',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
+    'video/webm;codecs="h264,opus"',
+    'video/webm;codecs="vp9,opus"',
+    'video/webm;codecs="vp8,opus"',
+    'video/webm'
+  ];
+  for (const m of список){
+    try{ if (MediaRecorder.isTypeSupported(m)) return m; }catch(e){}
+  }
+  return '';
+}
+/* ОЧЕРЕДЬ — ЭТО ЗАДЕРЖКА. Растущий bufferedAmount значит, что сеть не
+   увозит то, что мы кодируем: 2 МБ — сказать вслух, 12 МБ — эфир врёт
+   про «сейчас», и честнее остановиться, чем показывать прошлое. */
+function mostWatch(){
+  clearInterval(mostTimer);
+  let долго = 0;
+  mostTimer = setInterval(() => {
+    if (!mostWs || mostWs.readyState !== 1) return;
+    const q = mostWs.bufferedAmount;
+    if (q > 12e6){
+      bb('мост: очередь ' + (q / 1e6).toFixed(1) + ' МБ — сеть не увозит');
+      showMsg('Мост: сеть не успевает, очередь ' + (q / 1e6).toFixed(1) + ' МБ. '
+            + 'Останавливаю — иначе эфир отстанет на минуты. '
+            + 'Скажи «качество ниже» и заходи снова.', 12000);
+      mostStop();
+      return;
+    }
+    if (q > 2e6){
+      долго++;
+      if (долго === 2 || долго % 8 === 0)
+        linkFlash('мост: очередь ' + (q / 1e6).toFixed(1) + ' МБ — ступень выше сети');
+    } else долго = 0;
+  }, 1000);
+}
+async function mostStart(){
+  if (mostOn) return 'мост уже в эфире';
+  if (twitchOn) return 'сначала останови WHIP — два выхода разом телефон не потянет';
+  const url = mostUrl();
+  if (!url) return 'не знаю адреса моста: мост(\'wss://…/efir/ws\')';
+  const mime = mostMime();
+  if (!mime) return 'MediaRecorder здесь недоступен — мост не выйдет, остаётся WHIP';
+  let ws;
+  try{ ws = new WebSocket(url); }
+  catch(e){ return 'мост: адрес не открылся (' + (e.name || e) + ')'; }
+  ws.binaryType = 'arraybuffer';
+  mostWs = ws; mostBytes = 0;
+  const fps = FPS_LEVELS[perf.level] || 24;
+  bb('мост: стучусь — ' + url);
+  ws.onopen = () => {
+    try{
+      ensureMicChain();
+      const cs = out.captureStream(fps);
+      mostCs = cs;
+      const ms = new MediaStream([cs.getVideoTracks()[0], busTrack()]);
+      ws.send(JSON.stringify({ op: 'hello', mime: mime, w: W, h: H, fps: fps, kbps: kachKbps() }));
+      const rec = new MediaRecorder(ms, {
+        mimeType: mime,
+        videoBitsPerSecond: kachKbps() * 1000,
+        audioBitsPerSecond: 128000
+      });
+      mostRec = rec;
+      rec.ondataavailable = ev => {
+        if (!ev.data || !ev.data.size) return;
+        if (!mostWs || mostWs.readyState !== 1) return;
+        ev.data.arrayBuffer()
+          .then(b => { try{ mostWs.send(b); mostBytes += b.byteLength; }catch(e){} })
+          .catch(() => {});
+      };
+      rec.onerror = e => {
+        bb('мост: рекордер упал — ' + ((e.error && e.error.name) || 'неизвестно'));
+        mostStop();
+      };
+      rec.start(250);
+      mostOn = true;
+      twT0 = Date.now();
+      $('hud').style.display = 'flex';
+      $('hud').classList.add('live');
+      clearInterval(timerId);
+      timerId = setInterval(() => {
+        try{ $('timer').textContent = hhmmss(Date.now() - twT0) || '00:00'; }catch(e){}
+      }, 1000);
+      bb('мост: В ЭФИРЕ · ' + W + '×' + H + ' @' + fps + ' · ' + kachKbps() + ' кбит/с · ' + mime);
+      showMsg('Эфир через мост пошёл. Задержка будет больше, чем на WHIP — '
+            + 'это и есть плата за то, что картинку не режут.', 9000);
+      mostWatch();
+    }catch(e){
+      bb('мост: старт не вышел — ' + (e.message || e));
+      showMsg('Мост: старт не вышел — ' + (e.message || e), 9000);
+      mostStop(true);
+    }
+  };
+  ws.onclose = () => {
+    if (mostOn){ bb('мост: связь закрылась'); showMsg('Мост: связь закрылась', 6000); mostStop(true); }
+    else bb('мост: не открылось (мост запущен? туннель жив?)');
+  };
+  ws.onerror = () => bb('мост: ошибка связи');
+  ws.onmessage = e => {
+    try{ const d = JSON.parse(e.data); if (d && d.msg) bb('мост: ' + d.msg); }catch(err){}
+  };
+  return 'мост: подключаюсь…';
+}
+function mostStop(silent){
+  clearInterval(mostTimer); mostTimer = null;
+  if (mostRec){ try{ if (mostRec.state !== 'inactive') mostRec.stop(); }catch(e){} mostRec = null; }
+  if (mostCs){ try{ mostCs.getTracks().forEach(t => t.stop()); }catch(e){} mostCs = null; }
+  if (mostWs){
+    try{ if (mostWs.readyState === 1) mostWs.send(JSON.stringify({ op: 'bye' })); }catch(e){}
+    try{ mostWs.close(); }catch(e){}
+    mostWs = null;
+  }
+  if (mostOn) bb('мост: стоп · отдано ' + (mostBytes / 1e6).toFixed(1) + ' МБ');
+  mostOn = false;
+  $('hud').classList.remove('live');
+  clearInterval(timerId); timerId = null;
+  try{ $('timer').textContent = '00:00'; }catch(e){}
+  $('hud').style.display = 'none';
+  if (!silent) showMsg('Эфир через мост остановлен');
+}
+/* Ступень на мосту меняется только перезапуском: битрейт у MediaRecorder
+   задаётся при создании, а новый рекордер даёт новую шапку контейнера,
+   которую ffmpeg посреди потока не примет. Значит — разрыв, и он должен
+   быть явным, а не тихим. */
+async function mostRestart(){
+  if (!mostOn) return mostStart();
+  mostStop(true);
+  await new Promise(r => setTimeout(r, 900));
+  return mostStart();
+}
+/* с телефона: мост('wss://…/efir/ws') — задать и выйти, мост() — выйти,
+   мост(false) — стоп, мост('перезапуск') — сменить ступень */
+window.мост = v => {
+  if (v === false) return mostStop();
+  if (v === 'перезапуск' || v === 'restart') return mostRestart();
+  if (typeof v === 'string' && /^(wss?|https?):\/\//i.test(v)){
+    mostAddr = v.trim();
+    try{ localStorage.setItem('skrin-most', mostAddr); }catch(e){}
+    bb('мост: адрес запомнен — ' + mostUrl());
+  }
+  return mostStart();
+};
 
 /* ---------- рубка: канал инженера (Claude Code) ---------- */
 const api = {
@@ -6911,6 +7212,11 @@ const CMDS = {
   },
   subs: (v, lang) => setSubs(v, lang),
   aspect: a => setAspect(a),
+  /* второй выход: мост. 'restart' — сменить ступень с явным разрывом */
+  most: v => (v === false ? mostStop()
+            : (v === 'restart' || v === 'перезапуск' ? mostRestart()
+            : (typeof v === 'string' && /^(wss?|https?):\/\//i.test(v) ? window.мост(v)
+            : mostStart()))),
   montage: v => setProj(!!v),
   layoutLock: v => setProjLock(!!v),
   layoutTidy: () => projTidy(),
