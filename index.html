@@ -4358,6 +4358,15 @@ async function kachPrimeni(){
    берём у самого соединения раз в две секунды.
    Красный — сеть не тянет заказанное; жёлтый — впритык; зелёный — идёт. */
 let битЖив = 0, битПред = null, битT = 0;
+/* ЧТО НА САМОМ ДЕЛЕ УХОДИТ. Прибор показывал один битрейт, и этого
+   оказалось мало: эфир шёл на 5276 из 6000, а запись на площадке
+   сохранилась крошечной по высоте. Битрейт и размер кадра — разные
+   вещи, и расходятся они именно тогда, когда что-то не так. Здесь
+   лежит размер, который отправитель отдаёт в эту секунду, и причина,
+   по которой он его опустил: bandwidth — не увозит сеть, cpu — не
+   успевает телефон, none — никто не мешает, и смотреть надо дальше
+   по дороге, на приёмную сторону. */
+let кадрЖив = '', пределЖив = '', кодекЖив = '';
 async function bitrateTick(){
   if (!pc || !twitchOn) { битЖив = 0; битПред = null; return; }
   const t = Date.now();
@@ -4369,6 +4378,10 @@ async function bitrateTick(){
     stats.forEach(о => {
       if (о.type === 'outbound-rtp' && о.kind === 'video'){
         байт = о.bytesSent || 0; когда = о.timestamp || 0;
+        кадрЖив = (о.frameWidth && о.frameHeight)
+                ? (о.frameWidth + '×' + о.frameHeight) : '';
+        пределЖив = о.qualityLimitationReason || '';
+        кодекЖив = о.encoderImplementation || '';
       }
     });
     if (!байт) return;
@@ -4381,6 +4394,25 @@ async function bitrateTick(){
   }catch(e){}
 }
 function drawBitrate(c, w, h){
+  if (mostOn && !twitchOn){
+    /* На мосту оценщика нет и резать кадр некому: что нарисовали, то и
+       уехало. Показываем полотно и очередь — единственное, что там
+       может испортиться. */
+    const ш2 = SH(), fs2 = Math.max(9, w * 0.012);
+    const о = mostWs ? (mostWs.bufferedAmount / 1e6) : 0;
+    const т = 'мост · ' + W + '×' + H + ' · ' + kachKbps() + ' кбит/с'
+            + (о > 0.5 ? ' · очередь ' + о.toFixed(1) + ' МБ' : '');
+    c.save();
+    c.font = '700 ' + fs2 + 'px ' + ш2.шрифт;
+    c.fillStyle = ш2.фон;
+    rr(c, w * 0.035 - fs2 * 0.4, h - h * 0.055 - fs2 * 1.5,
+       c.measureText(т).width + fs2 * 0.8, fs2 * 2.2, fs2 * ш2.скруг);
+    c.fill();
+    c.fillStyle = (о > 2) ? ш2.беда : ш2.тихо;
+    c.fillText(т, w * 0.035, h - h * 0.055);
+    c.restore();
+    return;
+  }
   if (!twitchOn) return;
   bitrateTick();
   const ш = SH(), к = KACH();
@@ -4394,11 +4426,23 @@ function drawBitrate(c, w, h){
   c.font = '700 ' + fs + 'px ' + ш.шрифт;
   /* подпись: что заказано и что идёт на самом деле */
   const текст = к.имя + ' · ' + (битЖив ? битЖив : '—') + '/' + заказ;
+  /* Вторая строка — то, чего не хватало: настоящий кадр и кто его режет.
+     Ступень в первой строке это ЗАКАЗ, а не факт. */
+  const мелко = (кадрЖив && H && (+кадрЖив.split('×')[1] || 0) < H * 0.6);
+  const строка2 = кадрЖив
+    ? (кадрЖив + (пределЖив && пределЖив !== 'none' ? ' · ' + пределЖив : ''))
+    : 'кадр: ждём';
+  const ширБлок = Math.max(шир + fs,
+    c.measureText(строка2).width + fs * 0.8, c.measureText(текст).width + fs * 0.8);
   c.fillStyle = ш.фон;
-  rr(c, x - fs * 0.4, y - fs * 1.5, шир + fs, fs * 2.4, fs * ш.скруг);
+  rr(c, x - fs * 0.4, y - fs * 2.8, ширБлок, fs * 3.7, fs * ш.скруг);
   c.fill();
   c.fillStyle = ш.тихо;
-  c.fillText(текст, x, y - fs * 0.5);
+  c.fillText(текст, x, y - fs * 1.8);
+  c.font = '500 ' + (fs * 0.85) + 'px ' + ш.шрифт;
+  c.fillStyle = мелко ? ш.беда : ш.тихо;
+  c.fillText(строка2, x, y - fs * 0.5);
+  c.font = '700 ' + fs + 'px ' + ш.шрифт;
   /* сама шкала */
   c.fillStyle = 'rgba(255,255,255,0.12)';
   c.fillRect(x, y, шир, выс);
