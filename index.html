@@ -520,6 +520,42 @@
   .go{background:var(--violet);color:#1d0a3a}
   .quiet{background:rgba(232,227,216,.12);color:var(--ink)}
   .card small{color:var(--dim);display:block;margin-top:10px;line-height:1.5}
+
+/* ---------- ШТОРКА ВЫБОРА ----------
+   Кнопки по кругу — беда телефона: чтобы попасть из 720p в 4К, надо
+   ткнуть трижды, и каждый промах уносит в следующий круг. Шторка
+   показывает ВСЕ значения разом. Короткое нажатие оставлено кругом:
+   привычка рабочая, ломать её незачем. Долгое — открывает выбор. */
+#shtorka{position:fixed;inset:0;z-index:70;display:none;
+  background:rgba(4,7,11,.58);backdrop-filter:blur(3px)}
+#shtorka.on{display:block}
+#shtorkaBox{position:absolute;left:0;right:0;bottom:0;
+  max-height:72vh;overflow-y:auto;
+  padding:10px 12px calc(14px + env(safe-area-inset-bottom,0px));
+  background:rgba(11,15,20,.97);border-top:1px solid rgba(255,180,84,.35);
+  border-radius:16px 16px 0 0}
+#shtorkaTitle{font:600 12px/1.4 ui-monospace,Menlo,monospace;
+  letter-spacing:.14em;color:rgba(232,227,216,.6);
+  padding:4px 6px 10px;text-transform:uppercase}
+.shItem{display:flex;align-items:center;gap:10px;width:100%;
+  padding:13px 12px;margin:3px 0;border-radius:11px;text-align:left;
+  background:rgba(255,255,255,.05);border:1px solid transparent;
+  color:#E8E3D8;font:500 15px/1.25 ui-monospace,Menlo,monospace}
+.shItem.tek{border-color:rgba(255,180,84,.8);background:rgba(255,180,84,.14)}
+.shItem .shGal{width:16px;color:#FFB454;flex:0 0 16px}
+.shItem .shNiz{display:block;margin-top:3px;font-size:11px;
+  color:rgba(232,227,216,.5);font-weight:400}
+/* ---------- ЗУМ: подпись и метка внимания ---------- */
+#zoomHud{position:fixed;left:50%;top:14%;transform:translateX(-50%);
+  z-index:44;padding:6px 12px;border-radius:14px;pointer-events:none;
+  background:rgba(4,7,11,.6);color:#FFB454;opacity:0;transition:opacity .2s;
+  font:600 14px/1 ui-monospace,Menlo,monospace}
+#zoomHud.on{opacity:1}
+#fokus{position:fixed;z-index:44;width:64px;height:64px;margin:-32px 0 0 -32px;
+  border:2px solid #FFB454;border-radius:50%;pointer-events:none;opacity:0;
+  transition:opacity .25s,transform .25s;transform:scale(1.4)}
+#fokus.on{opacity:1;transform:scale(1)}
+#fokus.myagko{border-style:dashed;border-color:rgba(232,227,216,.7)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 </head>
@@ -898,6 +934,11 @@
 
 <div id="linkStatus"></div>
 
+<div id="shtorka"><div id="shtorkaBox">
+  <div id="shtorkaTitle">выбор</div><div id="shtorkaList"></div>
+</div></div>
+<div id="zoomHud"></div>
+<div id="fokus"></div>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -2561,6 +2602,9 @@ async function openCam(face){
   camGuard(camStream, face);          // дорожка умрёт — заметим и поднимем
   camVideo.style.transform = (face === 'user') ? 'scaleX(-1)' : '';
   await camVideo.play();
+  /* новая дорожка — новые возможности: у одной камеры аппаратный зум
+     есть, у другой нет. Спрашиваем заново и применяем, что уцелело. */
+  camZoomApply();
 }
 
 /* ---------- ОЧКИ КАК КАМЕРА СТУДИИ ----------
@@ -2672,7 +2716,7 @@ function drawHero(c, vid, rot, mirror){
   const ew = swap ? vh : vw, eh = swap ? vw : vh;
   const fits = Math.abs(ew / eh - W / H) < 0.12;       // пропорции почти совпали
   if (fits){                                          // ложится ровно — без боков
-    drawSpun(c, vid, W / 2, H / 2, W, H, rot, true, mirror);
+    camZoomWrap(c, vid, () => drawSpun(c, vid, W / 2, H / 2, W, H, rot, true, mirror));
     return true;
   }
   /* бока: та же картинка, уменьшенная в сорок пикселей и растянутая обратно */
@@ -2688,7 +2732,9 @@ function drawHero(c, vid, rot, mirror){
     c.fillRect(0, 0, W, H);
     c.restore();
   }catch(e){}
-  drawSpun(c, vid, W / 2, H / 2, W, H, rot, false, mirror);   // центр целиком
+  /* бока НЕ зумим нарочно: они и так размытая растяжка, а сдвиг вместе
+     с центром оставил бы по краям пустоту. */
+  camZoomWrap(c, vid, () => drawSpun(c, vid, W / 2, H / 2, W, H, rot, false, mirror));
   return true;
 }
 function heroVideo(){
@@ -2947,6 +2993,7 @@ function frame(){
      чистая трата — на 1920×1080 она тяжелее всего композита вместе. */
   if (winOn && !(screenMode && dispVideo && dispVideo.videoWidth)) pctx.drawImage(cv, 0, 0);
   renderOut(nowT);
+  if (kodekOn) kodekKadr(nowT);     // эфир через WebCodecs берёт кадр отсюда
   if (clipOn && clipRecs) clipCtx.drawImage(out, 0, 0, clipCv.width, clipCv.height);
 }
 
@@ -6633,6 +6680,7 @@ function setMode(m){
     if (efir) winEl.appendChild(camVideo);
     else camHolder.appendChild(camVideo);
     camVideo.play().catch(() => {});
+    camZoomApply();          // смена режима не должна сбрасывать зум
   }
   placeWinDom();
 }
@@ -6968,6 +7016,11 @@ let mostOn = false, mostWs = null, mostRec = null, mostCs = null,
     mostTimer = null, mostBytes = 0;
 let mostAddr = '';
 try{ mostAddr = localStorage.getItem('skrin-most') || ''; }catch(e){}
+/* 'контейнер' — MediaRecorder, работает везде. 'кодек' — WebCodecs, даёт
+   ключевой кадр по расписанию и снимает пересжатие с ноута; где его нет,
+   студия сама вернётся к контейнеру и скажет об этом. */
+let mostRezhim = 'контейнер';
+try{ mostRezhim = localStorage.getItem('skrin-most-rezhim') || 'контейнер'; }catch(e){}
 
 function mostUrl(){
   /* Свой адрес, если задан, иначе выводим из адреса WHIP-моста: он уже
@@ -7031,8 +7084,10 @@ async function mostStart(){
   if (twitchOn) return 'сначала останови WHIP — два выхода разом телефон не потянет';
   const url = mostUrl();
   if (!url) return 'не знаю адреса моста: мост(\'wss://…/efir/ws\')';
+  const хочуКодек = (mostRezhim === 'кодек');
   const mime = mostMime();
-  if (!mime) return 'MediaRecorder здесь недоступен — мост не выйдет, остаётся WHIP';
+  if (!mime && !(хочуКодек && kodekEst()))
+    return 'ни MediaRecorder, ни WebCodecs здесь нет — мост не выйдет, остаётся WHIP';
   let ws;
   try{ ws = new WebSocket(url); }
   catch(e){ return 'мост: адрес не открылся (' + (e.name || e) + ')'; }
@@ -7040,31 +7095,52 @@ async function mostStart(){
   mostWs = ws; mostBytes = 0;
   const fps = FPS_LEVELS[perf.level] || 24;
   bb('мост: стучусь — ' + url);
-  ws.onopen = () => {
+  ws.onopen = async () => {
     try{
       ensureMicChain();
-      const cs = out.captureStream(fps);
-      mostCs = cs;
-      const ms = new MediaStream([cs.getVideoTracks()[0], busTrack()]);
-      ws.send(JSON.stringify({ op: 'hello', mime: mime, w: W, h: H, fps: fps, kbps: kachKbps() }));
-      const rec = new MediaRecorder(ms, {
-        mimeType: mime,
-        videoBitsPerSecond: kachKbps() * 1000,
-        audioBitsPerSecond: 128000
-      });
-      mostRec = rec;
-      rec.ondataavailable = ev => {
-        if (!ev.data || !ev.data.size) return;
-        if (!mostWs || mostWs.readyState !== 1) return;
-        ev.data.arrayBuffer()
-          .then(b => { try{ mostWs.send(b); mostBytes += b.byteLength; }catch(e){} })
-          .catch(() => {});
-      };
-      rec.onerror = e => {
-        bb('мост: рекордер упал — ' + ((e.error && e.error.name) || 'неизвестно'));
-        mostStop();
-      };
-      rec.start(250);
+      let какВышло = mime;
+      if (хочуКодек){
+        ensureBus();
+        ws.send(JSON.stringify({ op: 'hello', rezhim: 'kodek', w: W, h: H,
+                                 fps: fps, kbps: kachKbps(),
+                                 zvuk: { rate: audioCtx.sampleRate, ch: 2, fmt: 's16le' } }));
+        const вышло = await kodekStart();
+        if (!вышло){
+          /* Кодек не поднялся — не молчим и не падаем: возвращаемся к
+             контейнеру, сказав вслух. Мост про это узнает из нового
+             hello, он перезапустит ffmpeg под другой вход. */
+          bb('кодек не поднялся — возвращаюсь к контейнеру');
+          linkFlash('WebCodecs здесь не вышел — эфир идёт контейнером');
+          if (!mime) throw new Error('ни кодека, ни контейнера');
+          ws.send(JSON.stringify({ op: 'hello', mime: mime, w: W, h: H,
+                                   fps: fps, kbps: kachKbps() }));
+        } else какВышло = 'WebCodecs · H264';
+      } else {
+        ws.send(JSON.stringify({ op: 'hello', mime: mime, w: W, h: H, fps: fps, kbps: kachKbps() }));
+      }
+      if (!kodekOn){
+        const cs = out.captureStream(fps);
+        mostCs = cs;
+        const ms = new MediaStream([cs.getVideoTracks()[0], busTrack()]);
+        const rec = new MediaRecorder(ms, {
+          mimeType: mime,
+          videoBitsPerSecond: kachKbps() * 1000,
+          audioBitsPerSecond: 128000
+        });
+        mostRec = rec;
+        rec.ondataavailable = ev => {
+          if (!ev.data || !ev.data.size) return;
+          if (!mostWs || mostWs.readyState !== 1) return;
+          ev.data.arrayBuffer()
+            .then(b => { try{ mostWs.send(b); mostBytes += b.byteLength; }catch(e){} })
+            .catch(() => {});
+        };
+        rec.onerror = e => {
+          bb('мост: рекордер упал — ' + ((e.error && e.error.name) || 'неизвестно'));
+          mostStop();
+        };
+        rec.start(250);
+      }
       mostOn = true;
       twT0 = Date.now();
       $('hud').style.display = 'flex';
@@ -7073,7 +7149,8 @@ async function mostStart(){
       timerId = setInterval(() => {
         try{ $('timer').textContent = hhmmss(Date.now() - twT0) || '00:00'; }catch(e){}
       }, 1000);
-      bb('мост: В ЭФИРЕ · ' + W + '×' + H + ' @' + fps + ' · ' + kachKbps() + ' кбит/с · ' + mime);
+      bb('мост: В ЭФИРЕ · ' + W + '×' + H + ' @' + fps + ' · ' + kachKbps()
+         + ' кбит/с · ' + какВышло);
       showMsg('Эфир через мост пошёл. Задержка будет больше, чем на WHIP — '
             + 'это и есть плата за то, что картинку не режут.', 9000);
       mostWatch();
@@ -7095,6 +7172,7 @@ async function mostStart(){
 }
 function mostStop(silent){
   clearInterval(mostTimer); mostTimer = null;
+  kodekStop();
   if (mostRec){ try{ if (mostRec.state !== 'inactive') mostRec.stop(); }catch(e){} mostRec = null; }
   if (mostCs){ try{ mostCs.getTracks().forEach(t => t.stop()); }catch(e){} mostCs = null; }
   if (mostWs){
@@ -9963,6 +10041,378 @@ try{
     $('btnLang').textContent = 'РУ';
   }
 }catch(e){}
+
+/* ================= ЗУМ ЩИПКОМ, ТОЧКА ВНИМАНИЯ, ШТОРКА, КОДЕК ================= */
+
+/* ---------- ЗУМ ----------
+   ЧТО ЗДЕСЬ ВОЗМОЖНО, А ЧТО ЗАКРЫТО СЛОЕМ.
+   Аппаратный зум камеры просят через applyConstraints({zoom}). Работает
+   это в Chromium — на Android и на десктопе. WebKit не отдаёт ни zoom,
+   ни focusMode, ни pointsOfInterest, а на iOS все браузеры внутри WebKit,
+   включая Chrome. То есть на айфоне аппаратной ручки нет ни у кого, и
+   обойти это из страницы нельзя: стена стоит на слое браузера.
+   Значит зум цифровой — вырезаем часть кадра и растягиваем. Цена прямая:
+   на 2× картинка вдвое мягче, потому что пикселей взято вдвое меньше.
+   Источник просят 1920×1080, полотно эфира обычно столько же — запаса
+   нет. Хочешь резкий зум — проси у камеры больше исходника. */
+let camZoom = 1, camFx = 0.5, camFy = 0.5, camZoomHW = null;
+let zoomHudT = 0, fokusT = 0;
+
+function camZoomClamp(){
+  camZoom = Math.min(6, Math.max(1, camZoom));
+  const п = 0.5 / camZoom;                 // половина видимого куска
+  camFx = Math.min(1 - п, Math.max(п, camFx));
+  camFy = Math.min(1 - п, Math.max(п, camFy));
+}
+function camZoomWrap(c, vid, рисуй){
+  /* Зумим только СВОЮ камеру и только когда железо не справилось само:
+     если аппаратный зум применился, кадр уже приехал увеличенным. */
+  if (vid !== camVideo || camZoom <= 1 || camZoomHW){ рисуй(); return; }
+  c.save();
+  c.translate(W / 2 - camZoom * W * camFx, H / 2 - camZoom * H * camFy);
+  c.scale(camZoom, camZoom);
+  рисуй();
+  c.restore();
+}
+async function camZoomApply(){
+  camZoomClamp();
+  try{
+    const т = camStream && camStream.getVideoTracks()[0];
+    const в = т && т.getCapabilities && т.getCapabilities();
+    if (в && в.zoom && в.zoom.max > 1){
+      const z = Math.min(в.zoom.max, Math.max(в.zoom.min || 1, camZoom));
+      await т.applyConstraints({ advanced: [{ zoom: z }] });
+      camZoomHW = z;
+    } else camZoomHW = null;
+  }catch(e){ camZoomHW = null; }
+  if (mode === 'efir' && camVideo){
+    const зерк = (facing === 'user') ? 'scaleX(-1) ' : '';
+    camVideo.style.transformOrigin = (camFx * 100) + '% ' + (camFy * 100) + '%';
+    camVideo.style.transform = зерк +
+      ((camZoom > 1 && !camZoomHW) ? 'scale(' + camZoom.toFixed(3) + ')' : '');
+    winEl.style.overflow = (camZoom > 1 && !camZoomHW) ? 'hidden' : '';
+  }
+  zoomHud();
+}
+function zoomHud(){
+  const э = $('zoomHud');
+  э.textContent = camZoom.toFixed(1) + '×' + (camZoomHW ? ' · линза' : '');
+  э.classList.add('on');
+  clearTimeout(zoomHudT);
+  zoomHudT = setTimeout(() => э.classList.remove('on'), 900);
+}
+function fokusMetka(clientX, clientY, железо){
+  const э = $('fokus');
+  э.style.left = clientX + 'px';
+  э.style.top = clientY + 'px';
+  э.classList.toggle('myagko', !железо);
+  э.classList.add('on');
+  clearTimeout(fokusT);
+  fokusT = setTimeout(() => э.classList.remove('on'), 700);
+}
+async function camFocus(т, clientX, clientY){
+  /* ТОЧКА ВНИМАНИЯ, А НЕ «ФОКУС». Где железо слушается — просим навестись
+     по-настоящему. Где нет (айфон) — точка двигает вырезанный кадр внутри
+     зума. Кольцо рисуется сплошным в первом случае и пунктиром во втором:
+     видно, чем именно ответило устройство, и незачем гадать. */
+  let железо = false;
+  try{
+    const тр = camStream && camStream.getVideoTracks()[0];
+    const в = тр && тр.getCapabilities && тр.getCapabilities();
+    if (в && (в.pointsOfInterest || в.focusMode)){
+      const огр = {};
+      if (в.pointsOfInterest) огр.pointsOfInterest = [{ x: т.x, y: т.y }];
+      if (в.focusMode && в.focusMode.indexOf('single-shot') >= 0)
+        огр.focusMode = 'single-shot';
+      await тр.applyConstraints({ advanced: [огр] });
+      железо = true;
+    }
+  }catch(e){ железо = false; }
+  if (camZoom > 1){ camFx = т.x; camFy = т.y; camZoomApply(); }
+  fokusMetka(clientX, clientY, железо);
+  if (!железо && camZoom <= 1)
+    linkFlash('этот браузер не даёт наводить линзу — точка внимания работает при зуме');
+}
+
+/* ЖЕСТЫ. Живут на полотне студии: в режиме ЭФИР картинка — это окно
+   поверх сайта, а у окна свои пальцы (перетаскивание), и отнимать их
+   у него нельзя. */
+(function жесты(){
+  const п = new Map();
+  let щипок0 = 0, зум0 = 1, тапT = 0, тапX = 0, тапY = 0, двойнойT = 0;
+  const разнос = () => {
+    const [a, b] = [...п.values()];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  };
+  const точка = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+             y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+  };
+  cv.style.touchAction = 'none';
+  /* Safari на айфоне тянет страницу двумя пальцами поверх всего. Его
+     собственные события жестов надо гасить отдельно — touch-action на
+     них не действует. */
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(и =>
+    cv.addEventListener(и, e => e.preventDefault()));
+  cv.addEventListener('pointerdown', e => {
+    п.set(e.pointerId, e);
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    if (п.size === 1){ тапT = Date.now(); тапX = e.clientX; тапY = e.clientY; }
+    if (п.size === 2){ щипок0 = разнос(); зум0 = camZoom; тапT = 0; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!п.has(e.pointerId)) return;
+    п.set(e.pointerId, e);
+    if (п.size === 2 && щипок0 > 0){
+      camZoom = зум0 * (разнос() / щипок0);
+      camZoomApply();
+    }
+  });
+  const конец = e => {
+    const был = п.size;
+    п.delete(e.pointerId);
+    if (п.size < 2) щипок0 = 0;
+    if (был !== 1 || !тапT) return;
+    const дт = Date.now() - тапT;
+    const сдвиг = Math.hypot(e.clientX - тапX, e.clientY - тапY);
+    тапT = 0;
+    if (дт > 320 || сдвиг > 12) return;
+    const сейчас = Date.now();
+    if (сейчас - двойнойT < 320){       // двойной тап — вернуть всё как было
+      двойнойT = 0;
+      camZoom = 1; camFx = 0.5; camFy = 0.5;
+      camZoomApply();
+      return;
+    }
+    двойнойT = сейчас;
+    camFocus(точка(e), e.clientX, e.clientY);
+  };
+  cv.addEventListener('pointerup', конец);
+  cv.addEventListener('pointercancel', e => { п.delete(e.pointerId); щипок0 = 0; тапT = 0; });
+})();
+window.zoom = v => { camZoom = +v || 1; camZoomApply(); return camZoom.toFixed(2) + '×'; };
+
+/* ---------- ШТОРКА ВЫБОРА ----------
+   Одно место на все кнопки с несколькими значениями: описываем, что
+   показать и что сделать с выбранным, а открытие, разметка и закрытие
+   общие. Добавить новую кнопку — одна запись, а не ещё один обработчик. */
+const SHTORKI = {
+  btnKach: {
+    имя: 'качество эфира',
+    пункты: () => KACHESTVO.map((к, i) => ({
+      имя: к.имя, тек: i === kachIdx,
+      низ: к.w + '×' + к.h + ' · ' + к.kbps + ' кбит/с · ' + к.про })),
+    выбор: н => {
+      const i = KACHESTVO.findIndex(к => к.имя === н);
+      if (i < 0) return;
+      kachIdx = i;
+      setKachestvo(н);
+      $('btnKach').textContent = '▤ ' + KACH().имя;
+    }
+  },
+  btnAspect: {
+    имя: 'форма кадра',
+    пункты: () => [
+      { имя: 'экран', тек: aspect === 'экран', низ: 'как экран телефона — площадки добавят поля' },
+      { имя: '16:9',  тек: aspect === '16:9',  низ: 'обычный горизонтальный эфир' },
+      { имя: '9:16',  тек: aspect === '9:16',  низ: 'вертикальный: шортсы, телефон в руке' },
+      { имя: '1:1',   тек: aspect === '1:1',   низ: 'квадрат' }
+    ],
+    выбор: н => {
+      setAspect(н);
+      $('btnAspect').textContent = н === 'экран' ? '⬛ ЭКРАН' : '⬛ ' + н;
+      $('btnAspect').classList.toggle('on', н !== 'экран');
+    }
+  },
+  btnLico: {
+    имя: 'лицо в кадре',
+    пункты: () => [
+      { имя: 'речь',   тек: licoMode === 'речь',   низ: 'появляется, когда говоришь' },
+      { имя: 'всегда', тек: licoMode === 'всегда', низ: 'видно постоянно' },
+      { имя: 'нет',    тек: licoMode === 'нет',    низ: 'скрыто' }
+    ],
+    выбор: н => {
+      setLico(н);
+      $('btnLico').textContent = '☺ ' + (н === 'нет' ? 'ЛИЦО ×' : н === 'всегда' ? 'ЛИЦО ✓' : 'ЛИЦО ~');
+      $('btnLico').classList.toggle('on', н !== 'нет');
+    }
+  },
+  btnShkura: {
+    имя: 'облик студии',
+    пункты: () => Object.keys(SHKURY).map(k => ({
+      имя: k, тек: k === shkuraId, низ: SHKURY[k].имя })),
+    выбор: н => { setShkura(н); $('btnShkura').textContent = '◧ ' + SH().имя; }
+  }
+};
+function shtorkaOpen(id){
+  const о = SHTORKI[id];
+  if (!о) return;
+  $('shtorkaTitle').textContent = о.имя;
+  const сп = $('shtorkaList');
+  сп.innerHTML = '';
+  о.пункты().forEach(п => {
+    const b = document.createElement('button');
+    b.className = 'shItem' + (п.тек ? ' tek' : '');
+    b.innerHTML = '<span class="shGal">' + (п.тек ? '●' : '○') + '</span><span>'
+                + п.имя + (п.низ ? '<span class="shNiz">' + п.низ + '</span>' : '')
+                + '</span>';
+    b.onclick = () => {
+      shtorkaClose();
+      try{ о.выбор(п.имя); }catch(e){ bb('шторка: ' + e.message); }
+    };
+    сп.appendChild(b);
+  });
+  $('shtorka').classList.add('on');
+}
+function shtorkaClose(){ $('shtorka').classList.remove('on'); }
+$('shtorka').addEventListener('pointerdown', e => {
+  if (e.target === $('shtorka')) shtorkaClose();
+});
+Object.keys(SHTORKI).forEach(id => {
+  const b = $(id);
+  if (!b) return;
+  let т = 0, сработало = false;
+  const пуск = () => {
+    сработало = false;
+    clearTimeout(т);
+    т = setTimeout(() => { сработало = true; shtorkaOpen(id); }, 420);
+  };
+  const стоп = () => clearTimeout(т);
+  b.addEventListener('pointerdown', пуск);
+  b.addEventListener('pointerup', стоп);
+  b.addEventListener('pointercancel', стоп);
+  b.addEventListener('pointermove', стоп);
+  /* Долгое нажатие уже открыло шторку — короткий клик по кругу после
+     него был бы вторым решением за одно касание. Гасим в перехвате,
+     до собственного обработчика кнопки. */
+  b.addEventListener('click', e => {
+    if (!сработало) return;
+    сработало = false;
+    e.preventDefault(); e.stopPropagation();
+  }, true);
+  b.addEventListener('contextmenu', e => { e.preventDefault(); shtorkaOpen(id); });
+});
+window.shtorka = id => shtorkaOpen(id);
+
+/* ---------- ЭФИР ЧЕРЕЗ WEBCODECS ----------
+   ЗАЧЕМ. MediaRecorder отдаёт готовый контейнер, но не даёт тронуть
+   интервал ключевых кадров. Площадки просят их каждые две секунды, и
+   мосту приходилось пересжимать поток на ноуте 2011 года — самую тяжёлую
+   работу класть на самое слабое место системы. VideoEncoder даёт прямую
+   ручку от аппаратного энкодера телефона: ключевой кадр по расписанию,
+   битрейт явный, кодирует железо. Ноуту остаётся перекладывание.
+
+   ЦЕНА, вся: поток уходит разобранным — видео голым H264, звук сырым
+   PCM (~1.5 Мбит/с поверх видео), склеивает мост. Метки времени у голого
+   H264 берутся по приходу, значит расхождение губ ограничено дрожью
+   сети, а не нулевое. И путь этот держится на WebCodecs: где его нет,
+   студия молча возвращается к контейнеру. */
+let kodekOn = false, kodekEnc = null, kodekT0 = 0, kodekKey = 0,
+    kodekN = 0, kodekZvuk = null, kodekSkip = 0;
+const KODEK_KEY_MS = 2000;      // ключевой кадр каждые две секунды
+
+function kodekEst(){
+  return !!(window.VideoEncoder && window.VideoFrame);
+}
+async function kodekProba(){
+  /* Спрашиваем у браузера, а не у себя. annexb обязателен: мост кормит
+     ffmpeg голым потоком, и заголовок в стиле mp4 он не разберёт. */
+  if (!kodekEst()) return null;
+  const кандидаты = ['avc1.42E02A', 'avc1.4D402A', 'avc1.640028', 'avc1.42E01F'];
+  for (const c of кандидаты){
+    try{
+      const о = await VideoEncoder.isConfigSupported({
+        codec: c, width: W, height: H, bitrate: kachKbps() * 1000,
+        framerate: FPS_LEVELS[perf.level] || 24,
+        avc: { format: 'annexb' }
+      });
+      if (о && о.supported) return о.config;
+    }catch(e){}
+  }
+  return null;
+}
+function kodekPoslat(метка, данные){
+  if (!mostWs || mostWs.readyState !== 1) return;
+  const б = new Uint8Array(данные.byteLength + 1);
+  б[0] = метка;                       // 0 — видео, 1 — звук
+  б.set(new Uint8Array(данные), 1);
+  try{ mostWs.send(б.buffer); mostBytes += б.byteLength; }catch(e){}
+}
+function kodekKadr(now){
+  if (!kodekEnc || kodekEnc.state !== 'configured') return;
+  /* ОЧЕРЕДЬ ЭНКОДЕРА — ЭТО ЗАДЕРЖКА. Если железо не поспевает, кадры
+     копятся внутри, и эфир отстаёт молча. Лучше пропустить кадр. */
+  if (kodekEnc.encodeQueueSize > 2){ kodekSkip++; return; }
+  let кадр;
+  try{ кадр = new VideoFrame(out, { timestamp: Math.round(now * 1000) }); }
+  catch(e){ return; }
+  const ключ = (now - kodekKey >= KODEK_KEY_MS);
+  if (ключ) kodekKey = now;
+  try{ kodekEnc.encode(кадр, { keyFrame: ключ }); kodekN++; }
+  catch(e){ bb('кодек: ' + e.message); }
+  кадр.close();
+}
+async function kodekStart(){
+  const конф = await kodekProba();
+  if (!конф) return false;
+  kodekEnc = new VideoEncoder({
+    output: ч => {
+      const б = new ArrayBuffer(ч.byteLength);
+      ч.copyTo(new Uint8Array(б));
+      kodekPoslat(0, б);
+    },
+    error: e => { bb('кодек упал: ' + e.message); mostStop(); }
+  });
+  kodekEnc.configure(конф);
+  /* ЗВУК СЫРЫМ. AudioEncoder есть не везде и не во всех форматах, а сырой
+     PCM понимает кто угодно. Берём с шины ПОСЛЕ задержки — там же, где
+     его берёт эфир, иначе при включённом блюре звук обгонит картинку. */
+  const ш = ensureBus();
+  const уз = audioCtx.createScriptProcessor(4096, 2, 2);
+  уз.onaudioprocess = e => {
+    if (!mostWs || mostWs.readyState !== 1) return;
+    const л = e.inputBuffer.getChannelData(0), п = e.inputBuffer.getChannelData(1);
+    const н = l16(л, п);
+    kodekPoslat(1, н.buffer);
+  };
+  const тихо = audioCtx.createGain();
+  тихо.gain.value = 0;                 // узлу нужен выход, но слышать его незачем
+  ш.delay.connect(уз); уз.connect(тихо); тихо.connect(audioCtx.destination);
+  kodekZvuk = { уз, тихо };
+  kodekT0 = performance.now(); kodekKey = 0; kodekN = 0; kodekSkip = 0;
+  kodekOn = true;
+  return true;
+}
+function l16(л, п){
+  const н = new Int16Array(л.length * 2);
+  for (let i = 0; i < л.length; i++){
+    let a = Math.max(-1, Math.min(1, л[i])), b = Math.max(-1, Math.min(1, п[i]));
+    н[i * 2] = a < 0 ? a * 0x8000 : a * 0x7FFF;
+    н[i * 2 + 1] = b < 0 ? b * 0x8000 : b * 0x7FFF;
+  }
+  return н;
+}
+function kodekStop(){
+  kodekOn = false;
+  if (kodekEnc){
+    try{ if (kodekEnc.state === 'configured') kodekEnc.close(); }catch(e){}
+    kodekEnc = null;
+  }
+  if (kodekZvuk){
+    try{ kodekZvuk.уз.disconnect(); kodekZvuk.тихо.disconnect(); }catch(e){}
+    kodekZvuk.уз.onaudioprocess = null;
+    kodekZvuk = null;
+  }
+}
+window.кодек = v => {
+  if (v === false){ mostRezhim = 'контейнер'; }
+  else if (v === true || v === undefined){ mostRezhim = 'кодек'; }
+  try{ localStorage.setItem('skrin-most-rezhim', mostRezhim); }catch(e){}
+  bb('мост: режим ' + mostRezhim + (mostOn ? ' — вступит в силу после «мост перезапуск»' : ''));
+  return mostRezhim;
+};
+
 dutyUp();
 fit();
 </script>
