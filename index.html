@@ -631,6 +631,10 @@
   <button class="btn" id="btnClip" data-g="кадр">КЛИП</button>
   <button class="btn" id="btnMark" data-g="эфир">★ МЕТКА</button>
   <button class="btn" id="btnTwitch" data-g="эфир">TWITCH</button>
+  <!-- МОСТ КНОПКОЙ. Адрес вводился в консоли, которой на айфоне нет:
+       возможность была, а руки до неё не доставали. Короткое нажатие —
+       эфир через мост, долгое — шторка с адресом и режимом. -->
+  <button class="btn" id="btnMost" data-g="эфир">⇄ МОСТ</button>
   <button class="btn" id="btnMic" data-g="эфир">МИК·выкл</button>
   <button class="btn" id="btnGateMic" data-g="звук">⊘МИК</button>
   <button class="btn" id="btnMon" data-g="эфир">🎧 НАУШНИКИ</button>
@@ -4366,7 +4370,7 @@ let битЖив = 0, битПред = null, битT = 0;
    по которой он его опустил: bandwidth — не увозит сеть, cpu — не
    успевает телефон, none — никто не мешает, и смотреть надо дальше
    по дороге, на приёмную сторону. */
-let кадрЖив = '', пределЖив = '', кодекЖив = '';
+let кадрЖив = '', пределЖив = '', кодекЖив = '', битСказT = 0;
 async function bitrateTick(){
   if (!pc || !twitchOn) { битЖив = 0; битПред = null; return; }
   const t = Date.now();
@@ -4391,6 +4395,16 @@ async function bitrateTick(){
       if (секунд > 0.5) битЖив = Math.round(дельта / секунд);
     }
     битПред = { байт, когда };
+    /* ТО ЖЕ САМОЕ СЛОВАМИ, РАЗ В 10 СЕКУНД. Прибор на полотне можно не
+       успеть прочитать: он мелкий, эфир идёт, руки заняты. В чёрной
+       строке эти же числа остаются в журнале, и после эфира видно не
+       «было плохо», а чем именно и когда. */
+    if (t - битСказT > 10000){
+      битСказT = t;
+      bb('эфир: ' + (кадрЖив || '?') + ' · ' + битЖив + '/' + kachKbps()
+         + ' кбит/с' + (пределЖив ? ' · ' + пределЖив : '')
+         + (кодекЖив ? ' · ' + кодекЖив : ''));
+    }
   }catch(e){}
 }
 function drawBitrate(c, w, h){
@@ -4420,7 +4434,10 @@ function drawBitrate(c, w, h){
   const доля = заказ ? Math.max(0, Math.min(1.15, битЖив / заказ)) : 0;
   const fs = Math.max(9, w * 0.012);
   const шир = w * 0.13, выс = fs * 0.55;
-  const x = w * 0.035, y = h - h * 0.055;
+  /* 20.09, поле: прибор стоял на 5.5% от низа — ровно под кнопкой ▶,
+     и вторая строка с настоящим кадром читалась наполовину. Поднимаю
+     выше зоны, где живут кнопки. */
+  const x = w * 0.035, y = h - h * 0.135;
 
   c.save();
   c.font = '700 ' + fs + 'px ' + ш.шрифт;
@@ -10337,6 +10354,51 @@ Object.keys(SHTORKI).forEach(id => {
   }, true);
   b.addEventListener('contextmenu', e => { e.preventDefault(); shtorkaOpen(id); });
 });
+SHTORKI.btnMost = {
+  имя: 'эфир через мост',
+  пункты: () => [
+    { имя: mostOn ? 'остановить' : 'в эфир', тек: false,
+      низ: mostAddr ? mostAddr : 'адрес ещё не задан' },
+    { имя: 'адрес моста…', тек: false,
+      низ: 'то, что напечатал туннель, плюс /efir/ws' },
+    { имя: 'контейнер', тек: mostRezhim === 'контейнер',
+      низ: 'MediaRecorder — работает везде' },
+    { имя: 'кодек', тек: mostRezhim === 'кодек',
+      низ: 'WebCodecs — ключевой кадр каждые 2 с, ноуту легче' }
+  ],
+  выбор: async н => {
+    if (н === 'остановить') return mostStop();
+    if (н === 'в эфир'){
+      const о = await mostStart();
+      if (typeof о === 'string' && !/подключ/i.test(о)) showMsg(о, 8000);
+      return;
+    }
+    if (н === 'адрес моста…'){
+      const v = prompt('Адрес моста (из туннеля или из сети):',
+                       mostAddr || 'https://…trycloudflare.com/efir/ws');
+      if (!v) return;
+      window.мост(v.trim());
+      return;
+    }
+    mostRezhim = н;
+    try{ localStorage.setItem('skrin-most-rezhim', mostRezhim); }catch(e){}
+    bb('мост: режим ' + mostRezhim + (mostOn ? ' — вступит в силу после перезапуска' : ''));
+  }
+};
+$('btnMost').onclick = async () => {
+  if (mostOn) return mostStop();
+  if (!mostAddr && !mostUrl()) return shtorkaOpen('btnMost');
+  const о = await mostStart();
+  if (typeof о === 'string' && !/подключ/i.test(о)) showMsg(о, 8000);
+};
+/* кнопка должна показывать правду, а не намерение: состояние моста
+   меняется и само — связь упала, очередь переполнилась */
+setInterval(() => {
+  const b = $('btnMost');
+  if (!b) return;
+  b.classList.toggle('on', mostOn);
+  b.textContent = mostOn ? '⇄ В ЭФИРЕ' : '⇄ МОСТ';
+}, 1000);
 window.shtorka = id => shtorkaOpen(id);
 
 /* ---------- ЭФИР ЧЕРЕЗ WEBCODECS ----------
