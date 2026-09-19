@@ -10330,7 +10330,7 @@ function shtorkaClose(){ $('shtorka').classList.remove('on'); }
 $('shtorka').addEventListener('pointerdown', e => {
   if (e.target === $('shtorka')) shtorkaClose();
 });
-Object.keys(SHTORKI).forEach(id => {
+function shtorkaVesit(id){
   const b = $(id);
   if (!b) return;
   let т = 0, сработало = false;
@@ -10353,7 +10353,14 @@ Object.keys(SHTORKI).forEach(id => {
     e.preventDefault(); e.stopPropagation();
   }, true);
   b.addEventListener('contextmenu', e => { e.preventDefault(); shtorkaOpen(id); });
-});
+  /* Safari на айфоне на долгое нажатие показывает своё меню и выделяет
+     текст — и наше нажатие обрывается на полпути. Гасим это на самой
+     кнопке, а не на всей странице. */
+  b.style.webkitUserSelect = 'none';
+  b.style.userSelect = 'none';
+  b.style.webkitTouchCallout = 'none';
+}
+Object.keys(SHTORKI).forEach(shtorkaVesit);
 SHTORKI.btnMost = {
   имя: 'эфир через мост',
   пункты: () => [
@@ -10385,6 +10392,7 @@ SHTORKI.btnMost = {
     bb('мост: режим ' + mostRezhim + (mostOn ? ' — вступит в силу после перезапуска' : ''));
   }
 };
+shtorkaVesit('btnMost');      // добавлен после общего цикла — вешаем отдельно
 $('btnMost').onclick = async () => {
   if (mostOn) return mostStop();
   if (!mostAddr && !mostUrl()) return shtorkaOpen('btnMost');
