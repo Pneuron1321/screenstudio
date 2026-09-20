@@ -4424,7 +4424,11 @@ function drawBitrate(c, w, h){
        может испортиться. */
     const ш2 = SH(), fs2 = Math.max(9, w * 0.012);
     const о = mostWs ? (mostWs.bufferedAmount / 1e6) : 0;
-    const т = 'мост · ' + W + '×' + H + ' · ' + kachKbps() + ' кбит/с'
+    /* СКОЛЬКО РЕАЛЬНО УШЛО, А НЕ ЗАКАЗАНО. Прибор писал заказанные
+       6000, пока канал увозил 2500, и разницу было видно только по
+       растущей очереди — то есть с опозданием на минуту. Считаем по
+       тому, что ушло из гнезда: отданное минус то, что ещё лежит. */
+    const т = 'мост · ' + W + '×' + H + ' · ' + mostRealKbps() + '/' + kachKbps() + ' кбит/с'
             + ' · ' + tempoReal + '/' + (FPS_LEVELS[perf.level] || 0) + ' к/с'
             + (mostRezhim === 'кодек' ? (kodekOn ? ' · кодек' : ' · кодек не вышел') : '')
             + (о > 0.5 ? ' · очередь ' + о.toFixed(1) + ' МБ' : '');
@@ -7133,6 +7137,18 @@ function mostMime(){
 /* ОЧЕРЕДЬ — ЭТО ЗАДЕРЖКА. Растущий bufferedAmount значит, что сеть не
    увозит то, что мы кодируем: 2 МБ — сказать вслух, 12 МБ — эфир врёт
    про «сейчас», и честнее остановиться, чем показывать прошлое. */
+let mostRealT = 0, mostRealB = 0, mostReal = 0;
+function mostRealKbps(){
+  const т = Date.now();
+  const ушло = mostBytes - (mostWs ? mostWs.bufferedAmount : 0);
+  if (!mostRealT){ mostRealT = т; mostRealB = ушло; return 0; }
+  const дт = (т - mostRealT) / 1000;
+  if (дт >= 2){
+    mostReal = Math.round((ушло - mostRealB) * 8 / 1000 / дт);
+    mostRealT = т; mostRealB = ушло;
+  }
+  return mostReal;
+}
 function mostWatch(){
   clearInterval(mostTimer);
   let долго = 0;
@@ -7256,6 +7272,7 @@ function mostStop(silent){
     mostWs = null;
   }
   if (mostOn) bb('мост: стоп · отдано ' + (mostBytes / 1e6).toFixed(1) + ' МБ');
+  mostRealT = 0; mostRealB = 0; mostReal = 0;
   mostOn = false;
   $('hud').classList.remove('live');
   clearInterval(timerId); timerId = null;
@@ -7923,6 +7940,10 @@ function scenaOpis(){
 function stSnap(){
   return {
     twitch: twitchOn, panic: panic, blur: autoBlur, ring: clipOn,
+    /* МОСТ — второй выход эфира. Без него в снимке кнопка на пульте
+       показывала бы намерение вместо правды, а подтверждать было бы
+       нечем: у пульта единственная честная проверка — состояние. */
+    most: mostOn, mostOchered: mostWs ? Math.round(mostWs.bufferedAmount / 1e5) / 10 : 0,
     /* Без этого кнопка качества на пульте не подсветится и не подтвердится,
        а подтверждение по состоянию — единственное честное.
        Записи здесь нет и не будет: она убрана из студии намеренно. */
