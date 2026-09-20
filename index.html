@@ -4423,7 +4423,12 @@ async function bitrateTick(){
     }
   }catch(e){}
 }
+/* Прибор — инструмент наладки, а не часть картинки. Он светил зрителям
+   весь эфир. Тумблер в шторке моста; выбор запоминается. */
+let priborOn = true;
+try{ priborOn = localStorage.getItem('skrin-pribor') !== 'нет'; }catch(e){}
 function drawBitrate(c, w, h){
+  if (!priborOn) return;
   if (mostOn && !twitchOn){
     /* На мосту оценщика нет и резать кадр некому: что нарисовали, то и
        уехало. Показываем полотно и очередь — единственное, что там
@@ -7421,6 +7426,11 @@ const CMDS = {
   subs: (v, lang) => setSubs(v, lang),
   aspect: a => setAspect(a),
   /* второй выход: мост. 'restart' — сменить ступень с явным разрывом */
+  pribor: v => {
+    priborOn = (v !== false && v !== 'нет');
+    try{ localStorage.setItem('skrin-pribor', priborOn ? 'да' : 'нет'); }catch(e){}
+    return 'прибор ' + (priborOn ? 'виден' : 'спрятан');
+  },
   most: v => (v === false ? mostStop()
             : (v === 'restart' || v === 'перезапуск' ? mostRestart()
             : (typeof v === 'string' && /^(wss?|https?):\/\//i.test(v) ? window.мост(v)
@@ -10441,6 +10451,8 @@ SHTORKI.btnMost = {
       низ: mostAddr ? mostAddr : 'адрес ещё не задан' },
     { имя: 'адрес моста…', тек: false,
       низ: 'то, что напечатал туннель, плюс /efir/ws' },
+    { имя: priborOn ? 'спрятать прибор' : 'показать прибор', тек: false,
+      низ: 'строка с битрейтом и очередью — её видят зрители' },
     { имя: 'контейнер', тек: mostRezhim === 'контейнер',
       низ: 'MediaRecorder — работает везде' },
     { имя: 'кодек', тек: mostRezhim === 'кодек',
@@ -10451,6 +10463,12 @@ SHTORKI.btnMost = {
     if (н === 'в эфир'){
       const о = await mostStart();
       if (typeof о === 'string' && !/подключ/i.test(о)) showMsg(о, 8000);
+      return;
+    }
+    if (н === 'спрятать прибор' || н === 'показать прибор'){
+      priborOn = (н === 'показать прибор');
+      try{ localStorage.setItem('skrin-pribor', priborOn ? 'да' : 'нет'); }catch(e){}
+      bb('прибор ' + (priborOn ? 'виден' : 'спрятан') + ' — в чёрную строку пишется всё равно');
       return;
     }
     if (н === 'адрес моста…'){
