@@ -7104,6 +7104,7 @@ try{ mostAddr = localStorage.getItem('skrin-most') || ''; }catch(e){}
 /* 'контейнер' — MediaRecorder, работает везде. 'кодек' — WebCodecs, даёт
    ключевой кадр по расписанию и снимает пересжатие с ноута; где его нет,
    студия сама вернётся к контейнеру и скажет об этом. */
+let mostPokolenie = 0;
 let mostRezhim = 'контейнер';
 try{ mostRezhim = localStorage.getItem('skrin-most-rezhim') || 'контейнер'; }catch(e){}
 
@@ -7234,6 +7235,13 @@ async function mostStart(){
         ws.send(JSON.stringify({ op: 'hello', mime: mime, w: W, h: H, fps: fps, kbps: kachKbps() }));
       }
       if (!kodekOn){
+        /* ПОКОЛЕНИЕ РЕКОРДЕРА. Куски уходят через ev.data.arrayBuffer() —
+           это обещание, и оно может исполниться уже ПОСЛЕ того, как
+           рекордер остановлен, а мост получил новый hello и поднял свежий
+           ffmpeg. Тогда в начало нового контейнера прилетает хвост
+           старого, и ffmpeg говорит «Invalid data found». Так и было в
+           поле дважды. Номер поколения отсекает опоздавших. */
+        const поколение = ++mostPokolenie;
         const cs = out.captureStream(fps);
         mostCs = cs;
         const ms = new MediaStream([cs.getVideoTracks()[0], busTrack()]);
@@ -7246,8 +7254,13 @@ async function mostStart(){
         rec.ondataavailable = ev => {
           if (!ev.data || !ev.data.size) return;
           if (!mostWs || mostWs.readyState !== 1) return;
+          if (поколение !== mostPokolenie) return;      // этот рекордер уже не в деле
           ev.data.arrayBuffer()
-            .then(b => { try{ mostWs.send(b); mostBytes += b.byteLength; }catch(e){} })
+            .then(b => {
+              if (поколение !== mostPokolenie) return;  // и пока читали, мог смениться
+              if (!mostWs || mostWs.readyState !== 1) return;
+              try{ mostWs.send(b); mostBytes += b.byteLength; }catch(e){}
+            })
             .catch(() => {});
         };
         rec.onerror = e => {
@@ -7286,6 +7299,7 @@ async function mostStart(){
   return 'мост: подключаюсь…';
 }
 function mostStop(silent){
+  mostPokolenie++;              // всё, что в пути от прежнего рекордера, — мимо
   clearInterval(mostTimer); mostTimer = null;
   kodekStop();
   if (mostRec){ try{ if (mostRec.state !== 'inactive') mostRec.stop(); }catch(e){} mostRec = null; }
