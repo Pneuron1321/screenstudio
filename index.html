@@ -2807,6 +2807,15 @@ function frame(){
   /* темп: телефону жарко — рисуем реже, эфир не рвём */
   const tNow = performance.now();
   if (tNow - perf.last < 1000 / FPS_LEVELS[perf.level] - 2) return;
+  /* НАСТОЯЩИЙ ТЕМП, А НЕ ЗАКАЗАННЫЙ. Лестница говорит, сколько мы
+     ХОТИМ рисовать; телефону под жарой и на низком заряде на это своё
+     мнение. Считаем кадры сами за две секунды — без этой цифры нельзя
+     отличить «композит не успевает» от «энкодер не забирает». */
+  tempoN++;
+  if (tNow - tempoT0 >= 2000){
+    tempoReal = Math.round(tempoN * 1000 / (tNow - tempoT0));
+    tempoN = 0; tempoT0 = tNow;
+  }
   const dtF = perf.last ? tNow - perf.last : 33;
   perf.last = tNow;
   perf.ema = perf.ema * 0.9 + dtF * 0.1;
@@ -4371,6 +4380,7 @@ let битЖив = 0, битПред = null, битT = 0;
    успевает телефон, none — никто не мешает, и смотреть надо дальше
    по дороге, на приёмную сторону. */
 let кадрЖив = '', пределЖив = '', кодекЖив = '', битСказT = 0;
+let tempoN = 0, tempoT0 = 0, tempoReal = 0;
 async function bitrateTick(){
   if (!pc || !twitchOn) { битЖив = 0; битПред = null; return; }
   const t = Date.now();
@@ -4401,7 +4411,7 @@ async function bitrateTick(){
        «было плохо», а чем именно и когда. */
     if (t - битСказT > 10000){
       битСказT = t;
-      bb('эфир: ' + (кадрЖив || '?') + ' · ' + битЖив + '/' + kachKbps()
+      bb('эфир: ' + (кадрЖив || '?') + ' · ' + tempoReal + ' к/с · ' + битЖив + '/' + kachKbps()
          + ' кбит/с' + (пределЖив ? ' · ' + пределЖив : '')
          + (кодекЖив ? ' · ' + кодекЖив : ''));
     }
@@ -4415,6 +4425,8 @@ function drawBitrate(c, w, h){
     const ш2 = SH(), fs2 = Math.max(9, w * 0.012);
     const о = mostWs ? (mostWs.bufferedAmount / 1e6) : 0;
     const т = 'мост · ' + W + '×' + H + ' · ' + kachKbps() + ' кбит/с'
+            + ' · ' + tempoReal + '/' + (FPS_LEVELS[perf.level] || 0) + ' к/с'
+            + (mostRezhim === 'кодек' ? (kodekOn ? ' · кодек' : ' · кодек не вышел') : '')
             + (о > 0.5 ? ' · очередь ' + о.toFixed(1) + ' МБ' : '');
     c.save();
     c.font = '700 ' + fs2 + 'px ' + ш2.шрифт;
@@ -4422,8 +4434,10 @@ function drawBitrate(c, w, h){
     rr(c, w * 0.035 - fs2 * 0.4, h - h * 0.055 - fs2 * 1.5,
        c.measureText(т).width + fs2 * 0.8, fs2 * 2.2, fs2 * ш2.скруг);
     c.fill();
-    c.fillStyle = (о > 2) ? ш2.беда : ш2.тихо;
-    c.fillText(т, w * 0.035, h - h * 0.055);
+    c.fillStyle = (о > 2 || tempoReal < 10) ? ш2.беда : ш2.тихо;
+    c.fillText(т, w * 0.035, h - h * 0.135);
+    const тн = Date.now();
+    if (тн - битСказT > 10000){ битСказT = тн; bb(т); }
     c.restore();
     return;
   }
