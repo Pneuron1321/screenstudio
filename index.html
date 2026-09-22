@@ -962,6 +962,14 @@ let curGroup = 'эфир', screenAvail = false;
 let timerId = null;                 // таймер эфира: записи в студии нет
 let audioCtx = null;
 let pc = null, whipResource = null, twitchOn = false;
+/* «ИДЁТ ЭФИР» — ОДНО СЛОВО НА ДВА ВЫХОДА. До моста эфир был только WHIP,
+   и `twitchOn` читали всюду как «мы в эфире». С мостом это стало ложью в
+   десятке мест разом: налёт не капал, Плюс считал эфир выключенным, экран
+   мог заснуть посреди трансляции, молчание эфира не замечалось. Там, где
+   смысл «соединение WHIP» — остаётся twitchOn; где «идёт эфир» — это. */
+/* mostOn объявлен ниже, в блоке моста; efirIdet зовётся только после
+   загрузки страницы (кадры, кнопки, команды), так что это безопасно. */
+function efirIdet(){ return twitchOn || mostOn; }
 let peer = null, mediaCall = null, linkRole = null;
 let micGate = null, micSrcNode = null;         // цепь микрофона в шину
 let bus = null;                                // постоянная аудио-шина эфира
@@ -1173,7 +1181,7 @@ function renderCode(){
 function toggleCode(){
   if (!linkCode || (linkCode[0] === 'r' && linkCode.length > 6)) return;
   if (codeShown){ codeShown = false; renderCode(); return; }
-  const onAir = twitchOn || screenMode;
+  const onAir = efirIdet() || screenMode;
   if (onAir && !confirm('Идёт эфир — экран могут видеть зрители. Всё равно показать код?')) return;
   codeShown = true;
   renderCode();
@@ -1883,7 +1891,7 @@ function hhmmss(ms){
 function markMoment(text, opts){
   const now = Date.now();
   const rec = null;   // записи в студии больше нет: пишут очки и Twitch VOD
-  const air = (twitchOn && twT0) ? (now - twT0) : null;
+  const air = (efirIdet() && twT0) ? (now - twT0) : null;
   const m = {
     t: now,
     text: String(text || '').slice(0, 90),
@@ -2877,6 +2885,7 @@ function frame(){
 
   for (const rm of remotes){
     if (heroName && rm.label === heroName) continue;   // герой уже во весь фон
+    if (rm.skryt) continue;                            // спрятано крестиком
     const live = !rm.lost && rm.video && rm.video.videoWidth;
     if (!live && !rm.lost) continue;               // картинка ещё не пошла
     /* ОБРЫВ СВОРАЧИВАЕТСЯ. Замороженный кадр во весь размер занимал место
@@ -4675,7 +4684,7 @@ function setPerevod(v, язык){
 */
 let licoMode = 'речь';       // 'всегда' | 'нет' | 'речь'
 try{ licoMode = localStorage.getItem('skrin-lico-rezhim') || 'речь'; }catch(e){}
-const LICO = { морг: 0, моргДо: 0, дых: 0, качT: 0, рот: 0, состояние: 'тихо' };
+const LICO = { морг: 0, моргДо: 0, дых: 0, качT: 0, рот: 0, состояние: 'тихо', улыбкаДо: 0 };
 /* МЕСТО И РАЗМЕР — как у радара и окон камер. Замечание Александра 22.08:
    всё в кадре должно двигаться и менять размер, иначе это не инструмент,
    а картинка. Доли кадра, а не пиксели: тогда одинаково на телефоне и
@@ -4700,9 +4709,11 @@ function licoDraw(c, w, h){
   const сост = licoSostoyanie();
   LICO.состояние = сост;
   if (licoMode === 'нет') return;
-  if (licoMode === 'речь' && сост !== 'говорит' && сост !== 'думает') return;
+  if (licoMode === 'речь' && сост !== 'говорит' && сост !== 'думает'
+      && performance.now() >= LICO.улыбкаДо) return;   // улыбку видно и в режиме «речь»
 
-  const ш = SH();
+  /* облик лица — свой, если шкура его задала; иначе общий */
+  const ш = SHKURY[SH().лицо] || SH();
   const t = performance.now();
   const P = Math.max(2, Math.round(w * 0.0055 * licoWin.scale));
   const W16 = 16 * P, H16 = 16 * P;
@@ -4726,9 +4737,13 @@ function licoDraw(c, w, h){
 
   c.save();
   c.translate(x0 + кач, y0 + дых);
+  /* каждый закрашенный кусок запоминаем: по ним ляжет развёртка */
+  const куски = [];
   const точка = (кx, кy, цвет, шир, выс) => {
     c.fillStyle = цвет;
-    c.fillRect(кx * P, кy * P, (шир || 1) * P, (выс || 1) * P);
+    const r = [кx * P, кy * P, (шир || 1) * P, (выс || 1) * P];
+    c.fillRect(r[0], r[1], r[2], r[3]);
+    куски.push(r);
   };
 
   /* ТЕЛО — маленькое и приземистое: голова важнее, как в восьмибитных */
@@ -4736,8 +4751,10 @@ function licoDraw(c, w, h){
   точка(4, 13, ш.тепло, 1, 3);
   точка(11, 13, ш.тепло, 1, 3);
 
-  /* ГОЛОВА — крупная, почти квадратная */
-  shSvet(c, ш.ярко);
+  /* ГОЛОВА — крупная, почти квадратная. Свечение берётся из облика ЛИЦА,
+     а не из общего: общий shSvet смотрит на шкуру кадра и в «своей»
+     не светился бы вовсе. */
+  if (ш.свечение){ c.shadowColor = ш.ярко; c.shadowBlur = ш.свечение; }
   точка(3, 2, ш.ярко, 10, 10);
   shSvetOff(c);
   точка(2, 4, ш.ярко, 1, 6);          // уши-грани
@@ -4745,7 +4762,12 @@ function licoDraw(c, w, h){
 
   /* ГЛАЗА: закрыты при моргании — одна тёмная полоса вместо двух точек */
   const глаз = ш.фон;
-  if (моргает){
+  const улыбка = (t < LICO.улыбкаДо);
+  if (улыбка){
+    /* довольный прищур: глаза-дуги, уголки вниз */
+    точка(5, 6, глаз, 2, 1); точка(4, 7, глаз, 1, 1); точка(7, 7, глаз, 1, 1);
+    точка(9, 6, глаз, 2, 1); точка(8, 7, глаз, 1, 1); точка(11, 7, глаз, 1, 1);
+  } else if (моргает){
     точка(5, 7, глаз, 2, 1);
     точка(9, 7, глаз, 2, 1);
   } else {
@@ -4758,8 +4780,16 @@ function licoDraw(c, w, h){
     }
   }
 
-  /* РОТ: закрыт — черта, открыт — прямоугольник в две высоты */
-  if (LICO.рот) точка(6, 9, глаз, 4, LICO.рот);
+  /* РОТ: закрыт — черта, открыт — прямоугольник в две высоты.
+     УЛЫБКА — во всю ширину лица, уголки вверх, ряд белых зубов. Зубы белые
+     при любой шкуре: жёлтые зубы на жёлтой голове читались бы как дыра. */
+  if (улыбка){
+    точка(4, 8, глаз, 1, 1); точка(11, 8, глаз, 1, 1);     // уголки вверх
+    точка(5, 9, глаз, 6, 2);                               // раскрытый рот
+    точка(5, 9, '#FFFFFF', 6, 1);                          // верхний ряд зубов
+    for (let i = 0; i < 5; i++) точка(6 + i, 9, глаз, 0.18, 1); // щели между зубами
+  }
+  else if (LICO.рот) точка(6, 9, глаз, 4, LICO.рот);
   else точка(6, 10, глаз, 4, 1);
 
   /* ЗНАК СОСТОЯНИЯ над головой — то, ради чего лицо и нужно */
@@ -4770,9 +4800,35 @@ function licoDraw(c, w, h){
   } else if (сост === 'слушает'){
     точка(15, 3, ш.удача, 1, 2);
   }
+  /* СТРОЧНАЯ РАЗВЁРТКА ВНУТРИ ЛИЦА. Общий слой «развёртка» кладёт линии
+     на весь кадр — и в неоне в полосках оказывалась и камера. Если облик
+     лица их хочет, а шкура кадра нет, линии ложатся только на квадрат
+     лица: трубка старого телевизора вокруг Плюса, камера чистая. Когда
+     линии есть и у кадра, второй раз не кладём — было бы вдвое темнее. */
+  if (ш.линии && !SH().линии){
+    /* Стенд 21.09 показал: линии на весь квадрат 16×16 рисуют тёмную
+       полосатую коробку вокруг головы — заплатку на камере. Линии должны
+       лечь в сами пиксели лица. Обрезаем по тем кускам, что закрасили. */
+    c.save();
+    c.beginPath();
+    куски.forEach(r => c.rect(r[0], r[1], r[2], r[3]));
+    c.clip();
+    c.fillStyle = 'rgba(0,0,0,0.26)';
+    for (let yy = 0; yy < H16; yy += ш.линии * 2) c.fillRect(0, yy, W16, ш.линии);
+    c.restore();
+  }
   c.restore();
 }
 layers.set('лицо', (c, w, h) => licoDraw(c, w, h));
+
+/* УЛЫБКА — ТОЛЬКО ПО ПОВОДУ. Лицо Плюса задумано как правда о системе:
+   рот открывается, когда он правда говорит. Улыбка без причины была бы
+   тем самым враньём в лице. Поэтому она привязана к настоящим событиям —
+   зачёт залу, удар за донат, взятая цель — и к прямой просьбе. */
+function licoUlybka(мс){
+  LICO.улыбкаДо = performance.now() + (мс || 1500);
+  return 'улыбается';
+}
 
 function setLico(v){
   const m = String(v || '').toLowerCase().trim();
@@ -4807,6 +4863,10 @@ function setLico(v){
 const SHKURY = {
   своя: {
     имя: 'СВОЯ',
+    /* ЛИЦО — отдельный облик внутри облика (слово Александра 21.09):
+       Плюс в неоне-16 с развёрткой, а камера чистая. Свойство общее для
+       любой шкуры: какую шкуру носит лицо. Нет свойства — лицо в той же. */
+    лицо: 'неонпиксель',
     шрифт: 'ui-monospace, Menlo, monospace',
     ярко: '#FFB454', тепло: '#E8E3D8', тихо: 'rgba(232,227,216,0.55)',
     фон: 'rgba(11,15,20,0.65)', удача: '#7ED8A0', беда: '#FF5D45',
@@ -5103,8 +5163,10 @@ function koinTick(){
   /* НАЛЁТ КАПАЕТ ТОЛЬКО В ЭФИРЕ. Была моя ошибка: running значит «студия
      открыта», а не «идёт трансляция». Монеты копились, пока страница
      просто висела — налёт переставал быть налётом и превращался в счётчик
-     времени за компьютером. Найдено Александром 22.08. */
-  if (!twitchOn) return;
+     времени за компьютером. Найдено Александром 22.08.
+     21.09: и через мост тоже — прежняя проверка знала только WHIP,
+     и эфир через мост монет не давал вовсе (найдено Александром). */
+  if (!efirIdet()) return;
   const now = Date.now();
   if (!koinLast){ koinLast = now; return; }
   const сек = (now - koinLast) / 1000;
@@ -5209,6 +5271,7 @@ function udarPick(count){
 }
 async function udarFire(arg){
   if (!udarOn) return 'удары выключены';
+  licoUlybka(1500);                   // донат или взятая цель — повод
   await udarLoad();
   ensureBus();
   if (audioCtx.state === 'suspended') try{ await audioCtx.resume(); }catch(e){}
@@ -5723,6 +5786,9 @@ const EAR_TABLE = [
   [['помни всё', 'помни все', 'память полная'], { op: 'cmd', name: 'pamyat', args: ['всё'] }],
   [['настрой слово', 'настройка слова'], { op: 'cmd', name: 'wakeTune', args: [true] }],
   [['налёт', 'налет', 'коины'], { op: 'cmd', name: 'koiny', args: [''] }],
+  [['улыбнись', 'улыбка', 'плюс улыбнись'], { op: 'cmd', name: 'smile', args: [] }],
+  [['спрячь прибор', 'убери прибор'], { op: 'cmd', name: 'pribor', args: [false] }],
+  [['покажи прибор', 'прибор'], { op: 'cmd', name: 'pribor', args: [true] }],
   [['итоги', 'итоги эфира', 'экран итогов'], { op: 'cmd', name: 'itog', args: [true] }],
   [['облик пиксель', 'шкура пиксель', 'шестнадцать бит'], { op: 'cmd', name: 'shkura', args: ['пиксель'] }],
   [['облик море', 'шкура море'], { op: 'cmd', name: 'shkura', args: ['море'] }],
@@ -6352,7 +6418,7 @@ async function presenceStart(){
 /* показать себя может только человек — здесь и нигде больше */
 async function presenceAsk(){
   if (!await presenceStart()) return;
-  const onAir = twitchOn || screenMode;
+  const onAir = efirIdet() || screenMode;
   if (mayak.ask(onAir)){
     $('btnMe').classList.add('on');
     $('btnMe').textContent = '👋 Я НА КАРТЕ';
@@ -7253,7 +7319,10 @@ async function mostStart(){
         const rec = new MediaRecorder(ms, {
           mimeType: mime,
           videoBitsPerSecond: kachKbps() * 1000,
-          audioBitsPerSecond: 128000
+          /* 192, а не 128: мост теперь НЕ пережимает AAC, а несёт как есть,
+             значит этот битрейт и есть то, что слышат зрители. Раньше
+             потерю второго прохода маскировало то, что первый был скромным. */
+          audioBitsPerSecond: 192000
         });
         mostRec = rec;
         rec.ondataavailable = ev => {
@@ -7275,6 +7344,7 @@ async function mostStart(){
         rec.start(250);
       }
       mostOn = true;
+      try{ keepAwake(); }catch(e){}   // эфир идёт — экран гаснуть не должен
       twT0 = Date.now();
       $('hud').style.display = 'flex';
       $('hud').classList.add('live');
@@ -7561,9 +7631,11 @@ const CMDS = {
     return все.length ? все.join(' · ') : 'налёта пока нет';
   },
   wakeTune: v => setWakeTune(v !== false),
+  smile: мс => licoUlybka(+мс || 1500),
   zachet: who => {
     /* Команда рубке: вес советчика живёт у неё. Без имени — последнему
        совету в очереди: чаще всего его Клод и озвучил. */
+    licoUlybka(1500);                 // зачёт — повод
     engSend({ op: 'zachet', user: who || '' });
     return engConns.length ? 'зачёт передан' : 'рубка не на связи — вес не запишется';
   },
@@ -7689,6 +7761,9 @@ const CMDS = {
   zoneClear: () => { manualZones.length = 0; linkFlash('ручные зоны стёрты'); },
   state: () => ({
     mode, micOn, micMuted, camMuted, twitchOn,
+    /* Плюс читал только twitchOn и во время эфира через мост сказал бы
+       «эфир: нет». efir — правда про эфир, most — каким путём он идёт. */
+    efir: efirIdet(), most: mostOn,
     ptt: pttHeld, prompterAloud, autoBlur, panic, zones: manualZones.length,
     pocket: lockOn,
     entryOpen: !entryLocked,
@@ -8220,10 +8295,19 @@ function makeWinDom(rm){
       });
     }
   }
+  /* КРЕСТИК ПРЯЧЕТ ОКНО, А НЕ КЛАДЁТ ТРУБКУ. Раньше он рвал звонок и
+     удалял камеру целиком — хотел убрать окно с кадра, а выгнал друга, и
+     вернуть было нечего (найдено Александром 21.09). Теперь окно уходит
+     из кадра, звонок живёт; вернуть — долгим нажатием на СВЯЗЬ, там же
+     отдельно «выгнать». Звук друга при этом не трогается — у него свои
+     ручки 🔊, и смешивать два решения в одной кнопке значит повторить
+     ту же ошибку. */
   mkBtn('✕', 'x', () => {
-    try{ if (rm.call) rm.call.close(); }catch(e){}
-    removeRemote(rm.call);
-    showMsg((rm.label || 'Камера') + ': окно убрано');
+    rm.skryt = true;
+    try{ rm.dom.style.display = 'none'; }catch(e){}
+    bb('окно спрятано: ' + (rm.label || 'камера'));
+    showMsg((rm.label || 'Камера') + ': окно спрятано, звонок идёт. '
+          + 'Вернуть — долгое нажатие на СВЯЗЬ.', 6000);
   });
   el.appendChild(wbar);
 
@@ -9233,8 +9317,9 @@ $('btnPerevod').onclick = () => {
 };
 
 $('btnReload').onclick = () => {
-  if (twitchOn && !confirm('Эфир идёт. Перезапустить страницу?')) return;
+  if (efirIdet() && !confirm('Эфир идёт. Перезапустить страницу?')) return;
   try{ if (twitchOn) twitchStop(true); }catch(e){}
+  try{ if (mostOn) mostStop(true); }catch(e){}   // мост прощается, а не обрывается
   try{ remotes.slice().forEach(r => { if (r.call) r.call.close(); }); }catch(e){}
   try{ if (peer) peer.destroy(); }catch(e){}
   bb('перезапуск страницы по кнопке');
@@ -9480,7 +9565,7 @@ setInterval(() => {
       ZVUK.окно.length = 0;
     }
   }
-  const onAir = twitchOn;
+  const onAir = efirIdet();
   const expect = (micOn && !micMuted && !pttHeld) || remotes.some(r => !r.lost) || twTabNode;
   if (onAir && expect && rms < 0.006){
     if (!silentSince) silentSince = Date.now();
@@ -9885,7 +9970,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   wakeAllVideos();   // фон гасит воспроизведение — на возврате оживляем окна друзей
-  if (!wakeLock && (lockOn || linkRole || twitchOn))
+  /* мост тоже эфир: без этого после возврата из фона экран мог
+     погаснуть посреди трансляции, iOS заморозил бы вкладку */
+  if (!wakeLock && (lockOn || linkRole || efirIdet()))
     keepAwake();
   /* Свёрнутый браузер морозит вкладку: связь могла умереть тихо.
      Вернулись — проверяем и, если оборвалось, звоним сами. */
@@ -9908,6 +9995,19 @@ document.addEventListener('visibilitychange', () => {
      вернулся, видишь свою картинку и уверен, что всё идёт, а зрители
      смотрят застывший кадр. Хуже всего, что это молчит.
      Проверяем состояние соединения и говорим правду. */
+  /* Мост: WebSocket вкладки, замороженной iOS, мог тихо умереть. Эфир
+     считает себя живым, а до ноута не доходит ни байта. Вернулись —
+     смотрим гнездо; мёртвое поднимаем заново и говорим вслух. */
+  if (mostOn){
+    setTimeout(() => {
+      if (!mostOn) return;
+      if (!mostWs || mostWs.readyState !== 1){
+        bb('мост: после фона связь мёртвая — поднимаю заново');
+        showMsg('Пока экран был свёрнут, мост отвалился. Поднимаю эфир заново.', 7000);
+        mostRestart();
+      }
+    }, 1200);
+  }
   if (twitchOn){
     setTimeout(() => {
       if (!twitchOn) return;
@@ -10498,6 +10598,78 @@ setInterval(() => {
   b.classList.toggle('on', mostOn);
   b.textContent = mostOn ? '⇄ В ЭФИРЕ' : '⇄ МОСТ';
 }, 1000);
+/* НАЛЁТ: РАЗМЕР И МЕСТО. Слой умел масштаб (koinWin.scale) давно, но
+   добраться до него можно было только командой — пальцем никак. */
+/* КАМЕРЫ: вернуть спрятанное, выгнать, сделать главной. Одно место на
+   всё, что раньше было разбросано по панелям окон. */
+SHTORKI.btnLink = {
+  имя: 'камеры в студии',
+  пункты: () => {
+    const живые = remotes.filter(r => !r.lost || r.skryt);
+    if (!живые.length) return [{ имя: 'камер нет', тек: false, низ: 'поле ещё не дозвонилось' }];
+    const п = [];
+    живые.forEach(r => {
+      const имя = r.label || 'камера';
+      п.push({ имя: (r.skryt ? 'показать · ' : 'спрятать · ') + имя, тек: !r.skryt,
+               низ: r.lost ? 'переподключается' : (r.skryt ? 'окно спрятано, звонок идёт' : 'в кадре') });
+    });
+    живые.forEach(r => {
+      п.push({ имя: 'выгнать · ' + (r.label || 'камера'), тек: false,
+               низ: 'положить трубку — вернётся, только если позвонит снова' });
+    });
+    return п;
+  },
+  выбор: н => {
+    const [дело, имя] = н.split(' · ');
+    const r = remotes.find(x => (x.label || 'камера') === имя);
+    if (!r) return;
+    if (дело === 'показать'){
+      r.skryt = false;
+      try{ r.dom.style.display = ''; if (r.place) r.place(); }catch(e){}
+      bb('окно вернулось: ' + имя);
+    } else if (дело === 'спрятать'){
+      r.skryt = true;
+      try{ r.dom.style.display = 'none'; }catch(e){}
+      bb('окно спрятано: ' + имя);
+    } else if (дело === 'выгнать'){
+      if (!confirm('Положить трубку ' + имя + '? Вернётся, только если позвонит снова.')) return;
+      try{ if (r.call) r.call.close(); }catch(e){}
+      removeRemote(r.call);
+    }
+  }
+};
+shtorkaVesit('btnLink');
+SHTORKI.btnKoin = {
+  имя: 'налёт в кадре',
+  пункты: () => {
+    const виден = layers.has('коины');
+    const р = koinWin.scale;
+    const место = koinWin.nx < 0.5 ? (koinWin.ny < 0.5 ? 'лево верх' : 'лево низ')
+                                   : (koinWin.ny < 0.5 ? 'право верх' : 'право низ');
+    return [
+      { имя: виден ? 'спрятать' : 'показать', тек: false, низ: 'налёт копится и спрятанным' },
+      { имя: 'мелко',   тек: Math.abs(р - 0.7) < 0.05, низ: 'почти незаметно' },
+      { имя: 'обычно',  тек: Math.abs(р - 1)   < 0.05, низ: '' },
+      { имя: 'крупно',  тек: Math.abs(р - 1.5) < 0.05, низ: '' },
+      { имя: 'огромно', тек: Math.abs(р - 2.2) < 0.05, низ: 'для экрана итогов и сотен' },
+      { имя: 'лево верх',  тек: место === 'лево верх',  низ: '' },
+      { имя: 'право верх', тек: место === 'право верх', низ: '' },
+      { имя: 'лево низ',   тек: место === 'лево низ',   низ: '' },
+      { имя: 'право низ',  тек: место === 'право низ',  низ: '' }
+    ];
+  },
+  выбор: н => {
+    const РАЗМЕР = { 'мелко': 0.7, 'обычно': 1, 'крупно': 1.5, 'огромно': 2.2 };
+    const МЕСТО = { 'лево верх': [0.04, 0.12], 'право верх': [0.72, 0.12],
+                    'лево низ': [0.04, 0.93], 'право низ': [0.72, 0.93] };
+    if (н === 'спрятать'){ layers.delete('коины'); return; }
+    if (н === 'показать'){ layers.set('коины', (c, w, h) => drawKoiny(c, w, h)); return; }
+    if (РАЗМЕР[н]) koinWin.scale = РАЗМЕР[н];
+    if (МЕСТО[н]){ koinWin.nx = МЕСТО[н][0]; koinWin.ny = МЕСТО[н][1]; }
+    koinWinSave();
+  }
+};
+shtorkaVesit('btnKoin');
 window.shtorka = id => shtorkaOpen(id);
 
 /* ---------- ЭФИР ЧЕРЕЗ WEBCODECS ----------
