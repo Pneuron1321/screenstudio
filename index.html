@@ -1585,6 +1585,21 @@ function bb(ev){
   if (bb.list.length > 80) bb.list.shift();
 }
 bb.list = [];
+/* ОШИБКИ ВИДНЫ. На телефоне консоли нет, и ReferenceError в обработчике
+   умирал молча — так прожили ra, pickMime и conn (найдены линтером 24.09).
+   Теперь любая необработанная ошибка ложится в чёрный ящик с номером строки
+   html; повтор одной и той же — раз в 50, чтобы не залить ящик. */
+(() => {
+  let last = '', n = 0;
+  const put = t => {
+    if (t === last){ n++; if (n % 50) return; t += ' ×' + n; } else { last = t; n = 1; }
+    bb('⚠ ' + t);
+  };
+  window.addEventListener('error', e => put((e.message || 'ошибка') + ' @' + (e.lineno || '?')));
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason; put('promise: ' + ((r && r.message) || String(r)));
+  });
+})();
 let micMuted = false, camMuted = false;
 let engKey = '', engConns = [];
 const layers = new Map();
@@ -3385,6 +3400,7 @@ function pttDown(){
   pttHeld = true;
   bb('рация: слушаю');
   if (earOn && earMode === 'idle') earCapture('ptt');   // зажал — говори без «рут код»
+  else if (!earOn) linkFlash('ухо студии спит — рацию слышит только ухо ноута (/sluh)');
   ensureMicChain();
   applyMicGate();
   $('btnPtt').classList.add('on');
@@ -3399,6 +3415,9 @@ function pttUp(){
   $('btnPtt').classList.remove('on');
   $('pttHud').style.display = 'none';
   engSend({ op: 'ptt', down: false });
+  /* Отпустил — фраза кончилась. Короткий хвост: последнее слово
+     распознавание отдаёт с опозданием, резать сразу — терять его. */
+  if (earMode === 'capture' && earSrc === 'ptt') earBump(900);
 }
 function setPrompterAloud(v){
   prompterAloud = !!v;
@@ -6135,7 +6154,7 @@ function earCapture(src){
   beep('on');                        // услышал: можно говорить
   linkFlash('слушаю…');
   clearTimeout(earHard);
-  earHard = setTimeout(earFinish, 9000);
+  earHard = setTimeout(earFinish, src === 'ptt' ? 30000 : 9000);   // рацию держат дольше
 }
 function earFinish(){
   if (earMode !== 'capture') return;
@@ -6143,11 +6162,16 @@ function earFinish(){
   const t = earNorm(earBuf), src = earSrc;
   earMode = 'idle'; earSrc = ''; earBuf = '';
   if (src === 'wake' && !earWasGate) CMDS.micGate(false);   // гейт ДО команды
-  if (!t) return;
+  if (!t){ if (src === 'ptt') linkFlash('рация: не расслышал'); return; }
   earRoute(t, src);
 }
 function earBump(ms){
   clearTimeout(earQuiet);
+  /* РАЦИЯ ЗАЖАТА — ФРАЗА НЕ КОНЧИЛАСЬ. Раньше пауза 0.7 с посреди фразы
+     обрывала захват, и в рубку уходил обрубок, пока кнопка ещё зажата;
+     а отпускание не завершало ничего — ухо ждало до 9 с. Теперь конец
+     фразы — это отпускание (pttUp), а не тишина. */
+  if (earSrc === 'ptt' && pttHeld) return;
   earQuiet = setTimeout(earFinish, ms || 1200);
 }
 function setEar(v){
@@ -7212,6 +7236,9 @@ function mostMime(){
   }
   return '';
 }
+/* pickMime звали кольцо клипов, «инфо» и проверка — а определения не было:
+   кольцо падало на первом же clipNewRec. Один выбор формата на всю студию. */
+function pickMime(){ return mostMime(); }
 /* ОЧЕРЕДЬ — ЭТО ЗАДЕРЖКА. Растущий bufferedAmount значит, что сеть не
    увозит то, что мы кодируем: 2 МБ — сказать вслух, 12 МБ — эфир врёт
    про «сейчас», и честнее остановиться, чем показывать прошлое. */
@@ -7845,14 +7872,7 @@ function handleEngMsg(raw){
        написано), а студия их не принимала вовсе. Команды шли только в одну
        сторону, и нажатие НАЛЕГКЕ или КАРМАН на телефоне оставалось
        невидимым: режиссёр не знал, почему камера вдруг замерла чёрной. */
-    const кто = (remotes.find(r => r.call && r.call.peer === conn.peer) || {}).label
-                || 'поле';
-    const что = (m.op === 'lite')
-      ? (m.on ? 'ушло НАЛЕГКЕ — экран чёрный, камера и голос живы'
-              : 'вернулось из налегке')
-      : (m.on ? 'заперло карман — касания не проходят' : 'открыло карман');
-    linkFlash(кто + ': ' + что);
-    bb('поле ' + m.op + ': ' + (m.on ? 'вкл' : 'выкл'));
+    poleSelf(null, m);   // обычно сюда не доходит: поле ходит ролью program (onDataConn)
   } else if (m.op === 'moment'){
     momentCatch(m.kind || 'чат', m.note);   // рубка увидела вспышку чата
   } else if (m.op === 'earText'){
@@ -7877,6 +7897,18 @@ function handleEngMsg(raw){
 }
 /* входящие дата-каналы: инженер (по ключу) или ПРОГРАММА (друг хочет видеть сборку).
    Программа — тот же уровень доверия, что и отдача камеры: достаточно кода эфира. */
+/* ОТВЕТ ПОЛЯ О СЕБЕ (налегке / карман). Поле подключается ролью program,
+   поэтому принимать надо там, где живёт его conn, а не в handleEngMsg. */
+function poleSelf(conn, m){
+    const кто = (remotes.find(r => r.call && conn && r.call.peer === conn.peer) || {}).label
+                || 'поле';
+    const что = (m.op === 'lite')
+      ? (m.on ? 'ушло НАЛЕГКЕ — экран чёрный, камера и голос живы'
+              : 'вернулось из налегке')
+      : (m.on ? 'заперло карман — касания не проходят' : 'открыло карман');
+    linkFlash(кто + ': ' + что);
+    bb('поле ' + m.op + ': ' + (m.on ? 'вкл' : 'выкл'));
+}
 function onDataConn(conn){
   const md = conn.metadata || {};
   if (md.role === 'pult'){
@@ -7916,10 +7948,11 @@ function onDataConn(conn){
     conn.on('data', d => {
       if (!d) return;
       const who0 = (md.name || '').slice(0, 16);
-      if (trusted && (d.op === 'cmd' || d.op === 'ptt' || d.op === 'voice')){
+      if (trusted && (d.op === 'cmd' || d.op === 'ptt' || d.op === 'voice' || d.op === 'earText')){
         handleEngMsg(d);                 // те же команды, что у рубки и пульта
         return;
       }
+      if (d.op === 'lite' || d.op === 'poleLock'){ poleSelf(conn, d); return; }
       if (d.op === 'bye'){
         /* камера ушла сама — не обрыв: убираем окно сразу, а не морозим */
         const gone = remotes.find(r => r.call && r.call.peer === conn.peer);
@@ -8453,7 +8486,7 @@ function addRemote(call, s){
   if (dashOn || mapMode === 'mini') setTimeout(tidyLayout, 300);   // не налезть на приборы
   bb('камера вошла: ' + (rm.label || '—') + ' · видео ' +
      (s.getVideoTracks().length ? 'есть' : 'НЕТ') + ', звук ' +
-     (ra.length ? 'есть' : 'НЕТ'));
+     (s.getAudioTracks().length ? 'есть' : 'НЕТ'));
   /* через секунду проверяем, реально ли пошли кадры — видно в чёрном ящике */
   setTimeout(() => {
     if (!rm.lost) bb('поток ' + (rm.label || '—') + ': ' +
@@ -9561,7 +9594,8 @@ setInterval(() => {
     if (п){
       engSend({ op: 'zvuk', slovo: п.слово, sredn: +п.средн.toFixed(3),
                 tiho: +п.тихо.toFixed(2), vspl: п.всплесков,
-                rvano: +п.рвано.toFixed(2) });
+                rvano: +п.рвано.toFixed(2),
+                efir: !!(twitchOn || mostOn) });   // дежурному: идёт ли эфир на самом деле
       ZVUK.окно.length = 0;
     }
   }
