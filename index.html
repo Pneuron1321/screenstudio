@@ -8300,9 +8300,12 @@ function parAsk(){
 function rubkaKick(){
   clearTimeout(rubkaTimer);
   rubkaFast = true;
-  parRefresh(true);
-  if (rubkaWs && rubkaWs.readyState === 1){ try{ rubkaWs.close(); }catch(e){} }
-  else if (!rubkaWs) tryLocalRubka();
+  /* звоним ПОСЛЕ того, как ящик ответил: иначе первый звонок уйдёт по
+     старому адресу (или в 127.0.0.1, который Safari режет сразу) */
+  parRefresh(true).then(() => {
+    if (rubkaWs && rubkaWs.readyState === 1){ try{ rubkaWs.close(); }catch(e){} }
+    else if (!rubkaWs) tryLocalRubka();
+  });
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden){ hiddenAt = Date.now(); return; }
@@ -8317,7 +8320,12 @@ function tryLocalRubka(){
   try{ adres = localStorage.getItem('skrin-rubka') || ''; }catch(e){}
   let w;
   try{ w = new WebSocket(adres || 'ws://127.0.0.1:8787/studio'); }
-  catch(e){ return; } // https+Safari режет ws к loopback — не колотимся зря
+  catch(e){
+    /* https+Safari режет ws к loopback сразу, без onclose — раньше на этом
+       попытки кончались навсегда. Есть код связи — ждём адрес из ящика. */
+    if (parCode){ clearTimeout(rubkaTimer); rubkaTimer = setTimeout(() => { parRefresh(); tryLocalRubka(); }, 5000); }
+    return;
+  }
   rubkaWs = w;
   w.onopen = () => {
     rubkaConn = { send: s => w.send(s) };
