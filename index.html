@@ -970,7 +970,8 @@
 (() => {
   try{
     const h = new URLSearchParams((location.hash || '').slice(1));
-    const r = h.get('rubka'), m = h.get('most');
+    const r = h.get('rubka'), m = h.get('most'), par = h.get('par');
+    if (par && /^[a-z2-9]{8}$/.test(par)) localStorage.setItem('skrin-par', par);
     if (r && /^wss?:\/\//i.test(r)) localStorage.setItem('skrin-rubka', r);
     if (m && /^(wss?|https?):\/\//i.test(m)) localStorage.setItem('skrin-most', m);
     if ((r || m) && !h.get('krug')) history.replaceState(null, '', location.pathname + location.search);
@@ -3430,6 +3431,7 @@ function pttDown(){
   if (pttHeld) return;
   pttHeld = true;
   bb('рация: слушаю');
+  if (!engConns.length && parCode) rubkaKick();   // пока говоришь — успеет переподключиться
   if (earOn && earMode === 'idle') earCapture('ptt');   // зажал — говори без «рут код»
   else if (!earOn) linkFlash('ухо студии спит — рацию слышит только ухо ноута (/sluh)');
   ensureMicChain();
@@ -3451,6 +3453,7 @@ function pttUp(){
   /* Отпустил — фраза кончилась. Короткий хвост: последнее слово
      распознавание отдаёт с опозданием, резать сразу — терять его. */
   if (earMode === 'capture' && earSrc === 'ptt') earBump(900);
+  if (!engConns.length && !parCode) setTimeout(parAsk, 50);   // связи нет и кода нет — спросим один раз
 }
 function setPrompterAloud(v){
   prompterAloud = !!v;
@@ -8245,6 +8248,68 @@ function acceptEngineer(conn){
   conn.on('close', () => { engConns = engConns.filter(c => c !== conn); linkFlash('рубка отключилась'); });
   linkFlash('РУБКА НА СВЯЗИ — Claude у пульта');
 }
+/* ---------- СВЯЗЬ С НОУТОМ БЕЗ QR (25.09.26) ----------
+   QR открывается в Safari, а приложение с экрана «Домой» — отдельный мир:
+   своё хранилище, ссылкой в него не попасть. Поэтому рубка сама кладёт
+   свежие адреса туннелей в ящик ntfy.sh под кодом связи, а студия забирает
+   их при старте, при каждом обрыве и после возврата из фона. Код вводится
+   один раз (он же приходит с QR). Цена: зависимость от ntfy.sh; кто знает
+   код — узнает адрес рубки, поэтому код в 8 знаков и не светится в кадре. */
+let parCode = '';
+try{ parCode = localStorage.getItem('skrin-par') || ''; }catch(e){}
+let parLast = 0, rubkaFast = false, hiddenAt = 0;
+async function parRefresh(force){
+  if (!parCode) return false;
+  if (!force && Date.now() - parLast < 10000) return false;
+  parLast = Date.now();
+  try{
+    const r = await fetch('https://ntfy.sh/skrin-par-' + encodeURIComponent(parCode)
+                          + '/json?poll=1&since=12h', { cache: 'no-store' });
+    const lines = (await r.text()).trim().split('\n').filter(Boolean);
+    for (let i = lines.length - 1; i >= 0; i--){
+      let m, d;
+      try{ m = JSON.parse(lines[i]); }catch(e){ continue; }
+      if (m.event !== 'message') continue;
+      try{ d = JSON.parse(m.message); }catch(e){ continue; }
+      let changed = false;
+      if (d.rubka && /^wss?:\/\//i.test(d.rubka)
+          && (localStorage.getItem('skrin-rubka') || '') !== d.rubka){
+        localStorage.setItem('skrin-rubka', d.rubka);
+        changed = true;
+      }
+      if (d.most && /^(wss?|https?):\/\//i.test(d.most) && d.most !== mostAddr){
+        mostAddr = d.most;
+        try{ localStorage.setItem('skrin-most', mostAddr); }catch(e){}
+      }
+      if (changed) bb('связь: свежие адреса с ноута');
+      return changed;
+    }
+  }catch(e){ bb('связь: ящик ntfy молчит — ' + (e.message || e)); }
+  return false;
+}
+function parAsk(){
+  const k = (prompt('Рубка не на связи.\nКод связи с ноутом — 8 знаков, он в окне рубки (вводится один раз):') || '')
+            .trim().toLowerCase();
+  if (!/^[a-z2-9]{8}$/.test(k)){ if (k) linkFlash('код связи — 8 знаков, как в окне рубки'); return; }
+  parCode = k;
+  try{ localStorage.setItem('skrin-par', k); }catch(e){}
+  rubkaKick();
+}
+/* ПИНОК: после сна iOS сокет мог умереть молча и числиться открытым —
+   закрываем и звоним заново сразу, не ожидая 4 с. */
+function rubkaKick(){
+  clearTimeout(rubkaTimer);
+  rubkaFast = true;
+  parRefresh(true);
+  if (rubkaWs && rubkaWs.readyState === 1){ try{ rubkaWs.close(); }catch(e){} }
+  else if (!rubkaWs) tryLocalRubka();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden){ hiddenAt = Date.now(); return; }
+  const dolgo = hiddenAt && Date.now() - hiddenAt > 8000;
+  hiddenAt = 0;
+  if (running && dolgo) rubkaKick();
+});
 function tryLocalRubka(){
   if (rubkaWs && (rubkaWs.readyState === 0 || rubkaWs.readyState === 1)) return; // уже стучимся/на связи
   /* адрес из QR — рубка через туннель; иначе рубка на этом же ноуте */
@@ -8271,7 +8336,9 @@ function tryLocalRubka(){
     }
     rubkaWs = null;
     clearTimeout(rubkaTimer);
-    rubkaTimer = setTimeout(tryLocalRubka, 4000); // тихо стучимся, пока рубку не поднимут
+    parRefresh();                                  // может, у ноута уже новые туннели
+    rubkaTimer = setTimeout(tryLocalRubka, rubkaFast ? 400 : 4000); // тихо стучимся, пока рубку не поднимут
+    rubkaFast = false;
   };
 }
 
@@ -10036,6 +10103,7 @@ $('btnStart').onclick = async () => {
   running = true;
   setMode('studio');
   ensureBus();          // аудио-шина с первого жеста — iOS доволен
+  parRefresh(true).then(ch => { if (ch) rubkaKick(); });
   tryLocalRubka();
   frame();
 };
