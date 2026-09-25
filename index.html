@@ -963,6 +963,19 @@
 <div id="fokus"></div>
 <script>
 'use strict';
+/* АДРЕСА ИЗ QR (25.09.26). Рубка на ноуте показывает QR: студия
+   открывается с #rubka=wss://…/studio?k=…&most=https://…/efir/ws.
+   Запоминаем до того, как ниже прочтётся адрес моста, и стираем из
+   адресной строки, чтобы ключ рубки не висел на виду. */
+(() => {
+  try{
+    const h = new URLSearchParams((location.hash || '').slice(1));
+    const r = h.get('rubka'), m = h.get('most');
+    if (r && /^wss?:\/\//i.test(r)) localStorage.setItem('skrin-rubka', r);
+    if (m && /^(wss?|https?):\/\//i.test(m)) localStorage.setItem('skrin-most', m);
+    if ((r || m) && !h.get('krug')) history.replaceState(null, '', location.pathname + location.search);
+  }catch(e){}
+})();
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const prev = document.createElement('canvas'), pctx = prev.getContext('2d');
@@ -8234,15 +8247,18 @@ function acceptEngineer(conn){
 }
 function tryLocalRubka(){
   if (rubkaWs && (rubkaWs.readyState === 0 || rubkaWs.readyState === 1)) return; // уже стучимся/на связи
+  /* адрес из QR — рубка через туннель; иначе рубка на этом же ноуте */
+  let adres = '';
+  try{ adres = localStorage.getItem('skrin-rubka') || ''; }catch(e){}
   let w;
-  try{ w = new WebSocket('ws://127.0.0.1:8787/studio'); }
+  try{ w = new WebSocket(adres || 'ws://127.0.0.1:8787/studio'); }
   catch(e){ return; } // https+Safari режет ws к loopback — не колотимся зря
   rubkaWs = w;
   w.onopen = () => {
     rubkaConn = { send: s => w.send(s) };
     engConns.push(rubkaConn);
-    bb('рубка: на связи');
-    linkFlash('рубка на связи (localhost)');
+    bb('рубка: на связи' + (adres ? ' через туннель' : ''));
+    linkFlash('рубка на связи (' + (adres ? 'туннель' : 'localhost') + ')');
   };
   w.onmessage = e => handleEngMsg(e.data);
   w.onerror = () => {};
