@@ -3208,7 +3208,9 @@ function ensureBus(){
   /* talkback: голос режиссёра уходит друзьям отдельной дорожкой —
      не вся шина, иначе друг слышал бы сам себя эхом */
   const talk = audioCtx.createMediaStreamDestination();
-  bus = { master, delay, dest, monitor, an, talk };
+  /* ухо отдельной дорожкой — для зрителя vrslink: голос Плюса «только мне» */
+  const ear = audioCtx.createMediaStreamDestination();
+  bus = { master, delay, dest, monitor, an, talk, ear };
   return bus;
 }
 function busTrack(){ return ensureBus().dest.stream.getAudioTracks()[0]; }
@@ -3404,7 +3406,7 @@ async function playEngineerAudio(m){
     const s = audioCtx.createBufferSource();
     s.buffer = ab;
     if (m.aloud){ s.connect(bus.master); s.connect(bus.monitor); }
-    else s.connect(audioCtx.destination);
+    else { s.connect(audioCtx.destination); if (bus && bus.ear) s.connect(bus.ear); }
     s.start();
     engSend({ op: 'result', of: 'audio',
       result: 'играю ' + ab.duration.toFixed(1) + ' с ' + (m.aloud ? 'в эфир' : 'в ухо') });
@@ -7946,8 +7948,75 @@ function poleSelf(conn, m){
     linkFlash(кто + ': ' + что);
     bb('поле ' + m.op + ': ' + (m.on ? 'вкл' : 'выкл'));
 }
+/* ---------- ЗРИТЕЛЬ: vrslink (26.09.26) ----------
+   Шлем открывает vrslink и видит программу целиком — композит и звук
+   эфира — не становясь камерой. Задумано как ЗАМЕНА выхода в мост, а не
+   добавка: на Twitch стримит шлем (BeamXR), телефон кодирует один раз, как
+   и раньше. Мост и зритель разом греют телефон вдвое — предупреждаем.
+   Второй вызов несёт голос Плюса «в ухо» отдельно: шлем сам решает, пускать
+   ли его в динамики — BeamXR услышит всё, что звучит в шлеме.
+   Вход — по коду связи (тот же, что у рубки) или по ключу рубки с экрана. */
+let zritelConns = [];
+function zritelAccept(conn, md){
+  const okPar = !!parCode && md.par === parCode;
+  const okKey = !!engKey && md.key === engKey;
+  if (!okPar && !okKey){
+    const net = () => {
+      try{ conn.send({ op: 'zritel-net', why: 'код связи не тот' }); }catch(e){}
+      setTimeout(() => { try{ conn.close(); }catch(e){} }, 400);
+    };
+    if (conn.open) net(); else conn.on('open', net);
+    bb('зритель без кода — не пустил');
+    return;
+  }
+  zritelConns.push(conn);
+  const cs = out.captureStream(FPS_LEVELS[perf.level] || 24);
+  const main = new MediaStream([cs.getVideoTracks()[0], busTrack()]);
+  const calls = [];
+  const tune = c => setTimeout(() => {
+    try{
+      const snd = c.peerConnection.getSenders().find(x => x.track && x.track.kind === 'video');
+      if (!snd) return;
+      const p = snd.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = kachKbps() * 1000;
+      p.degradationPreference = 'maintain-resolution';
+      snd.setParameters(p).catch(() => {});
+    }catch(e){}
+  }, 1500);
+  const zvonok = () => {
+    try{
+      const c1 = peer.call(conn.peer, main, { metadata: { kind: 'efir' } });
+      calls.push(c1); tune(c1);
+      const et = ensureBus().ear.stream.getAudioTracks()[0];
+      if (et) calls.push(peer.call(conn.peer, new MediaStream([et]), { metadata: { kind: 'uho' } }));
+      try{ conn.send({ op: 'zritel-da', room: linkCode }); }catch(e){}
+    }catch(e){ bb('зритель: звонок не ушёл — ' + (e.message || e)); }
+  };
+  if (conn.open) zvonok(); else conn.on('open', zvonok);
+  /* УХО ИЗ ШЛЕМА. В очках до рации телефона не дотянуться, а его микрофон
+     в паре метров. vrslink сам распознаёт речь и шлёт текст — разбираем
+     тем же путём, что ухо поля. Доверие уже проверено кодом связи. */
+  conn.on('data', d => {
+    if (!d || d.op !== 'earText') return;
+    const t = String(d.text || '').trim().slice(0, 300);
+    if (!t) return;
+    linkFlash('🎙 шлем: ' + t);
+    bb('ухо шлема: «' + t + '»');
+    earRoute(earNorm(t), 'шлем');
+  });
+  linkFlash('👓 зритель vrslink на связи' + (efirIdet() ? ' — мост тоже идёт: два выхода греют телефон вдвое' : ''));
+  bb('зритель vrslink: ' + (md.name || conn.peer));
+  conn.on('close', () => {
+    zritelConns = zritelConns.filter(c => c !== conn);
+    calls.forEach(c => { try{ c.close(); }catch(e){} });
+    try{ cs.getVideoTracks().forEach(t => t.stop()); }catch(e){}
+    linkFlash('👓 зритель ушёл');
+  });
+}
 function onDataConn(conn){
   const md = conn.metadata || {};
+  if (md.role === 'zritel'){ zritelAccept(conn, md); return; }
   if (md.role === 'pult'){
     /* Пульт может всё, поэтому пускаем только своих: либо знает ключ рубки,
        либо пришёл по комнате с паролем (её адрес без пароля не вычислить). */
@@ -8271,6 +8340,7 @@ async function parRefresh(force){
       try{ m = JSON.parse(lines[i]); }catch(e){ continue; }
       if (m.event !== 'message') continue;
       try{ d = JSON.parse(m.message); }catch(e){ continue; }
+      if (!d.rubka && !d.most) continue;           // это не адреса (например, комната для vrslink)
       let changed = false;
       if (d.rubka && /^wss?:\/\//i.test(d.rubka)
           && (localStorage.getItem('skrin-rubka') || '') !== d.rubka){
@@ -8287,6 +8357,14 @@ async function parRefresh(force){
   }catch(e){ bb('связь: ящик ntfy молчит — ' + (e.message || e)); }
   return false;
 }
+/* КОМНАТА ДЛЯ ШЛЕМА. vrslink на Quest не знает кода комнаты — студия
+   кладёт его в тот же ящик по коду связи. */
+function parRoom(){
+  if (!parCode || !linkCode || linkRole !== 'director') return;
+  fetch('https://ntfy.sh/skrin-par-' + encodeURIComponent(parCode), {
+    method: 'POST', body: JSON.stringify({ room: linkCode, t: Date.now() })
+  }).catch(() => {});
+}
 function parAsk(){
   const k = (prompt('Рубка не на связи.\nКод связи с ноутом — 8 знаков, он в окне рубки (вводится один раз):') || '')
             .trim().toLowerCase();
@@ -8294,6 +8372,7 @@ function parAsk(){
   parCode = k;
   try{ localStorage.setItem('skrin-par', k); }catch(e){}
   rubkaKick();
+  parRoom();
 }
 /* ПИНОК: после сна iOS сокет мог умереть молча и числиться открытым —
    закрываем и звоним заново сразу, не ожидая 4 с. */
@@ -8331,6 +8410,13 @@ function tryLocalRubka(){
     rubkaConn = { send: s => w.send(s) };
     engConns.push(rubkaConn);
     bb('рубка: на связи' + (adres ? ' через туннель' : ''));
+    /* ТУМБЛЕРЫ — С ПОРОГА. Дежурный берёт соведущего из журнала, а студия
+       после перезагрузки начинает с «выкл»: 25.09 Плюс полез в эфир, студия
+       отказала. Теперь при каждом подключении студия сама говорит, как есть. */
+    try{
+      w.send(JSON.stringify({ op: 'note', data: 'cohost:' + (cohostOn ? 'on' : 'off') }));
+      if (naedine) w.send(JSON.stringify({ op: 'note', data: 'naedine:on' }));
+    }catch(e){}
     linkFlash('рубка на связи (' + (adres ? 'туннель' : 'localhost') + ')');
   };
   w.onmessage = e => handleEngMsg(e.data);
@@ -8690,6 +8776,7 @@ function startDirector(keep){
   keepAwake();
   engKey = makeCode() + makeCode().slice(0, 2);
   $('engLine').textContent = 'ключ рубки: ' + engKey;
+  parRoom();
   peer.on('call', onIncomingCall);
   peer.on('connection', onDataConn);
   tryLocalRubka();
