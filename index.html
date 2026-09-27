@@ -3372,12 +3372,36 @@ let golosUha = 'ava';
 try{ golosUha = localStorage.getItem('skrin-golos-uha') || 'ava'; }catch(e){}
 const frazaBuf = {};
 let frazaCep = Promise.resolve();
+/* ПАКЕТ ОДНИМ ФАЙЛОМ. С айфона на GitHub папку не залить — только файлы.
+   Поэтому все фразы голоса лежат в одном golos-uha-ava.json (mp3 в base64)
+   рядом со студией; грузится один раз, дальше всё из памяти. Нет пакета —
+   пробуем папку golos-uha/ГОЛОС/fNNN.mp3 (если её зальют с ноута). */
+const frazaPak = {};
+async function frazaPakZagr(v){
+  if (v in frazaPak) return frazaPak[v];
+  frazaPak[v] = null;
+  try{
+    const r = await fetch('golos-uha-' + v + '.json');
+    if (r.ok) frazaPak[v] = await r.json();
+  }catch(e){}
+  return frazaPak[v];
+}
 async function frazaBufer(f){
   const k = golosUha + '/' + f;
   if (frazaBuf[k]) return frazaBuf[k];
-  const r = await fetch('golos-uha/' + k + '.mp3');
-  if (!r.ok) throw new Error('нет файла ' + k);
-  frazaBuf[k] = await audioCtx.decodeAudioData(await r.arrayBuffer());
+  const pak = await frazaPakZagr(golosUha);
+  let bytes;
+  if (pak && pak[f]){
+    const bin = atob(pak[f]);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    bytes = u.buffer;
+  } else {
+    const r = await fetch('golos-uha/' + k + '.mp3');
+    if (!r.ok) throw new Error('нет ни golos-uha-' + golosUha + '.json, ни файла ' + k);
+    bytes = await r.arrayBuffer();
+  }
+  frazaBuf[k] = await audioCtx.decodeAudioData(bytes);
   return frazaBuf[k];
 }
 function speakEar(text){
