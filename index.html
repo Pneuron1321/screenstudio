@@ -3359,8 +3359,63 @@ function beep(kind){
     }
   }catch(e){}
 }
-/* голос в ухо: системный TTS телефона — в эфирный микс НЕ входит */
+/* ---------- ЖИВОЙ ГОЛОС УХА (26.09.26) ----------
+   Системный синтез айфона звучит роботом, а ровно эти фразы звучат чаще
+   всего — и именно тогда, когда рубки нет («рубка не на связи…»), так что
+   Плюсом их не озвучить. Поэтому постоянные фразы студии заранее записаны
+   голосами Ава и Светлана (mp3 рядом со студией, папка golos-uha/) и играются
+   с телефона — живо и без сети до ноута. Фраза не из списка (имена, числа,
+   текст от рубки) — системный голос, но лучший из установленных на айфоне.
+   Выбор: CMDS.golosUha('ava' | 'svetlana' | 'sistema'). */
+const FRAZY_UHA = {"блюр включён": "f001", "блюр снят": "f002", "главный экран": "f003", "глухо": "f004", "говори слово, слушаю": "f005", "дверь доната открыта": "f006", "дверь закрыта": "f007", "есть": "f008", "запись пошла": "f009", "зачёт залу": "f010", "звук вернулся": "f011", "итоги убраны": "f012", "итоги эфира": "f013", "ищу в памяти": "f014", "карман заперт": "f015", "карман поля заперт": "f016", "карман поля открыт": "f017", "карта": "f018", "карта убрана": "f019", "картинка": "f020", "клип режется": "f021", "кольцо крутится": "f022", "кольцо остановлено": "f023", "ловец на посту": "f024", "ловец спит": "f025", "мини карта": "f026", "молчу": "f027", "момент отмечен": "f028", "момент — скажи клип": "f029", "наедине": "f030", "налёт": "f031", "наушники": "f032", "наушники выключены": "f033", "не вышло": "f034", "обычный фон": "f035", "опрос пошёл": "f036", "отметил": "f037", "память": "f038", "память пишет всё": "f039", "память пишет эфир": "f040", "память спит": "f041", "пауза": "f042", "перевод выключен": "f043", "перевожу": "f044", "передал Клоду": "f045", "передал рубке": "f046", "по-русски": "f047", "поговорим": "f048", "поле в полном режиме": "f049", "поле налегке": "f050", "приборы": "f051", "приборы убраны": "f052", "разбираю эфир": "f053", "разложил": "f054", "рубка не на связи": "f055", "рубка не на связи — память живёт на ноуте": "f056", "рубка не на связи — разбор живёт на ноуте": "f057", "рубка не на связи — разогрев живёт на ноуте": "f058", "рубка не на связи — цели некому считать": "f059", "сайт в кадре": "f060", "скрин снят": "f061", "слово настроено": "f062", "слушаю слово": "f063", "снова в эфире": "f064", "снято": "f065", "собираю разогрев": "f066", "титр стоит": "f067", "тихо": "f068", "удары включены": "f069", "удары выключены": "f070", "удары ещё не записаны — играю заглушки": "f071", "ухо закрыто": "f072", "ухо слушает": "f073", "ясно": "f074"};
+let golosUha = 'ava';
+try{ golosUha = localStorage.getItem('skrin-golos-uha') || 'ava'; }catch(e){}
+const frazaBuf = {};
+let frazaCep = Promise.resolve();
+async function frazaBufer(f){
+  const k = golosUha + '/' + f;
+  if (frazaBuf[k]) return frazaBuf[k];
+  const r = await fetch('golos-uha/' + k + '.mp3');
+  if (!r.ok) throw new Error('нет файла ' + k);
+  frazaBuf[k] = await audioCtx.decodeAudioData(await r.arrayBuffer());
+  return frazaBuf[k];
+}
 function speakEar(text){
+  const s = String(text || '').trim();
+  if (!s) return;
+  const f = FRAZY_UHA[s];
+  if (!f || golosUha === 'sistema' || !audioCtx) return sistemaSay(s);
+  /* очередь: фразы не перебивают друг друга; нет файла — системный голос */
+  frazaCep = frazaCep.then(() => frazaBufer(f)).then(ab => new Promise(res => {
+    const src = audioCtx.createBufferSource();
+    src.buffer = ab;
+    src.connect(audioCtx.destination);
+    if (bus && bus.ear) src.connect(bus.ear);   // и в шлем (vrslink), если он слушает ухо
+    src.onended = res;
+    src.start();
+    setTimeout(res, (ab.duration + 1) * 1000);  // страховка, если onended не придёт
+  })).catch(e => { bb('голос уха: ' + (e.message || e) + ' — системный'); sistemaSay(s); });
+}
+/* лучший установленный системный голос: Premium > Enhanced > обычный */
+let luchshiy = {};
+function luchshiyGolos(lang){
+  if (luchshiy[lang] !== undefined) return luchshiy[lang];
+  let best = null, bestS = -1;
+  try{
+    speechSynthesis.getVoices().forEach(v => {
+      if (!String(v.lang || '').replace('_', '-').toLowerCase().startsWith(lang.slice(0, 2))) return;
+      const n = String(v.name || '');
+      const sc = (/premium|премиум/i.test(n) ? 3 : 0) + (/enhanced|улучш/i.test(n) ? 2 : 0)
+               + (String(v.lang).replace('_', '-') === lang ? 1 : 0);
+      if (sc > bestS){ best = v; bestS = sc; }
+    });
+  }catch(e){}
+  if (best) luchshiy[lang] = best;
+  return best;
+}
+try{ speechSynthesis.addEventListener('voiceschanged', () => { luchshiy = {}; }); }catch(e){}
+/* голос в ухо: системный TTS телефона — в эфирный микс НЕ входит */
+function sistemaSay(text){
   try{
     /* ХРИП. 21.08, живой запуск: голос разогрева хрипел. Причина не в
        голосе — в конкуренции: синтез речи на телефоне делит процессор с
@@ -3385,6 +3440,8 @@ function speakEar(text){
     (куски.length ? куски : [s]).forEach(кусок => {
       const u = new SpeechSynthesisUtterance(кусок);
       u.lang = язык;
+      const lg = luchshiyGolos(язык);
+      if (lg) u.voice = lg;
       u.rate = 0.98;
       speechSynthesis.speak(u);
     });
@@ -7572,6 +7629,13 @@ const CMDS = {
             : (typeof v === 'string' && /^(wss?|https?):\/\//i.test(v) ? window.мост(v)
             : mostStart()))),
   montage: v => setProj(!!v),
+  golosUha: v => {
+    if (!['ava', 'svetlana', 'sistema'].includes(v)) return 'ava | svetlana | sistema — сейчас ' + golosUha;
+    golosUha = v;
+    try{ localStorage.setItem('skrin-golos-uha', v); }catch(e){}
+    speakEar('ухо слушает');
+    return 'голос уха: ' + v;
+  },
   layoutLock: v => setProjLock(!!v),
   layoutTidy: () => projTidy(),
   /* удалённая расстановка: пульт двигает элемент по имени */
